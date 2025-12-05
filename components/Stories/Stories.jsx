@@ -1,0 +1,143 @@
+import React from 'react'
+import { View, ScrollView, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import StoryCircle from './StoryCircle'
+import { hp, wp } from '../../helpers/common'
+import theme from '../../constants/theme'
+import { useStoriesContext } from '../../contexts/StoriesContext'
+
+export default function Stories({
+  forumId,
+  onCreateStory,
+  onViewStory,
+  showCreateButton = true,
+  currentUserId,
+}) {
+  const { getForumStories, hasViewedStory } = useStoriesContext()
+
+  // Group stories by user
+  const rawStories = getForumStories(forumId)
+  const groupedStories = {}
+  rawStories.forEach((story) => {
+    if (!groupedStories[story.userId]) {
+      groupedStories[story.userId] = {
+        id: story.userId,
+        userId: story.userId,
+        name: story.userName,
+        thumbnail: story.userAvatar,
+        segments: [],
+        hasUnviewed: false,
+      }
+    }
+    groupedStories[story.userId].segments.push(story)
+    if (!hasViewedStory(story.id)) {
+      groupedStories[story.userId].hasUnviewed = true
+    }
+  })
+
+  const stories = Object.values(groupedStories)
+
+  // Sort: User's own stories first, then unviewed, then viewed
+  const sortedStories = stories.sort((a, b) => {
+    if (a.userId === currentUserId) return -1
+    if (b.userId === currentUserId) return 1
+    if (a.hasUnviewed && !b.hasUnviewed) return -1
+    if (!a.hasUnviewed && b.hasUnviewed) return 1
+    return 0
+  })
+
+  // Always show if there's a create button, even if no stories
+  if (sortedStories.length === 0 && !showCreateButton) {
+    return null
+  }
+
+  return (
+    <View style={styles.wrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.container}
+        style={styles.scrollView}
+      >
+        {showCreateButton && (
+          <TouchableOpacity
+            style={styles.createStoryItem}
+            activeOpacity={0.8}
+            onPress={onCreateStory}
+          >
+            <View style={styles.createStoryCircle}>
+              <View style={styles.createStoryInner}>
+                <Ionicons name="add" size={hp(3.5)} color={theme.colors.bondedPurple} />
+              </View>
+            </View>
+            <Text style={styles.createStoryLabel} numberOfLines={1}>
+              Your Story
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {sortedStories.length > 0 &&
+          sortedStories.map((story) => (
+            <StoryCircle
+              key={story.id}
+              story={story}
+              onPress={() => onViewStory(story)}
+              isOwn={story.userId === currentUserId}
+            />
+          ))}
+      </ScrollView>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  wrapper: {
+    backgroundColor: theme.colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    width: '100%',
+    paddingVertical: hp(1.5),
+  },
+  scrollView: {
+    flexGrow: 0,
+  },
+  container: {
+    paddingHorizontal: wp(4),
+    paddingRight: wp(6),
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  createStoryItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(4),
+  },
+  createStoryCircle: {
+    width: hp(8),
+    height: hp(8),
+    borderRadius: hp(4),
+    backgroundColor: theme.colors.white,
+    borderWidth: 3,
+    borderColor: theme.colors.bondedPurple,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(1),
+  },
+  createStoryInner: {
+    width: hp(7),
+    height: hp(7),
+    borderRadius: hp(3.5),
+    backgroundColor: theme.colors.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createStoryLabel: {
+    fontSize: hp(1.5),
+    color: theme.colors.charcoal,
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    maxWidth: wp(22),
+    textAlign: 'center',
+  },
+})

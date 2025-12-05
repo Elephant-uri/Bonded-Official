@@ -1,0 +1,193 @@
+import React, { useState } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
+import theme from '../constants/theme'
+import { hp, wp } from '../helpers/common'
+import AppTopBar from '../components/AppTopBar'
+import BottomNav from '../components/BottomNav'
+
+const MOCK_SCHOOLS = [
+  { id: '1', name: 'Stanford University', location: 'Stanford, CA', students: '17,000+' },
+  { id: '2', name: 'MIT', location: 'Cambridge, MA', students: '11,000+' },
+  { id: '3', name: 'Harvard University', location: 'Cambridge, MA', students: '23,000+' },
+  { id: '4', name: 'UC Berkeley', location: 'Berkeley, CA', students: '45,000+' },
+  { id: '5', name: 'Yale University', location: 'New Haven, CT', students: '13,000+' },
+  { id: '6', name: 'Princeton University', location: 'Princeton, NJ', students: '8,000+' },
+  { id: '7', name: 'Columbia University', location: 'New York, NY', students: '33,000+' },
+  { id: '8', name: 'UCLA', location: 'Los Angeles, CA', students: '45,000+' },
+]
+
+export default function BrowseSchools() {
+  const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredSchools = MOCK_SCHOOLS.filter((school) =>
+    school.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    school.location.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const renderSchool = ({ item }) => (
+    <TouchableOpacity
+      style={styles.schoolCard}
+      activeOpacity={0.8}
+      onPress={() => {
+        router.push({
+          pathname: '/forum',
+          params: { schoolName: item.name },
+        })
+      }}
+    >
+      <View style={styles.schoolInfo}>
+        <Text style={styles.schoolName}>{item.name}</Text>
+        <View style={styles.schoolMeta}>
+          <Ionicons
+            name="location-outline"
+            size={hp(1.6)}
+            color={theme.colors.softBlack}
+            style={{ marginRight: wp(1) }}
+          />
+          <Text style={styles.schoolLocation}>{item.location}</Text>
+          <Text style={styles.schoolSeparator}> • </Text>
+          <Text style={styles.schoolStudents}>{item.students} students</Text>
+        </View>
+      </View>
+      <Ionicons
+        name="chevron-forward"
+        size={hp(2)}
+        color={theme.colors.softBlack}
+        style={{ opacity: 0.5 }}
+      />
+    </TouchableOpacity>
+  )
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        <AppTopBar
+          schoolName="University of Rhode Island"
+          onPressProfile={() => router.push('/profile')}
+          onPressSchool={() => router.back()}
+          onPressNotifications={() => router.push('/notifications')}
+        />
+
+        <Text style={styles.title}>Browse Schools</Text>
+        <Text style={styles.subtitle}>Explore forums from other universities</Text>
+
+        <View style={styles.searchContainer}>
+          <Ionicons
+            name="search-outline"
+            size={hp(2.2)}
+            color={theme.colors.softBlack}
+            style={{ marginRight: wp(2) }}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search schools..."
+            placeholderTextColor={theme.colors.softBlack}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        <FlatList
+          data={filteredSchools}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSchool}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+
+        <BottomNav />
+      </View>
+    </SafeAreaView>
+  )
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.offWhite,
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+  },
+  title: {
+    fontSize: hp(2.6),
+    fontWeight: '700',
+    color: theme.colors.charcoal,
+    fontFamily: theme.typography.fontFamily.heading,
+    marginBottom: hp(0.5),
+  },
+  subtitle: {
+    fontSize: hp(1.7),
+    color: theme.colors.softBlack,
+    fontFamily: theme.typography.fontFamily.body,
+    opacity: 0.8,
+    marginBottom: hp(2),
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    marginBottom: hp(2),
+    borderWidth: 1,
+    borderColor: theme.colors.offWhite,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: hp(1.8),
+    color: theme.colors.charcoal,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  listContent: {
+    paddingBottom: hp(10),
+  },
+  schoolCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radius.xl,
+    padding: wp(4),
+    marginBottom: hp(1.5),
+  },
+  schoolInfo: {
+    flex: 1,
+  },
+  schoolName: {
+    fontSize: hp(2),
+    fontWeight: '700',
+    color: theme.colors.charcoal,
+    fontFamily: theme.typography.fontFamily.heading,
+    marginBottom: hp(0.5),
+  },
+  schoolMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  schoolLocation: {
+    fontSize: hp(1.5),
+    color: theme.colors.softBlack,
+    fontFamily: theme.typography.fontFamily.body,
+    opacity: 0.8,
+  },
+  schoolSeparator: {
+    fontSize: hp(1.5),
+    color: theme.colors.softBlack,
+    opacity: 0.5,
+  },
+  schoolStudents: {
+    fontSize: hp(1.5),
+    color: theme.colors.softBlack,
+    fontFamily: theme.typography.fontFamily.body,
+    opacity: 0.8,
+  },
+})
+
