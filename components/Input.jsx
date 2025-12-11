@@ -1,6 +1,6 @@
 import { TextInput, View, Text, StyleSheet, Platform } from 'react-native'
 import React, { useState } from 'react'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 
 const Input = ({
@@ -25,6 +25,8 @@ const Input = ({
   onBlur,
   ...props
 }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [isFocused, setIsFocused] = useState(false)
 
   const handleFocus = (e) => {
@@ -59,7 +61,7 @@ const Input = ({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={theme.colors.softBlack + '80'} // 50% opacity
+          placeholderTextColor={theme.colors.textSecondary + '80'} // 50% opacity
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
@@ -95,7 +97,7 @@ const Input = ({
 
 export default Input
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     width: '100%',
     marginBottom: hp(2),
@@ -103,17 +105,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1),
     fontFamily: theme.typography.fontFamily.heading,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.pill,
     borderWidth: 2,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     paddingHorizontal: wp(5),
     paddingVertical: Platform.OS === 'ios' ? hp(1.8) : hp(1.5),
     minHeight: hp(6),
@@ -146,13 +148,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.error,
   },
   inputContainerDisabled: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     opacity: 0.6,
   },
   input: {
     flex: 1,
     fontSize: hp(2),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     padding: 0, // Remove default padding
     ...Platform.select({

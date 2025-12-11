@@ -10,11 +10,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 import AppTopBar from '../components/AppTopBar'
 
 export default function CreateForum() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -39,7 +41,7 @@ export default function CreateForum() {
           <TextInput
             style={styles.input}
             placeholder="e.g. Campus Events, CS memes..."
-            placeholderTextColor={theme.colors.softBlack}
+            placeholderTextColor={theme.colors.textSecondary}
             value={name}
             onChangeText={setName}
           />
@@ -50,7 +52,7 @@ export default function CreateForum() {
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="What is this forum for?"
-            placeholderTextColor={theme.colors.softBlack}
+            placeholderTextColor={theme.colors.textSecondary}
             multiline
             textAlignVertical="top"
             value={description}
@@ -69,7 +71,7 @@ export default function CreateForum() {
             value={isPrivate}
             onValueChange={setIsPrivate}
             trackColor={{
-              false: theme.colors.offWhite,
+              false: theme.colors.border,
               true: theme.colors.bondedPurple,
             }}
             thumbColor={theme.colors.white}
@@ -85,7 +87,7 @@ export default function CreateForum() {
             value={allowStories}
             onValueChange={setAllowStories}
             trackColor={{
-              false: theme.colors.offWhite,
+              false: theme.colors.border,
               true: theme.colors.bondedPurple,
             }}
             thumbColor={theme.colors.white}
@@ -103,7 +105,7 @@ export default function CreateForum() {
             value={allowNonAnon}
             onValueChange={setAllowNonAnon}
             trackColor={{
-              false: theme.colors.offWhite,
+              false: theme.colors.border,
               true: theme.colors.bondedPurple,
             }}
             thumbColor={theme.colors.white}
@@ -141,10 +143,10 @@ export default function CreateForum() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -156,7 +158,7 @@ const styles = StyleSheet.create({
     marginBottom: hp(1.5),
     fontSize: hp(2.4),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   inputGroup: {
@@ -164,25 +166,25 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.5),
   },
   hint: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.8,
     fontFamily: theme.typography.fontFamily.body,
   },
   input: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
-    backgroundColor: theme.colors.white,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   textArea: {
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
   },
   secondaryButton: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   primaryButton: {
     backgroundColor: theme.colors.bondedPurple,

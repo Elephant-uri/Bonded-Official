@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Keyboard
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 
 const MOCK_CHAT_MESSAGES = [
@@ -40,6 +40,8 @@ const MOCK_CHAT_MESSAGES = [
 ]
 
 export default function Chat() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const params = useLocalSearchParams()
   const [messages, setMessages] = useState(MOCK_CHAT_MESSAGES)
@@ -197,10 +199,10 @@ export default function Chat() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
     width: hp(3.5),
     height: hp(3.5),
     borderRadius: hp(1.75),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(2),
@@ -238,12 +240,12 @@ const styles = StyleSheet.create({
   chatHeaderTitle: {
     fontSize: hp(2.2),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   groupChatSubtitle: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.7,
     marginTop: hp(0.2),
@@ -275,7 +277,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: theme.radius.sm,
   },
   messageBubbleOther: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderBottomLeftRadius: theme.radius.sm,
   },
   messageText: {
@@ -288,7 +290,7 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
   },
   messageTextOther: {
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   messageTime: {
     fontSize: hp(1.2),
@@ -300,19 +302,19 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   messageTimeOther: {
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.6,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     paddingVertical: hp(1),
     paddingHorizontal: wp(3),
     marginBottom: hp(2),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   attachButton: {
     padding: hp(0.5),
@@ -321,7 +323,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     maxHeight: hp(10),
     paddingVertical: hp(0.8),
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
     marginLeft: wp(2),
   },
   sendButtonDisabled: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
 })
 

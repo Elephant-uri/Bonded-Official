@@ -3,6 +3,7 @@ import { Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../helpers/common'
+import { useAppTheme } from '../app/theme'
 
 const PrimaryButton = ({
   label,
@@ -13,6 +14,9 @@ const PrimaryButton = ({
   style,
   textStyle,
 }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
+  
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -21,7 +25,7 @@ const PrimaryButton = ({
       style={[styles.button, style, disabled && styles.buttonDisabled]}
     >
       <LinearGradient
-        colors={['#A855F7', '#7C3AED']}
+        colors={[theme.colors.bondedPurple, '#7C3AED']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.gradient}
@@ -30,7 +34,7 @@ const PrimaryButton = ({
           <Ionicons
             name={icon}
             size={hp(2)}
-            color="#FFFFFF"
+            color={theme.colors.white}
             style={{ marginRight: wp(2) }}
           />
         )}
@@ -39,7 +43,7 @@ const PrimaryButton = ({
           <Ionicons
             name={icon}
             size={hp(2)}
-            color="#FFFFFF"
+            color={theme.colors.white}
             style={{ marginLeft: wp(2) }}
           />
         )}
@@ -50,9 +54,9 @@ const PrimaryButton = ({
 
 export default PrimaryButton
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   button: {
-    borderRadius: hp(1.2),
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
   },
   buttonDisabled: {
@@ -68,7 +72,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.colors.white,
   },
 })
 

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../helpers/common'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 
 const Chip = ({
   label,
@@ -13,13 +13,16 @@ const Chip = ({
   iconPosition = 'left',
   style,
 }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
+  
   const content = (
     <>
       {icon && iconPosition === 'left' && (
         <Ionicons
           name={icon}
           size={hp(1.4)}
-          color={active ? '#FFFFFF' : '#000000'}
+          color={active ? theme.colors.white : theme.colors.textPrimary}
           style={{ marginRight: wp(1) }}
         />
       )}
@@ -30,7 +33,7 @@ const Chip = ({
         <Ionicons
           name={icon}
           size={hp(1.4)}
-          color={active ? '#FFFFFF' : '#000000'}
+          color={active ? theme.colors.white : theme.colors.textPrimary}
           style={{ marginLeft: wp(1) }}
         />
       )}
@@ -51,7 +54,7 @@ const Chip = ({
         style={chipStyle}
       >
         <LinearGradient
-          colors={['#A855F7', '#7C3AED']}
+          colors={[theme.colors.bondedPurple, '#7C3AED']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.gradient}
@@ -75,24 +78,24 @@ const Chip = ({
 
 export default Chip
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   chip: {
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.8),
-    borderRadius: 9999,
+    borderRadius: theme.radius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipInactive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: theme.colors.border,
   },
   gradient: {
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.8),
-    borderRadius: 9999,
+    borderRadius: theme.radius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -100,10 +103,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(1.4),
     fontWeight: '500',
-    color: '#000000',
+    color: theme.colors.textPrimary,
   },
   labelActive: {
-    color: '#FFFFFF',
+    color: theme.colors.white,
   },
 })
 

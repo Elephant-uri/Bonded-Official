@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
@@ -13,6 +13,8 @@ import CircleRoom from '../components/Circles/CircleRoom'
 import { useCirclesContext } from '../contexts/CirclesContext'
 
 export default function Circles() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const {
     dailyTopic,
@@ -225,10 +227,10 @@ export default function Circles() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -250,14 +252,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(3.4),
     fontWeight: '900',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: -1,
     marginBottom: hp(0.5),
   },
   subtitle: {
     fontSize: hp(1.7),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.6,
   },
@@ -267,14 +269,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(1.5),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: 0.5,
     marginLeft: wp(4),
     marginBottom: hp(1.5),
   },
   howItWorksCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     padding: wp(5),
     marginHorizontal: wp(4),
@@ -304,19 +306,19 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.3),
   },
   stepText: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
     lineHeight: hp(2.1),
   },
   insightsCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     padding: wp(5),
     marginHorizontal: wp(4),
@@ -337,20 +339,20 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.7,
     marginTop: hp(0.3),
   },
   insightDivider: {
     height: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.border,
     marginVertical: hp(2),
   },
   insightTitle: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
   },
@@ -362,13 +364,13 @@ const styles = StyleSheet.create({
   },
   shiftFrom: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     fontStyle: 'italic',
   },
   shiftTo: {
     fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
     fontStyle: 'italic',
@@ -393,18 +395,18 @@ const styles = StyleSheet.create({
   },
   speakerName: {
     fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
   },
   speakerInfluence: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.7,
   },
   scheduleCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     padding: wp(5),
     marginHorizontal: wp(4),
@@ -413,14 +415,14 @@ const styles = StyleSheet.create({
   scheduleText: {
     fontSize: hp(1.7),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     textAlign: 'center',
     marginBottom: hp(0.5),
   },
   scheduleSubtext: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.7,
     textAlign: 'center',
@@ -429,7 +431,7 @@ const styles = StyleSheet.create({
   reminderButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.lg,
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(4),

@@ -13,10 +13,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 import Slider from '@react-native-community/slider'
 
 export default function PreAnswerModal({ visible, topic, subtitle, onClose, onSubmit }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [answer, setAnswer] = useState('')
   const [confidence, setConfidence] = useState(50)
 
@@ -41,7 +43,7 @@ export default function PreAnswerModal({ visible, topic, subtitle, onClose, onSu
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={hp(2.5)} color={theme.colors.charcoal} />
+            <Ionicons name="arrow-back" size={hp(2.5)} color={theme.colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Submit Answer</Text>
           <TouchableOpacity
@@ -74,7 +76,7 @@ export default function PreAnswerModal({ visible, topic, subtitle, onClose, onSu
             <TextInput
               style={styles.textInput}
               placeholder="Share your honest opinion..."
-              placeholderTextColor={theme.colors.softBlack}
+              placeholderTextColor={theme.colors.textSecondary}
               value={answer}
               onChangeText={setAnswer}
               multiline
@@ -101,7 +103,7 @@ export default function PreAnswerModal({ visible, topic, subtitle, onClose, onSu
               value={confidence}
               onValueChange={setConfidence}
               minimumTrackTintColor={theme.colors.bondedPurple}
-              maximumTrackTintColor={theme.colors.offWhite}
+              maximumTrackTintColor={theme.colors.border}
               thumbTintColor={theme.colors.bondedPurple}
             />
 
@@ -148,10 +150,10 @@ export default function PreAnswerModal({ visible, topic, subtitle, onClose, onSu
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -159,9 +161,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   backButton: {
     padding: hp(0.5),
@@ -170,7 +172,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   doneButton: {
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
   },
   doneTextDisabled: {
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   scrollView: {
     flex: 1,
@@ -202,7 +204,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
     opacity: 0.8,
@@ -210,40 +212,40 @@ const styles = StyleSheet.create({
   topicText: {
     fontSize: hp(2.4),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     lineHeight: hp(3),
     marginBottom: hp(0.5),
   },
   topicSubtitle: {
     fontSize: hp(1.6),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.7,
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     marginVertical: hp(2.5),
   },
   answerSection: {
     marginBottom: hp(2),
   },
   textInput: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     minHeight: hp(20),
     borderWidth: 2,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     lineHeight: hp(2.4),
   },
   characterCount: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.6,
     marginTop: hp(1),
@@ -275,7 +277,7 @@ const styles = StyleSheet.create({
   },
   confidenceLabel: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.6,
   },
@@ -285,7 +287,7 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1.5),
   },
@@ -297,18 +299,18 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: hp(1.6),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     flex: 1,
   },
   updateNote: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     fontStyle: 'italic',
     marginTop: hp(1.5),
     padding: wp(3),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.md,
   },
   submitButton: {
@@ -333,7 +335,7 @@ const styles = StyleSheet.create({
     }),
   },
   submitButtonDisabled: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     opacity: 0.5,
   },
   submitButtonText: {

@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { hp, wp } from '../helpers/common'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
 import AppCard from '../components/AppCard'
@@ -33,6 +33,8 @@ const CATEGORIES = [
 ]
 
 export default function Clubs() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const { getAllClubs, isUserInterested, showInterest, removeInterest } = useClubsContext()
   const [searchQuery, setSearchQuery] = useState('')
@@ -94,7 +96,7 @@ export default function Clubs() {
                 <Ionicons
                   name="people-outline"
                   size={hp(1.4)}
-                  color="#8E8E93"
+                  color={theme.colors.textSecondary}
                 />
                 <Text style={styles.memberCountText}>{memberCount} members</Text>
               </View>
@@ -152,13 +154,13 @@ export default function Clubs() {
             <Ionicons
               name="search-outline"
               size={hp(1.8)}
-              color="#8E8E93"
+              color={theme.colors.textSecondary}
               style={styles.searchIcon}
             />
             <TextInput
               style={styles.searchInput}
               placeholder="Search clubs..."
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -170,7 +172,7 @@ export default function Clubs() {
                 <Ionicons
                   name="close-circle"
                   size={hp(1.8)}
-                  color="#8E8E93"
+                  color={theme.colors.textSecondary}
                 />
               </TouchableOpacity>
             )}
@@ -215,10 +217,10 @@ export default function Clubs() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -237,25 +239,25 @@ const styles = StyleSheet.create({
     fontSize: hp(3.5),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   subtitle: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: theme.colors.background,
     borderRadius: 9999,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
     marginBottom: hp(2),
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: theme.colors.border,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -273,7 +275,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   clearButton: {
     padding: hp(0.5),
@@ -289,7 +291,7 @@ const styles = StyleSheet.create({
   resultsCount: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginBottom: hp(1.5),
   },
@@ -342,7 +344,7 @@ const styles = StyleSheet.create({
     marginBottom: hp(1),
   },
   clubCategoryChip: {
-    backgroundColor: '#F3E8FF',
+    backgroundColor: theme.colors.bondedPurple + '15',
   },
   memberCount: {
     flexDirection: 'row',
@@ -352,7 +354,7 @@ const styles = StyleSheet.create({
   memberCountText: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   interestButton: {
@@ -372,7 +374,7 @@ const styles = StyleSheet.create({
   clubDescription: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     lineHeight: hp(2.4),
     marginBottom: hp(1),
   },
@@ -387,12 +389,12 @@ const styles = StyleSheet.create({
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   leadershipName: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   leadershipMore: {
     fontSize: hp(1.4),

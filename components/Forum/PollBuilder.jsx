@@ -10,12 +10,14 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 const MIN_OPTIONS = 2
 const MAX_OPTIONS = 6
 
 export default function PollBuilder({ poll, onPollChange, onRemove }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [question, setQuestion] = useState(poll?.question || '')
   const [options, setOptions] = useState(
     poll?.options || ['', '']
@@ -192,9 +194,9 @@ export default function PollBuilder({ poll, onPollChange, onRemove }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     marginVertical: hp(1),
@@ -215,7 +217,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(1.9),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   removeButton: {
@@ -227,16 +229,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
   },
   questionInput: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.md,
     padding: wp(3),
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     minHeight: hp(6),
     textAlignVertical: 'top',
@@ -266,11 +268,11 @@ const styles = StyleSheet.create({
   },
   optionInput: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.md,
     padding: wp(3),
     fontSize: hp(1.6),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   removeOptionButton: {
@@ -302,13 +304,13 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     marginBottom: hp(0.3),
   },
   settingDescription: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.7,
   },

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'expo-router'
 import ScreenWrapper from '../components/ScreenWrapper'
 import { StatusBar } from 'expo-status-bar'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 import AnimatedLogo from '../components/AnimatedLogo'
 import Input from '../components/Input'
@@ -11,6 +11,8 @@ import Button from '../components/Button'
 import BackButton from '../components/BackButton'
 
 export default function Login() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [email, setEmail] = useState('')
   const hoverValue = useRef(new Animated.Value(0)).current
@@ -124,7 +126,7 @@ export default function Login() {
   )     
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   background: {
     flex: 1,
     width: '100%',
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
     marginBottom: hp(4),
   },
   title: {
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontSize: hp(3.5),
     fontWeight: '800',
     textAlign: 'center',

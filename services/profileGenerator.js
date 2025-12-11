@@ -150,8 +150,12 @@ export const generateProfile = (index, getPhotoUrl) => {
   const age = [18, 19, 20, 21, 22, 23][index % 6]
   const major = MAJORS[index % MAJORS.length]
   
-  const firstName = FIRST_NAMES[index % FIRST_NAMES.length]
-  const lastName = LAST_NAMES[Math.floor(index / FIRST_NAMES.length) % LAST_NAMES.length]
+  // Use index directly for better distribution
+  // Mix with a simple hash-like function to ensure variety
+  const firstNameIndex = index % FIRST_NAMES.length
+  const lastNameIndex = (index * 7 + 13) % LAST_NAMES.length // Simple hash for better distribution
+  const firstName = FIRST_NAMES[firstNameIndex]
+  const lastName = LAST_NAMES[lastNameIndex]
   const name = `${firstName} ${lastName}`
   
   // Generate realistic interests (3-6 interests)

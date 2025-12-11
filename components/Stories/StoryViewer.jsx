@@ -1,28 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react'
-import {
-  View,
-  Modal,
-  Pressable,
-  Text,
-  StyleSheet,
-  Image,
-  Animated,
-  Dimensions,
-  TouchableOpacity,
-  Alert,
-  TextInput,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  PanResponder,
-} from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import React, { useEffect, useRef, useState } from 'react'
+import {
+    Alert,
+    Animated,
+    Dimensions,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useAppTheme } from '../../app/theme'
 import { useStoriesContext } from '../../contexts/StoriesContext'
+import { hp, wp } from '../../helpers/common'
 
 const STORY_DURATION = 5000 // 5 seconds per story segment
 
@@ -34,13 +32,16 @@ export default function StoryViewer({
   currentUserId,
 }) {
   const router = useRouter()
+  const theme = useAppTheme()
   const [currentStoryGroupIndex, setCurrentStoryGroupIndex] = useState(initialIndex)
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [showMessageModal, setShowMessageModal] = useState(false)
   const [commentText, setCommentText] = useState('')
+  const [messageText, setMessageText] = useState('')
   const [swipeUpProgress, setSwipeUpProgress] = useState(0)
+  const [likedStories, setLikedStories] = useState(new Set())
   const progressAnims = useRef([]).current
   const pauseTimeRef = useRef(null)
   const remainingTimeRef = useRef(STORY_DURATION)
@@ -190,96 +191,43 @@ export default function StoryViewer({
     setCommentText('')
   }
 
-  const handleSwipeUp = () => {
-    if (!currentStoryGroup || !currentSegment) return
-    
-    if (isPublic) {
-      // Show action sheet for public stories
-      Alert.alert(
-        'Story Actions',
-        'What would you like to do?',
-        [
-          {
-            text: 'Comment',
-            onPress: () => setShowComments(true),
-          },
-          {
-            text: 'Message',
-            onPress: () => {
-              // Navigate to messages with story content
-              router.push({
-                pathname: '/messages',
-                params: {
-                  share: JSON.stringify({
-                    type: 'story',
-                    data: {
-                      storyId: currentStoryId,
-                      userName: currentStoryGroup?.name || 'Unknown',
-                      imageUri: currentSegment?.imageUri || '',
-                    },
-                  }),
-                },
-              })
-            },
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ],
-        { cancelable: true }
-      )
-    } else {
-      setShowComments(true)
-    }
+  const handleLike = () => {
+    if (!currentStoryId) return
+    setLikedStories((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(currentStoryId)) {
+        newSet.delete(currentStoryId)
+      } else {
+        newSet.add(currentStoryId)
+      }
+      return newSet
+    })
   }
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (_, gestureState) => {
-        // Only start if it's an upward swipe
-        return gestureState.dy < 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
-      },
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Continue if it's an upward swipe
-        return Math.abs(gestureState.dy) > 10 && gestureState.dy < 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
-      },
-      onPanResponderGrant: () => {
-        pauseProgress()
-        Animated.spring(swipeUpAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }).start()
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy < -50) {
-          setSwipeUpProgress(Math.min(1, Math.abs(gestureState.dy) / 100))
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        Animated.spring(swipeUpAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }).start()
-        if (gestureState.dy < -100) {
-          handleSwipeUp()
-        }
-        setSwipeUpProgress(0)
-        resumeProgress()
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(swipeUpAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }).start()
-        setSwipeUpProgress(0)
-        resumeProgress()
+  const handleSendMessage = () => {
+    if (!messageText.trim()) return
+    
+    // Navigate to messages with story content
+    router.push({
+      pathname: '/chat',
+      params: {
+        userId: currentStoryGroup.userId,
+        userName: currentStoryGroup.name,
+        initialMessage: messageText.trim(),
+        share: JSON.stringify({
+          type: 'story',
+          data: {
+            storyId: currentStoryId,
+            userName: currentStoryGroup?.name || 'Unknown',
+            imageUri: currentSegment?.imageUri || '',
+          },
+        }),
       },
     })
-  ).current
+    setMessageText('')
+    setShowMessageModal(false)
+  }
+
 
   const renderComment = ({ item }) => (
     <View style={styles.commentItem}>
@@ -301,6 +249,8 @@ export default function StoryViewer({
 
   if (!visible || !currentStoryGroup || !currentSegment) return null
 
+  const styles = createStyles(theme)
+
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.container}>
@@ -320,9 +270,9 @@ export default function StoryViewer({
                         }) || '0%',
                       backgroundColor:
                         index < currentSegmentIndex
-                          ? '#FFFFFF'
+                          ? theme.colors.white
                           : index === currentSegmentIndex
-                          ? '#FFFFFF'
+                          ? theme.colors.white
                           : 'rgba(255, 255, 255, 0.3)',
                     },
                   ]}
@@ -351,20 +301,17 @@ export default function StoryViewer({
             <View style={styles.headerRight}>
               {isOwnStory && (
                 <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
-                  <Ionicons name="trash-outline" size={hp(2.5)} color="#FFFFFF" />
+                  <Ionicons name="trash-outline" size={hp(2.5)} color={theme.colors.white} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-                <Ionicons name="close" size={hp(2.8)} color="#FFFFFF" />
+                <Ionicons name="close" size={hp(2.8)} color={theme.colors.white} />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Story content - Full Screen */}
-          <View
-            style={styles.content}
-            {...panResponder.panHandlers}
-          >
+          {/* Story content - Proper dimensions */}
+          <View style={styles.content}>
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={handleTap}
@@ -381,7 +328,7 @@ export default function StoryViewer({
               <Image
                 source={{ uri: currentSegment.imageUri }}
                 style={styles.media}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             )}
 
@@ -438,61 +385,89 @@ export default function StoryViewer({
 
             {isPaused && (
               <View style={styles.pausedIndicator}>
-                <Ionicons name="pause" size={hp(6)} color="rgba(255, 255, 255, 0.9)" />
+                <Ionicons name="pause" size={hp(6)} color={theme.colors.white} />
               </View>
             )}
             </Pressable>
           </View>
 
-          {/* Swipe Up Action Indicator */}
-          <Animated.View
-            style={[
-              styles.swipeUpContainer,
-              {
-                opacity: swipeUpAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0.7],
-                }),
-                transform: [
-                  {
-                    translateY: swipeUpAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -20],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
+          {/* Bottom Action Bar */}
+          <View style={styles.bottomActions}>
+            <View style={styles.bottomActionsLeft}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => setShowComments(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chatbubble-outline" size={hp(2.8)} color={theme.colors.white} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleLike}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={likedStories.has(currentStoryId) ? "heart" : "heart-outline"}
+                  size={hp(2.8)}
+                  color={likedStories.has(currentStoryId) ? "#FF3040" : theme.colors.white}
+                />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={styles.swipeUpButton}
-              onPress={handleSwipeUp}
+              style={styles.messageButton}
+              onPress={() => setShowMessageModal(true)}
               activeOpacity={0.8}
             >
-              <Animated.View
-                style={[
-                  styles.swipeUpArrow,
-                  {
-                    transform: [
-                      {
-                        translateY: swipeUpAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, -10],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Ionicons name="chevron-up" size={hp(3)} color="#FFFFFF" />
-              </Animated.View>
-              <Text style={styles.swipeUpText}>
-                {isPublic ? 'Swipe up to interact' : 'Swipe up to comment'}
-              </Text>
+              <Ionicons name="paper-plane-outline" size={hp(2.2)} color={theme.colors.white} />
+              <Text style={styles.messageButtonText}>Message</Text>
             </TouchableOpacity>
-          </Animated.View>
+          </View>
 
-          {/* Comments Panel */}
+          {/* Message Modal */}
+          {showMessageModal && (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.messageModalOverlay}
+            >
+              <Pressable
+                style={styles.messageModalBackdrop}
+                onPress={() => setShowMessageModal(false)}
+              >
+                <Pressable
+                  style={styles.messageModalContent}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <View style={styles.messageModalHeader}>
+                    <Text style={styles.messageModalTitle}>Send Message</Text>
+                    <TouchableOpacity onPress={() => setShowMessageModal(false)}>
+                      <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    value={messageText}
+                    onChangeText={setMessageText}
+                    placeholder="Type a message..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    style={styles.messageInput}
+                    multiline
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    onPress={handleSendMessage}
+                    style={[
+                      styles.messageSendButton,
+                      !messageText.trim() && styles.messageSendButtonDisabled,
+                    ]}
+                    disabled={!messageText.trim()}
+                  >
+                    <Text style={styles.messageSendButtonText}>Send</Text>
+                  </TouchableOpacity>
+                </Pressable>
+              </Pressable>
+            </KeyboardAvoidingView>
+          )}
+
+          {/* Comments Panel (Notes) */}
           {showComments && (
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -500,10 +475,10 @@ export default function StoryViewer({
             >
               <View style={styles.commentsHeader}>
                 <Text style={styles.commentsTitle}>
-                  {comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}
+                  Notes ({comments.length})
                 </Text>
                 <TouchableOpacity onPress={() => setShowComments(false)}>
-                  <Ionicons name="close" size={hp(2.5)} color="#FFFFFF" />
+                  <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -517,8 +492,8 @@ export default function StoryViewer({
                 <TextInput
                   value={commentText}
                   onChangeText={setCommentText}
-                  placeholder="Add a comment..."
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                  placeholder="Add a note..."
+                  placeholderTextColor={theme.colors.textSecondary}
                   style={styles.commentInput}
                   multiline
                 />
@@ -533,7 +508,7 @@ export default function StoryViewer({
                   <Ionicons
                     name="send"
                     size={hp(2.2)}
-                    color={commentText.trim() ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)'}
+                    color={commentText.trim() ? theme.colors.bondedPurple : theme.colors.textSecondary}
                   />
                 </TouchableOpacity>
               </View>
@@ -545,13 +520,21 @@ export default function StoryViewer({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#000000', // Keep dark for media contrast
+    width: wp(100),
+    height: hp(100),
+    maxWidth: wp(100),
+    maxHeight: hp(100),
   },
   safeArea: {
     flex: 1,
+    width: '100%',
+    height: '100%',
+    maxWidth: wp(100),
+    maxHeight: hp(100),
   },
   progressContainer: {
     flexDirection: 'row',
@@ -600,7 +583,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: theme.colors.white,
   },
   avatarImage: {
     width: '100%',
@@ -608,22 +591,26 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: hp(2),
-    color: '#FFFFFF',
+    color: theme.colors.white,
     fontWeight: '700',
   },
   name: {
     fontSize: hp(1.8),
-    color: '#FFFFFF',
+    color: theme.colors.white,
     fontWeight: '600',
   },
   time: {
     fontSize: hp(1.3),
-    color: '#FFFFFF',
+    color: theme.colors.white,
     opacity: 0.9,
   },
   content: {
     flex: 1,
     position: 'relative',
+    width: '100%',
+    height: '100%',
+    maxWidth: wp(100),
+    maxHeight: hp(100),
   },
   media: {
     width: '100%',
@@ -633,9 +620,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    maxWidth: wp(100),
+    maxHeight: hp(100),
   },
   videoPlaceholder: {
-    color: '#FFFFFF',
+    color: theme.colors.white,
     fontSize: hp(2),
     textAlign: 'center',
     opacity: 0.7,
@@ -651,7 +640,7 @@ const styles = StyleSheet.create({
   },
   textElementText: {
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: theme.colors.white,
   },
   stickerElement: {
     position: 'absolute',
@@ -663,26 +652,115 @@ const styles = StyleSheet.create({
     left: '50%',
     transform: [{ translateX: -hp(3) }, { translateY: -hp(3) }],
   },
-  swipeUpContainer: {
+  bottomActions: {
     position: 'absolute',
-    bottom: hp(4),
+    bottom: hp(2),
     left: 0,
     right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+  },
+  bottomActionsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+  actionButton: {
+    width: hp(5),
+    height: hp(5),
+    borderRadius: hp(2.5),
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  swipeUpButton: {
+  messageButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: wp(1.5),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    borderRadius: hp(2.5),
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  messageButtonText: {
+    fontSize: hp(1.6),
+    color: theme.colors.white,
+    fontWeight: '600',
+  },
+  messageModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  messageModalBackdrop: {
+    flex: 1,
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  swipeUpArrow: {
-    marginBottom: hp(0.5),
+  messageModalContent: {
+    width: wp(85),
+    backgroundColor: theme.colors.background,
+    borderRadius: hp(2),
+    padding: wp(5),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 24,
+      },
+    }),
   },
-  swipeUpText: {
-    fontSize: hp(1.3),
-    color: '#FFFFFF',
-    fontWeight: '500',
-    opacity: 0.9,
+  messageModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  messageModalTitle: {
+    fontSize: hp(2),
+    color: theme.colors.textPrimary,
+    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  messageInput: {
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: hp(1.5),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+    fontSize: hp(1.6),
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+    minHeight: hp(10),
+    maxHeight: hp(20),
+    marginBottom: hp(2),
+    textAlignVertical: 'top',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+  },
+  messageSendButton: {
+    backgroundColor: theme.colors.bondedPurple,
+    borderRadius: hp(1.5),
+    paddingVertical: hp(1.5),
+    alignItems: 'center',
+  },
+  messageSendButtonDisabled: {
+    opacity: 0.5,
+  },
+  messageSendButtonText: {
+    fontSize: hp(1.7),
+    color: theme.colors.white,
+    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.body,
   },
   commentsContainer: {
     position: 'absolute',
@@ -690,9 +768,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '50%',
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: hp(2.5),
     borderTopRightRadius: hp(2.5),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   commentsHeader: {
     flexDirection: 'row',
@@ -700,13 +789,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
   },
   commentsTitle: {
     fontSize: hp(2),
-    color: '#FFFFFF',
+    color: theme.colors.textPrimary,
     fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.heading,
   },
   commentsList: {
     flex: 1,
@@ -735,7 +825,7 @@ const styles = StyleSheet.create({
   },
   commentAvatarText: {
     fontSize: hp(1.6),
-    color: '#FFFFFF',
+    color: theme.colors.white,
     fontWeight: '700',
   },
   commentContent: {
@@ -743,13 +833,15 @@ const styles = StyleSheet.create({
   },
   commentName: {
     fontSize: hp(1.6),
-    color: '#FFFFFF',
+    color: theme.colors.textPrimary,
     fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.3),
   },
   commentText: {
     fontSize: hp(1.5),
-    color: '#FFFFFF',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
     opacity: 0.9,
   },
   commentInputContainer: {
@@ -763,21 +855,26 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: hp(1.5),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1),
     fontSize: hp(1.6),
-    color: '#FFFFFF',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
     maxHeight: hp(10),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
   sendButton: {
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
   sendButtonDisabled: {
     opacity: 0.5,

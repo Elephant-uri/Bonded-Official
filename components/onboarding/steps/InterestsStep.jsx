@@ -2,10 +2,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import React, { useState } from 'react'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
 import { ALL_INTERESTS } from '../../../constants/interests'
-import theme from '../../../constants/theme'
+import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 
 const InterestsStep = ({ formData, updateFormData, onScroll }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   const [localData, setLocalData] = useState({
     interests: formData.interests || [],
   })
@@ -66,7 +67,7 @@ const InterestsStep = ({ formData, updateFormData, onScroll }) => {
 
 export default InterestsStep
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -77,15 +78,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     marginBottom: hp(4),
     textAlign: 'center',
   },
@@ -95,14 +96,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2.5),
     fontWeight: '700',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(0.5),
   },
   sectionSubtitle: {
     fontSize: hp(1.8),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     marginBottom: hp(2),
     opacity: 0.7,
   },
@@ -112,24 +113,24 @@ const styles = StyleSheet.create({
     gap: wp(2),
   },
   tag: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(4),
-    borderRadius: theme.radius.pill,
+    borderRadius: 9999,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   tagSelected: {
-    backgroundColor: theme.colors.bondedPurple,
-    borderColor: theme.colors.bondedPurple,
+    backgroundColor: '#A45CFF',
+    borderColor: '#A45CFF',
   },
   tagText: {
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#1A1A1A',
+    fontFamily: 'System',
   },
   tagTextSelected: {
-    color: theme.colors.white,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 })

@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 import Picker from '../Picker'
 import { useEventsContext } from '../../contexts/EventsContext'
 
@@ -34,6 +34,8 @@ const CATEGORIES = [
 ]
 
 const CreateEventModal = ({ visible, onClose, onSuccess }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const { createEvent } = useEventsContext()
 
   const [title, setTitle] = useState('')
@@ -239,7 +241,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                     value={title}
                     onChangeText={setTitle}
                     placeholder="e.g., Fall Hackathon 2025"
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={theme.colors.textSecondary}
                   />
                 </View>
 
@@ -251,7 +253,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                     value={description}
                     onChangeText={setDescription}
                     placeholder="Tell people about your event..."
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={theme.colors.textSecondary}
                     multiline
                     numberOfLines={4}
                   />
@@ -270,7 +272,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                         <Ionicons
                           name="calendar-outline"
                           size={hp(2)}
-                          color="#007AFF"
+                          color={theme.eventColors.campus}
                         />
                         <Text style={styles.dateTimeText}>
                           {formatDate(startDate)}
@@ -286,7 +288,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                         <Ionicons
                           name="time-outline"
                           size={hp(2)}
-                          color="#007AFF"
+                          color={theme.eventColors.campus}
                         />
                         <Text style={styles.dateTimeText}>
                           {formatTime(startDate)}
@@ -308,7 +310,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                         <Ionicons
                           name="calendar-outline"
                           size={hp(2)}
-                          color="#007AFF"
+                          color={theme.eventColors.campus}
                         />
                         <Text style={styles.dateTimeText}>
                           {formatDate(endDate)}
@@ -324,7 +326,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                         <Ionicons
                           name="time-outline"
                           size={hp(2)}
-                          color="#007AFF"
+                          color={theme.eventColors.campus}
                         />
                         <Text style={styles.dateTimeText}>
                           {formatTime(endDate)}
@@ -342,7 +344,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                     value={location}
                     onChangeText={setLocation}
                     placeholder="e.g., Engineering Building, Room 201"
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={theme.colors.textSecondary}
                   />
                 </View>
 
@@ -354,7 +356,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                     value={link}
                     onChangeText={setLink}
                     placeholder="https://example.com"
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={theme.colors.textSecondary}
                     keyboardType="url"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -371,8 +373,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                     <Switch
                       value={isRecurring}
                       onValueChange={setIsRecurring}
-                      trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-                      thumbColor={isRecurring ? '#FFFFFF' : '#FFFFFF'}
+                      trackColor={{ false: theme.colors.border, true: theme.eventColors.org }}
+                      thumbColor={theme.colors.white}
                     />
                   </View>
 
@@ -415,7 +417,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                             <Ionicons
                               name="calendar-outline"
                               size={hp(2)}
-                              color="#007AFF"
+                              color={theme.eventColors.campus}
                             />
                             <Text style={styles.dateTimeText}>
                               {formatDate(recurringEndDate)}
@@ -438,7 +440,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                         onPress={removeImage}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="close-circle" size={hp(2.5)} color="#FF3B30" />
+                        <Ionicons name="close-circle" size={hp(2.5)} color={theme.colors.error} />
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -447,7 +449,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                       onPress={pickImage}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="image-outline" size={hp(3)} color="#007AFF" />
+                      <Ionicons name="image-outline" size={hp(3)} color={theme.eventColors.campus} />
                       <Text style={styles.imagePickerText}>Add Flyer/Image</Text>
                     </TouchableOpacity>
                   )}
@@ -478,8 +480,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                     <Switch
                       value={isPublic}
                       onValueChange={setIsPublic}
-                      trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-                      thumbColor={isPublic ? '#FFFFFF' : '#FFFFFF'}
+                      trackColor={{ false: theme.colors.border, true: theme.eventColors.org }}
+                      thumbColor={theme.colors.white}
                     />
                   </View>
 
@@ -494,8 +496,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                       <Switch
                         value={requireApproval}
                         onValueChange={setRequireApproval}
-                        trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-                        thumbColor={requireApproval ? '#FFFFFF' : '#FFFFFF'}
+                        trackColor={{ false: theme.colors.border, true: theme.eventColors.org }}
+                        thumbColor={theme.colors.white}
                       />
                     </View>
                   )}
@@ -510,8 +512,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                     <Switch
                       value={allowPlusOnes}
                       onValueChange={setAllowPlusOnes}
-                      trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-                      thumbColor={allowPlusOnes ? '#FFFFFF' : '#FFFFFF'}
+                      trackColor={{ false: theme.colors.border, true: theme.eventColors.org }}
+                      thumbColor={theme.colors.white}
                     />
                   </View>
 
@@ -522,7 +524,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                       value={maxAttendees}
                       onChangeText={setMaxAttendees}
                       placeholder="Leave empty for unlimited"
-                      placeholderTextColor="#8E8E93"
+                      placeholderTextColor={theme.colors.textSecondary}
                       keyboardType="numeric"
                     />
                   </View>
@@ -880,7 +882,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
 
 export default CreateEventModal
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(0, 0, 0, 0.25)',
@@ -906,7 +908,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   dragHandleContainer: {
     alignItems: 'center',
@@ -916,7 +918,7 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: wp(12),
     height: hp(0.5),
-    backgroundColor: '#C7C7CC',
+    backgroundColor: theme.colors.border,
     borderRadius: hp(0.25),
     marginBottom: hp(0.5),
   },

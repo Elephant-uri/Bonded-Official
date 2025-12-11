@@ -4,10 +4,11 @@ import * as ImagePicker from 'expo-image-picker'
 import * as ImageManipulator from 'expo-image-manipulator'
 import { Ionicons } from '@expo/vector-icons'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
-import theme from '../../../constants/theme'
+import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 
 const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   const [localPhotos, setLocalPhotos] = useState(formData.photos || [])
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -163,7 +164,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
 
       {isProcessing && (
         <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
+          <ActivityIndicator size="large" color="#A45CFF" />
           <Text style={styles.processingText}>Processing photos...</Text>
         </View>
       )}
@@ -178,7 +179,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
             disabled={isProcessing}
             activeOpacity={0.7}
           >
-            <Ionicons name="add" size={hp(4)} color={theme.colors.bondedPurple} />
+            <Ionicons name="add" size={hp(4)} color="#A45CFF" />
             <Text style={styles.addPhotoText}>Add Photo</Text>
           </TouchableOpacity>
         )}
@@ -204,7 +205,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
               onPress={() => handleRemovePhoto(index)}
               activeOpacity={0.7}
             >
-              <Ionicons name="close-circle" size={hp(3)} color={theme.colors.white} />
+              <Ionicons name="close-circle" size={hp(3)} color="#FFFFFF" />
             </TouchableOpacity>
 
             {/* Set as Yearbook Photo Button (if not first) */}
@@ -224,7 +225,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
       {/* Instructions */}
       {localPhotos.length === 0 && (
         <View style={styles.instructionsContainer}>
-          <Ionicons name="information-circle-outline" size={hp(3)} color={theme.colors.softBlack} />
+          <Ionicons name="information-circle-outline" size={hp(3)} color="#2A2A2A" />
           <Text style={styles.instructionsText}>
             Tap "Add Photo" to select photos from your gallery. You can select multiple photos at once.
           </Text>
@@ -243,7 +244,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
 
 export default PhotoSelectionStep
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -255,15 +256,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     marginBottom: hp(4),
     textAlign: 'center',
     paddingHorizontal: wp(4),
@@ -275,8 +276,8 @@ const styles = StyleSheet.create({
   processingText: {
     marginTop: hp(2),
     fontSize: hp(2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
   },
   photoGrid: {
     flexDirection: 'row',
@@ -289,10 +290,10 @@ const styles = StyleSheet.create({
     width: (wp(100) - wp(8) - wp(2)) / 2, // Screen width - padding - gap, divided by 2
     aspectRatio: 1,
     marginBottom: wp(2),
-    backgroundColor: theme.colors.offWhite,
-    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
     borderWidth: 2,
-    borderColor: theme.colors.bondedPurple,
+    borderColor: '#A45CFF',
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -300,17 +301,17 @@ const styles = StyleSheet.create({
   },
   addPhotoText: {
     fontSize: hp(1.8),
-    color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#A45CFF',
+    fontFamily: 'System',
     fontWeight: '600',
   },
   photoCard: {
     width: (wp(100) - wp(8) - wp(2)) / 2, // Screen width - padding - gap, divided by 2
     aspectRatio: 1,
     marginBottom: wp(2),
-    borderRadius: theme.radius.lg,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     position: 'relative',
   },
   photoImage: {
@@ -322,15 +323,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: wp(2),
     left: wp(2),
-    backgroundColor: theme.colors.bondedPurple,
+    backgroundColor: '#A45CFF',
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.5),
-    borderRadius: theme.radius.pill,
+    borderRadius: 9999,
   },
   yearbookBadgeText: {
     fontSize: hp(1.4),
-    color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#FFFFFF',
+    fontFamily: 'System',
     fontWeight: '600',
   },
   removeButton: {
@@ -353,21 +354,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     paddingVertical: hp(1),
     paddingHorizontal: wp(2),
-    borderRadius: theme.radius.md,
+    borderRadius: 12,
     alignItems: 'center',
   },
   setYearbookText: {
     fontSize: hp(1.6),
-    color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#FFFFFF',
+    fontFamily: 'System',
     fontWeight: '600',
   },
   instructionsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     padding: wp(4),
-    borderRadius: theme.radius.md,
+    borderRadius: 12,
     marginHorizontal: wp(4),
     marginTop: hp(2),
     gap: wp(3),
@@ -375,14 +376,14 @@ const styles = StyleSheet.create({
   instructionsText: {
     flex: 1,
     fontSize: hp(1.8),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     lineHeight: hp(2.5),
   },
   photoCount: {
     fontSize: hp(2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     textAlign: 'center',
     marginTop: hp(2),
     opacity: 0.7,

@@ -199,7 +199,7 @@ export default function Profile() {
                 onPress={() => setShowFriendsModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={hp(2.5)} color="#000000" />
+                <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -221,7 +221,7 @@ export default function Profile() {
                       {item.major} • Class of {item.year}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={hp(2)} color="#8E8E93" />
+                  <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               )}
               contentContainerStyle={styles.friendsList}
@@ -243,7 +243,7 @@ export default function Profile() {
                 onPress={() => setShowEditModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={hp(2.5)} color="#000000" />
+                <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
               </TouchableOpacity>
             </View>
             <ScrollView
@@ -260,7 +260,7 @@ export default function Profile() {
                   multiline
                   numberOfLines={4}
                   placeholder="Tell us about yourself..."
-                  placeholderTextColor="#8E8E93"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </AppCard>
 
@@ -273,7 +273,7 @@ export default function Profile() {
                     onChangeText={(text) => setEditSocialLinks({ ...editSocialLinks, instagram: text })}
                     style={styles.socialInput}
                     placeholder="@username"
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={theme.colors.textSecondary}
                   />
                 </View>
                 <View style={styles.socialEditRow}>
@@ -283,7 +283,7 @@ export default function Profile() {
                     onChangeText={(text) => setEditSocialLinks({ ...editSocialLinks, spotify: text })}
                     style={styles.socialInput}
                     placeholder="Spotify username"
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={theme.colors.textSecondary}
                   />
                 </View>
                 <View style={styles.socialEditRow}>
@@ -293,7 +293,7 @@ export default function Profile() {
                     onChangeText={(text) => setEditSocialLinks({ ...editSocialLinks, appleMusic: text })}
                     style={styles.socialInput}
                     placeholder="Apple Music username"
-                    placeholderTextColor="#8E8E93"
+                    placeholderTextColor={theme.colors.textSecondary}
                   />
                 </View>
               </AppCard>
@@ -322,7 +322,7 @@ export default function Profile() {
 const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -366,14 +366,14 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileHandle: {
     fontSize: hp(1.5),
-    color: '#8E8E93',
+    color: theme.colors.textSecondary,
     fontWeight: '400',
   },
   groupJamCard: {
     marginBottom: hp(2),
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: theme.colors.border,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -401,7 +401,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   groupJamBarContainer: {
     height: hp(0.6),
-    backgroundColor: '#E5E5EA',
+    backgroundColor: theme.colors.border,
     borderRadius: 9999,
     overflow: 'hidden',
     marginBottom: hp(0.8),
@@ -412,7 +412,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   groupJamDescription: {
     fontSize: hp(1.3),
-    color: '#8E8E93',
+    color: theme.colors.textSecondary,
     fontWeight: '400',
   },
   bioCard: {
@@ -439,7 +439,7 @@ const createStyles = (theme) => StyleSheet.create({
     marginBottom: hp(2),
   },
   chip: {
-    backgroundColor: '#F3E8FF',
+    backgroundColor: theme.colors.bondedPurple + '15',
   },
   locationRow: {
     flexDirection: 'row',
@@ -449,7 +449,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   locationText: {
     fontSize: hp(1.4),
-    color: '#8E8E93',
+    color: theme.colors.textSecondary,
     fontWeight: '400',
   },
   socialCard: {
@@ -472,7 +472,7 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     paddingVertical: hp(1),
     paddingHorizontal: wp(3),
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: hp(1),
     gap: wp(2),
     minWidth: wp(30),
@@ -487,7 +487,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalSafeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -496,7 +496,7 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: hp(2.4),
@@ -533,7 +533,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   friendDetails: {
     fontSize: hp(1.4),
-    color: '#8E8E93',
+    color: theme.colors.textSecondary,
     fontWeight: '400',
   },
   editScrollView: {

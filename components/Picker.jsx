@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Modal, TouchableOpacity, FlatList, Pressable, TextInput } from 'react-native'
 import React, { useState } from 'react'
 import { Ionicons } from '@expo/vector-icons'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 
 const Picker = ({ 
@@ -12,7 +12,12 @@ const Picker = ({
   onValueChange,
   searchable = false,
   containerStyle,
+  theme: customTheme, // Optional theme override (for onboarding) - when provided, completely bypasses app theme
 }) => {
+  // Always call hook (React rules), but ignore if customTheme provided
+  const appTheme = useAppTheme()
+  const theme = customTheme || appTheme // Use custom theme if provided, otherwise use app theme
+  const styles = createStyles(theme)
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -161,14 +166,14 @@ const Picker = ({
 
 export default Picker
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     marginBottom: hp(2),
   },
   label: {
     fontSize: hp(2),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
   },
@@ -176,22 +181,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingVertical: hp(1.8),
     paddingHorizontal: wp(4),
     borderWidth: 2,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     minHeight: hp(6),
   },
   pickerText: {
     fontSize: hp(2),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     flex: 1,
   },
   placeholder: {
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.6,
   },
   modalOverlay: {
@@ -200,7 +205,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     height: hp(70),
@@ -218,7 +223,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: hp(2.5),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   closeButton: {
@@ -227,7 +232,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     marginHorizontal: wp(6),
     marginVertical: hp(1.5),
     borderRadius: theme.radius.md,
@@ -240,7 +245,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: hp(2),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   clearButton: {
@@ -260,7 +265,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: hp(2),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
   },
   optionItem: {
@@ -277,7 +282,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: hp(2),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   optionTextSelected: {

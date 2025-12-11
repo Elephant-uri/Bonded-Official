@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 import { useEventsContext } from '../../contexts/EventsContext'
 import { useClubsContext } from '../../contexts/ClubsContext'
 import ShareModal from '../ShareModal'
 
 export default function EventPost({ event, forumId }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const { rsvpToEvent, getUserRSVP } = useEventsContext()
   const { getClub } = useClubsContext()
@@ -248,9 +250,9 @@ export default function EventPost({ event, forumId }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     marginBottom: hp(1.5),
     overflow: 'hidden',
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
   category: {
     fontSize: hp(1.2),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     textTransform: 'capitalize',
     opacity: 0.7,
   },
@@ -323,13 +325,13 @@ const styles = StyleSheet.create({
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
   description: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.8,
     marginBottom: hp(1),
     lineHeight: hp(2.2),
@@ -346,7 +348,7 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     flex: 1,
   },
   statsRow: {
@@ -365,7 +367,7 @@ const styles = StyleSheet.create({
   statText: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   rsvpRow: {

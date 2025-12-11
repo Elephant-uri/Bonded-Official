@@ -2,10 +2,14 @@ import { TouchableOpacity, StyleSheet, Platform, Animated } from 'react-native'
 import React, { useEffect, useRef } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 
-const BackButton = ({ onPress, style, visible = true }) => {
+const BackButton = ({ onPress, style, visible = true, theme: customTheme }) => {
+  // Always call hook (React rules), but ignore if customTheme provided
+  const appTheme = useAppTheme()
+  const theme = customTheme || appTheme // Use custom theme if provided, otherwise use app theme
+  const styles = createStyles(theme)
   const { top } = useSafeAreaInsets()
   const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current
   
@@ -42,7 +46,7 @@ const BackButton = ({ onPress, style, visible = true }) => {
         <Ionicons 
           name="chevron-back" 
           size={hp(3)} 
-          color={theme.colors.charcoal} 
+          color={theme.colors.textPrimary} 
         />
       </TouchableOpacity>
     </Animated.View>
@@ -51,7 +55,7 @@ const BackButton = ({ onPress, style, visible = true }) => {
 
 export default BackButton
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: wp(4),
@@ -63,7 +67,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({

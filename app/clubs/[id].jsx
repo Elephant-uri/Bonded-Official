@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../theme'
 import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import { useClubsContext } from '../../contexts/ClubsContext'
@@ -24,6 +24,8 @@ import ShareModal from '../../components/ShareModal'
 import InviteModal from '../../components/InviteModal'
 
 export default function ClubDetail() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const {
@@ -191,7 +193,7 @@ export default function ClubDetail() {
                   <Ionicons
                     name="people"
                     size={hp(1.8)}
-                    color={theme.colors.softBlack}
+                    color={theme.colors.textSecondary}
                   />
                   <Text style={styles.memberCountText}>{memberCount} members</Text>
                 </View>
@@ -356,7 +358,7 @@ export default function ClubDetail() {
                         'person-add-outline'
                       }
                       size={hp(2.2)}
-                      color={activeTab === tab ? theme.colors.charcoal : theme.colors.softBlack}
+                      color={activeTab === tab ? theme.colors.textPrimary : theme.colors.textSecondary}
                       style={{ opacity: activeTab === tab ? 1 : 0.5 }}
                     />
                     <Text
@@ -386,7 +388,7 @@ export default function ClubDetail() {
                         'people-outline'
                       }
                       size={hp(2.2)}
-                      color={activeTab === tab ? theme.colors.charcoal : theme.colors.softBlack}
+                      color={activeTab === tab ? theme.colors.textPrimary : theme.colors.textSecondary}
                       style={{ opacity: activeTab === tab ? 1 : 0.5 }}
                     />
                     <Text
@@ -451,7 +453,7 @@ export default function ClubDetail() {
                   <Ionicons
                     name="document-text-outline"
                     size={hp(5)}
-                    color={theme.colors.softBlack}
+                    color={theme.colors.textSecondary}
                     style={{ opacity: 0.3 }}
                   />
                   <Text style={styles.emptyStateText}>No posts yet</Text>
@@ -476,7 +478,7 @@ export default function ClubDetail() {
                   <Ionicons
                     name="calendar-outline"
                     size={hp(5)}
-                    color={theme.colors.softBlack}
+                    color={theme.colors.textSecondary}
                     style={{ opacity: 0.3 }}
                   />
                   <Text style={styles.emptyStateText}>No events yet</Text>
@@ -502,7 +504,7 @@ export default function ClubDetail() {
                   <Ionicons
                     name="people-outline"
                     size={hp(5)}
-                    color={theme.colors.softBlack}
+                    color={theme.colors.textSecondary}
                     style={{ opacity: 0.3 }}
                   />
                   <Text style={styles.emptyStateText}>No members yet</Text>
@@ -569,7 +571,7 @@ export default function ClubDetail() {
                   <Ionicons
                     name="person-add-outline"
                     size={hp(5)}
-                    color={theme.colors.softBlack}
+                    color={theme.colors.textSecondary}
                     style={{ opacity: 0.3 }}
                   />
                   <Text style={styles.emptyStateText}>No pending requests</Text>
@@ -622,10 +624,10 @@ export default function ClubDetail() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -663,7 +665,7 @@ const styles = StyleSheet.create({
     borderRadius: hp(6),
     borderWidth: 4,
     borderColor: theme.colors.white,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -702,9 +704,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: wp(4),
     paddingTop: hp(6),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   clubInfo: {
     flex: 1,
@@ -713,7 +715,7 @@ const styles = StyleSheet.create({
     fontSize: hp(3),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   clubMeta: {
@@ -742,7 +744,7 @@ const styles = StyleSheet.create({
   memberCountText: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   actionButtons: {
@@ -767,19 +769,19 @@ const styles = StyleSheet.create({
   description: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     lineHeight: hp(2.6),
     padding: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   statItem: {
     alignItems: 'center',
@@ -788,13 +790,13 @@ const styles = StyleSheet.create({
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
   statLabel: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   adminActionsRow: {
@@ -808,9 +810,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     paddingVertical: hp(1.5),
     borderRadius: theme.radius.lg,
   },
@@ -818,15 +820,15 @@ const styles = StyleSheet.create({
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   settingsButton: {
     width: hp(5.5),
     height: hp(5.5),
     borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -867,7 +869,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 2,
     borderColor: theme.colors.bondedPurple,
     paddingVertical: hp(1.8),
@@ -911,11 +913,11 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   tab: {
     flex: 1,
@@ -931,7 +933,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.6,
   },
   tabTextActive: {
@@ -940,7 +942,7 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     padding: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     minHeight: hp(30),
   },
   section: {
@@ -950,7 +952,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
   leaderItem: {
@@ -966,12 +968,12 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   leaderRole: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   statsRow: {
@@ -979,9 +981,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   statItem: {
     alignItems: 'center',
@@ -990,17 +992,17 @@ const styles = StyleSheet.create({
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
   statLabel: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   postCard: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     marginBottom: hp(1.5),
@@ -1015,19 +1017,19 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     flex: 1,
   },
   postDate: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   postBody: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     lineHeight: hp(2.4),
   },
   membersRow: {
@@ -1049,7 +1051,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     textAlign: 'center',
   },
   emptyState: {
@@ -1059,7 +1061,7 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginTop: hp(1.5),
   },
@@ -1098,7 +1100,7 @@ const styles = StyleSheet.create({
   postGridPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1126,9 +1128,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: hp(1.5),
     paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
     gap: wp(3),
   },
   requestAvatar: {
@@ -1143,13 +1145,13 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
   requestTime: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   requestActions: {
@@ -1199,7 +1201,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     marginBottom: hp(2),
   },
   backButton: {

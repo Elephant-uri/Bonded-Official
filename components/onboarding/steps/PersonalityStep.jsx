@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
 import React, { useState } from 'react'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
-import theme from '../../../constants/theme'
+import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 
 const PersonalityStep = ({ formData, updateFormData, onScroll }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState(formData.personalityAnswers || {})
 
@@ -176,7 +177,7 @@ const PersonalityStep = ({ formData, updateFormData, onScroll }) => {
 
 export default PersonalityStep
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -187,15 +188,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     marginBottom: hp(4),
     textAlign: 'center',
   },
@@ -206,20 +207,20 @@ const styles = StyleSheet.create({
   progressBar: {
     width: '100%',
     height: hp(0.6),
-    backgroundColor: theme.colors.offWhite,
-    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 9999,
     overflow: 'hidden',
     marginBottom: hp(1),
   },
   progressFill: {
     height: '100%',
-    backgroundColor: theme.colors.bondedPurple,
-    borderRadius: theme.radius.pill,
+    backgroundColor: '#A45CFF',
+    borderRadius: 9999,
   },
   progressText: {
     fontSize: hp(1.8),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
   },
   questionContainer: {
     marginBottom: hp(4),
@@ -228,8 +229,8 @@ const styles = StyleSheet.create({
   questionText: {
     fontSize: hp(3),
     fontWeight: '700',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     textAlign: 'center',
     lineHeight: hp(4),
   },
@@ -238,42 +239,42 @@ const styles = StyleSheet.create({
     marginBottom: hp(4),
   },
   optionButton: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     paddingVertical: hp(2.5),
     paddingHorizontal: wp(5),
     borderWidth: 2,
-    borderColor: theme.colors.offWhite,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   optionButtonSelected: {
-    backgroundColor: theme.colors.bondedPurple + '15',
-    borderColor: theme.colors.bondedPurple,
+    backgroundColor: '#A45CFF15',
+    borderColor: '#A45CFF',
   },
   optionText: {
     fontSize: hp(2),
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     flex: 1,
     lineHeight: hp(2.8),
   },
   optionTextSelected: {
-    color: theme.colors.bondedPurple,
+    color: '#A45CFF',
     fontWeight: '600',
   },
   checkmark: {
     width: hp(3),
     height: hp(3),
     borderRadius: hp(1.5),
-    backgroundColor: theme.colors.bondedPurple,
+    backgroundColor: '#A45CFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: wp(3),
   },
   checkmarkText: {
-    color: theme.colors.white,
+    color: '#FFFFFF',
     fontSize: hp(1.8),
     fontWeight: 'bold',
   },
@@ -285,8 +286,8 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: hp(2),
-    color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#A45CFF',
+    fontFamily: 'System',
     fontWeight: '600',
   },
 })

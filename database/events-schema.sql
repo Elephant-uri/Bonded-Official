@@ -142,11 +142,14 @@ ALTER TABLE public.event_attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_invites ENABLE ROW LEVEL SECURITY;
 
 -- Events policies
--- Anyone can read public events
-DROP POLICY IF EXISTS "Public events are viewable by everyone" ON public.events;
-CREATE POLICY "Public events are viewable by everyone"
+-- Authenticated users can read public events
+DROP POLICY IF EXISTS "Public events are viewable by authenticated users" ON public.events;
+CREATE POLICY "Public events are viewable by authenticated users"
 ON public.events FOR SELECT
-USING (visibility = 'public' OR visibility = 'school');
+USING (
+  auth.uid() IS NOT NULL  -- Require authentication
+  AND (visibility = 'public' OR visibility = 'school')
+);
 
 -- Users can read org-only events if they're members of that org
 DROP POLICY IF EXISTS "Org members can view org events" ON public.events;
@@ -181,7 +184,11 @@ USING (
 DROP POLICY IF EXISTS "Organizers can manage their events" ON public.events;
 CREATE POLICY "Organizers can manage their events"
 ON public.events FOR ALL
-USING (organizer_id = auth.uid() OR created_by = auth.uid());
+USING (organizer_id = auth.uid() OR created_by = auth.uid())
+WITH CHECK (
+  -- Prevent changing organizer to someone else
+  organizer_id = auth.uid() OR created_by = auth.uid()
+);
 
 -- Event ticket types policies
 -- Anyone can read ticket types for events they can view
@@ -322,6 +329,11 @@ RETURNS TABLE (
   org_id uuid
 ) AS $$
 BEGIN
+  -- SECURITY: Validate user can only query their own events
+  IF user_id_param != auth.uid() THEN
+    RAISE EXCEPTION 'Access denied: Cannot query events for other users';
+  END IF;
+  
   RETURN QUERY
   SELECT 
     e.id,

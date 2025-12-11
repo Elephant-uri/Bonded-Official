@@ -4,10 +4,11 @@ import Picker from '../../Picker'
 import Button from '../../Button'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
 import { US_SCHOOLS } from '../../../constants/schools'
-import theme from '../../../constants/theme'
+import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 
 const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   const [localData, setLocalData] = useState({
     school: formData.school || null,
     age: formData.age || null,
@@ -115,6 +116,7 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
         onValueChange={(value) => handleChange('school', value)}
         searchable={true}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       {/* Age Picker */}
@@ -125,6 +127,7 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
         options={ageOptions}
         onValueChange={(value) => handleChange('age', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       {/* Grade Picker */}
@@ -135,6 +138,7 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
         options={gradeOptions}
         onValueChange={(value) => handleChange('grade', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       {/* Gender Picker */}
@@ -145,6 +149,7 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
         options={genderOptions}
         onValueChange={(value) => handleChange('gender', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       {/* Major Picker */}
@@ -156,6 +161,7 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
         onValueChange={(value) => handleChange('major', value)}
         searchable={true}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
     </ScrollView>
   )
@@ -163,7 +169,7 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
 
 export default BasicInfoStep
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -173,15 +179,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     marginBottom: hp(4),
     textAlign: 'center',
   },

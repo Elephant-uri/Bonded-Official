@@ -5,7 +5,7 @@ import ScreenWrapper from '../components/ScreenWrapper'
 import { StatusBar } from 'expo-status-bar'
 import { useOnboardingStore, ONBOARDING_STEPS } from '../stores/onboardingStore'
 import { useSaveOnboarding } from '../hooks/useSaveOnboarding'
-import theme from '../constants/theme'
+// Onboarding always uses light mode - don't use dynamic theme
 import { hp, wp } from '../helpers/common'
 import BackButton from '../components/BackButton'
 import ProgressBar from '../components/onboarding/ProgressBar'
@@ -17,8 +17,10 @@ import LivingHabitsStep from '../components/onboarding/steps/LivingHabitsStep'
 import PersonalityStep from '../components/onboarding/steps/PersonalityStep'
 import ClassScheduleStep from '../components/onboarding/steps/ClassScheduleStep'
 import OnboardingNavigation from '../components/onboarding/OnboardingNavigation'
+import { ONBOARDING_THEME } from '../constants/onboardingTheme'
 
 export default function Onboarding() {
+  const styles = createStyles(ONBOARDING_THEME)
   const router = useRouter()
   const { 
     currentStep, 
@@ -182,7 +184,7 @@ export default function Onboarding() {
     >
       <ScreenWrapper bg='transparent'>
         <StatusBar style='light' />
-        <BackButton onPress={handleBack} visible={!isScrollingDown} />
+        <BackButton onPress={handleBack} visible={!isScrollingDown} theme={ONBOARDING_THEME} />
         
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.container}>
@@ -213,7 +215,7 @@ export default function Onboarding() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   background: {
     flex: 1,
     width: '100%',

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
@@ -20,6 +20,8 @@ const MOCK_SCHOOLS = [
 ]
 
 export default function BrowseSchools() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -45,7 +47,7 @@ export default function BrowseSchools() {
           <Ionicons
             name="location-outline"
             size={hp(1.6)}
-            color={theme.colors.softBlack}
+            color={theme.colors.textSecondary}
             style={{ marginRight: wp(1) }}
           />
           <Text style={styles.schoolLocation}>{item.location}</Text>
@@ -79,13 +81,13 @@ export default function BrowseSchools() {
           <Ionicons
             name="search-outline"
             size={hp(2.2)}
-            color={theme.colors.softBlack}
+            color={theme.colors.textSecondary}
             style={{ marginRight: wp(2) }}
           />
           <TextInput
             style={styles.searchInput}
             placeholder="Search schools..."
-            placeholderTextColor={theme.colors.softBlack}
+            placeholderTextColor={theme.colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -105,10 +107,10 @@ export default function BrowseSchools() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -118,13 +120,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(2.6),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.5),
   },
   subtitle: {
     fontSize: hp(1.7),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
     marginBottom: hp(2),
@@ -132,18 +134,18 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
     marginBottom: hp(2),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   searchInput: {
     flex: 1,
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   listContent: {
@@ -153,7 +155,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     padding: wp(4),
     marginBottom: hp(1.5),
@@ -164,7 +166,7 @@ const styles = StyleSheet.create({
   schoolName: {
     fontSize: hp(2),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.5),
   },
@@ -174,18 +176,18 @@ const styles = StyleSheet.create({
   },
   schoolLocation: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
   },
   schoolSeparator: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.5,
   },
   schoolStudents: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
   },

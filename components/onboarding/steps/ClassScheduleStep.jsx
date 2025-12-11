@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native'
 import React from 'react'
 import { Ionicons } from '@expo/vector-icons'
-import theme from '../../../constants/theme'
+import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 
 const ClassScheduleStep = ({ formData, updateFormData, onScroll }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   return (
     <ScrollView 
       style={styles.container}
@@ -17,7 +18,7 @@ const ClassScheduleStep = ({ formData, updateFormData, onScroll }) => {
         <Ionicons 
           name="calendar-outline" 
           size={hp(12)} 
-          color={theme.colors.bondedPurple + '40'} 
+          color="#A45CFF40" 
         />
       </View>
       
@@ -32,7 +33,7 @@ const ClassScheduleStep = ({ formData, updateFormData, onScroll }) => {
 
 export default ClassScheduleStep
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -51,23 +52,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(2),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(3),
     fontWeight: '700',
-    color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#A45CFF',
+    fontFamily: 'System',
     marginBottom: hp(3),
     textAlign: 'center',
   },
   description: {
     fontSize: hp(2.2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     textAlign: 'center',
     lineHeight: hp(3.2),
     opacity: 0.8,

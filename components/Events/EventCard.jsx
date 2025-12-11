@@ -60,6 +60,7 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
     })
   }
 
+
   const getVisibilityBadge = () => {
     switch (event.visibility) {
       case 'public':

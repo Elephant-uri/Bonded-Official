@@ -1,10 +1,11 @@
 import { Text, StyleSheet } from 'react-native'
 import React from 'react'
-import theme from '../../constants/theme'
+// Onboarding always uses light mode
 import { hp, wp } from '../../helpers/common'
 import { ONBOARDING_STEPS } from '../../stores/onboardingStore'
 
 const ProgressBar = ({ currentStep, completionPercentage }) => {
+  const styles = createStyles()
   const steps = Object.values(ONBOARDING_STEPS)
   const currentStepIndex = steps.indexOf(currentStep)
   const currentStepNumber = currentStepIndex + 1
@@ -19,11 +20,11 @@ const ProgressBar = ({ currentStep, completionPercentage }) => {
 
 export default ProgressBar
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   stepIndicator: {
     fontSize: hp(1.8),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     textAlign: 'center',
     opacity: 0.7,
   },

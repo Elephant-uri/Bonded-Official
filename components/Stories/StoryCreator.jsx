@@ -5,9 +5,11 @@ import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 export default function StoryCreator({ visible, forumId, forumName, onClose, onCaptured }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [facing, setFacing] = useState('back')
   const [flash, setFlash] = useState('off')
   const [permission, requestPermission] = useCameraPermissions()
@@ -251,10 +253,10 @@ export default function StoryCreator({ visible, forumId, forumName, onClose, onC
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.charcoal,
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -390,7 +392,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: wp(8),
-    backgroundColor: theme.colors.charcoal,
+    backgroundColor: theme.colors.background,
   },
   permissionTitle: {
     fontSize: hp(2.4),

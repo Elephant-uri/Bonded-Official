@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { hp, wp } from '../helpers/common'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import AppHeader from './AppHeader'
 import AppCard from './AppCard'
 
@@ -31,6 +31,8 @@ const MOCK_FRIENDS = [
 ]
 
 export default function ShareModal({ visible, content, onClose }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [selectedFriends, setSelectedFriends] = useState([])
   const [message, setMessage] = useState('')
@@ -230,10 +232,10 @@ export default function ShareModal({ visible, content, onClose }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -261,13 +263,13 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
   previewSubtitle: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   messageSection: {
@@ -330,7 +332,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   friendsList: {
     padding: wp(4),
@@ -366,7 +368,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   checkbox: {
     width: hp(2.5),

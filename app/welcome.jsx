@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import ScreenWrapper from '../components/ScreenWrapper'
 import { StatusBar } from 'expo-status-bar'
 import { hp, wp } from '../helpers/common'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import Button from '../components/Button'
 import AnimatedLogo from '../components/AnimatedLogo'
 import { useRouter } from 'expo-router'
@@ -18,6 +18,8 @@ const phrases = [
 ];
 
 const welcome = () => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const hoverValue = useRef(new Animated.Value(0)).current
   const phraseAnim = useRef(new Animated.Value(1)).current
   const [phraseIndex, setPhraseIndex] = useState(0)
@@ -128,7 +130,7 @@ const welcome = () => {
 
 export default welcome
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     background: {
         flex: 1,
         width: '100%',
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
         marginTop: hp(0),
     },
     title: {
-        color: theme.colors.charcoal,
+        color: theme.colors.textPrimary,
         fontSize: hp(5),
         fontWeight: '800',
         textAlign: 'center',
@@ -160,7 +162,7 @@ const styles = StyleSheet.create({
         fontSize: hp(3),
         paddingHorizontal: wp(4),
         fontWeight: '500',
-        color: theme.colors.softBlack,
+        color: theme.colors.textSecondary,
         fontFamily: theme.typography.fontFamily.heading,
     },
     metricsPill: {
@@ -188,7 +190,7 @@ const styles = StyleSheet.create({
     },
     metricsLabel: {
         fontSize: hp(1.8),
-        color: theme.colors.charcoal,
+        color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.body,
     },
     footer: {

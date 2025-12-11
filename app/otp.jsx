@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import ScreenWrapper from '../components/ScreenWrapper'
 import { StatusBar } from 'expo-status-bar'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 import AnimatedLogo from '../components/AnimatedLogo'
 import OTPInput from '../components/OTPInput'
@@ -11,6 +11,8 @@ import Button from '../components/Button'
 import BackButton from '../components/BackButton'
 
 export default function OTP() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const { type, email, name, isVerified } = useLocalSearchParams()
   const [otpCode, setOtpCode] = useState('')
@@ -146,7 +148,7 @@ export default function OTP() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   background: {
     flex: 1,
     width: '100%',
@@ -162,7 +164,7 @@ const styles = StyleSheet.create({
     marginBottom: hp(4),
   },
   welcomeTitle: {
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontSize: hp(5),
     fontWeight: '800',
     textAlign: 'center',
@@ -171,7 +173,7 @@ const styles = StyleSheet.create({
     marginBottom: hp(3),
   },
   welcomeBackTitle: {
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontSize: hp(4),
     fontWeight: '800',
     textAlign: 'center',
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
     marginVertical: hp(2),
   },
   codePrompt: {
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontSize: hp(2.2),
     textAlign: 'center',
     fontFamily: theme.typography.fontFamily.body,

@@ -1,7 +1,7 @@
 import { View, StyleSheet } from 'react-native'
 import React from 'react'
 import Button from '../Button'
-import theme from '../../constants/theme'
+import { ONBOARDING_THEME } from '../../constants/onboardingTheme'
 import { hp, wp } from '../../helpers/common'
 
 const OnboardingNavigation = ({
@@ -13,6 +13,7 @@ const OnboardingNavigation = ({
   isSaving,
   stepIndicator,
 }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   return (
     <View style={styles.container}>
       {/* Step Indicator */}
@@ -25,8 +26,10 @@ const OnboardingNavigation = ({
           <Button
             title="Finish Later"
             onPress={onFinishLater}
-            buttonStyle={[styles.finishLaterButton, styles.button]}
+            buttonStyle={[styles.button, styles.finishLaterButton]}
             textStyle={styles.finishLaterText}
+            theme={ONBOARDING_THEME}
+            hasShadow={false}
           />
         )}
 
@@ -35,11 +38,13 @@ const OnboardingNavigation = ({
           title={isSaving ? "Saving..." : "Continue"}
           onPress={onContinue}
           buttonStyle={[
-            styles.continueButton,
             styles.button,
+            styles.continueButton,
             !canContinue && styles.buttonDisabled,
           ]}
           textStyle={!canContinue && styles.buttonDisabledText}
+          theme={ONBOARDING_THEME}
+          hasShadow={false}
         />
       </View>
     </View>
@@ -48,7 +53,7 @@ const OnboardingNavigation = ({
 
 export default OnboardingNavigation
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     paddingBottom: hp(4),
     gap: hp(1.5),
@@ -63,20 +68,20 @@ const styles = StyleSheet.create({
   finishLaterButton: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: theme.colors.bondedPurple,
+    borderColor: '#A45CFF',
   },
   finishLaterText: {
-    color: theme.colors.bondedPurple,
+    color: '#A45CFF',
   },
   continueButton: {
-    backgroundColor: theme.colors.bondedPurple,
+    backgroundColor: '#A45CFF', // Purple color - this should override Button's default
   },
   buttonDisabled: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     opacity: 0.5,
   },
   buttonDisabledText: {
-    color: theme.colors.softBlack,
+    color: '#8E8E8E',
   },
 })
 

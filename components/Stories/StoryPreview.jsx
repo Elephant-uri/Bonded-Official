@@ -3,7 +3,7 @@ import { View, Modal, StyleSheet, TouchableOpacity, Text, Image, ActivityIndicat
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 export default function StoryPreview({
   visible,
@@ -15,6 +15,8 @@ export default function StoryPreview({
   onBack,
   onPost,
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [isPosting, setIsPosting] = useState(false)
 
   const handlePost = async () => {
@@ -135,10 +137,10 @@ export default function StoryPreview({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.charcoal,
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',

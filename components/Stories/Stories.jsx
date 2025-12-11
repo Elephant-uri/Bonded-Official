@@ -3,7 +3,7 @@ import { View, ScrollView, TouchableOpacity, Text, StyleSheet, Platform } from '
 import { Ionicons } from '@expo/vector-icons'
 import StoryCircle from './StoryCircle'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 import { useStoriesContext } from '../../contexts/StoriesContext'
 
 export default function Stories({
@@ -13,6 +13,8 @@ export default function Stories({
   showCreateButton = true,
   currentUserId,
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const { getForumStories, hasViewedStory } = useStoriesContext()
 
   // Group stories by user
@@ -90,9 +92,9 @@ export default function Stories({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   wrapper: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
     width: '100%',
@@ -116,7 +118,7 @@ const styles = StyleSheet.create({
     width: hp(8),
     height: hp(8),
     borderRadius: hp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 3,
     borderColor: theme.colors.bondedPurple,
     borderStyle: 'dashed',
@@ -128,13 +130,13 @@ const styles = StyleSheet.create({
     width: hp(7),
     height: hp(7),
     borderRadius: hp(3.5),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   createStoryLabel: {
     fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
     maxWidth: wp(22),

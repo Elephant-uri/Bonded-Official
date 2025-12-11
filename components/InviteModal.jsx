@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../helpers/common'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 
 // Mock data for users - in a real app, this would come from a users context or API
 const MOCK_USERS = [
@@ -30,6 +30,8 @@ const MOCK_USERS = [
 ]
 
 export default function InviteModal({ visible, clubName, onClose, onInvite }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedUsers, setSelectedUsers] = useState([])
 
@@ -160,17 +162,17 @@ export default function InviteModal({ visible, clubName, onClose, onInvite }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -180,7 +182,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.5),
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.offWhite,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   closeButton: {
     padding: wp(1),
@@ -193,12 +195,12 @@ const styles = StyleSheet.create({
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   headerSubtitle: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginTop: hp(0.2),
   },
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     marginHorizontal: wp(4),
     marginTop: hp(1.5),
@@ -235,7 +237,7 @@ const styles = StyleSheet.create({
     marginLeft: wp(2),
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   selectedUsersContainer: {
     marginBottom: hp(1.5),
@@ -289,7 +291,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontWeight: '500',
     marginBottom: hp(0.2),
   },

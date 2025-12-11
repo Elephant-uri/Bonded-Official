@@ -1,67 +1,59 @@
-import React, { useState, useRef, useMemo } from 'react'
+import * as ImagePicker from 'expo-image-picker'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import React, { useMemo, useRef, useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
+    Alert,
+    Animated,
   FlatList,
-  TouchableOpacity,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
   Modal,
+    Platform,
   Pressable,
   ScrollView,
+    StyleSheet,
+    Text,
   TextInput,
-  Switch,
-  Keyboard,
-  TouchableWithoutFeedback,
-  Image,
-  Platform,
-  Animated,
-  KeyboardAvoidingView,
+    TouchableOpacity,
+    View
 } from 'react-native'
-import * as ImagePicker from 'expo-image-picker'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import BottomNav from '../components/BottomNav'
+import Chip from '../components/Chip'
+import AnonymousMessageButton from '../components/Forum/AnonymousMessageButton'
+import PollRenderer from '../components/Forum/PollRenderer'
+import PostTags from '../components/Forum/PostTags'
+import RepostModal from '../components/Forum/RepostModal'
+import ForumSelectorModal from '../components/ForumSelectorModal'
+import ForumSwitcher from '../components/ForumSwitcher'
 import { 
   Add, 
-  ArrowUpCircle, 
   ArrowDownCircle, 
+    ArrowUpCircle,
+    Check,
+    ChevronDown,
+    EyeOff,
+    Heart,
+    HeartFill,
+    ImageIcon,
   MessageCircle, 
-  Share2, 
-  Repeat, 
   MoreHorizontal,
-  ImageIcon,
-  Video,
-  EyeOff,
   Person,
-  X,
-  Tag,
-  BarChart3,
-  Mail,
-  ChevronDown,
-  MapPin,
-  Check
+    Repeat,
+    Search,
+    Share2,
+    Video,
+    X
 } from '../components/Icons'
-import { useRouter, useLocalSearchParams } from 'expo-router'
-import theme from '../constants/theme'
-import { hp, wp } from '../helpers/common'
-import AppTopBar from '../components/AppTopBar'
-import BottomNav from '../components/BottomNav'
-import Stories from '../components/Stories/Stories'
-import StoryViewer from '../components/Stories/StoryViewer'
-import StoryFlow from '../components/Stories/StoryFlow'
 import ShareModal from '../components/ShareModal'
-import AppCard from '../components/AppCard'
-import PrimaryButton from '../components/PrimaryButton'
-import SecondaryButton from '../components/SecondaryButton'
-import Chip from '../components/Chip'
-import ForumSwitcher from '../components/ForumSwitcher'
-import ForumSelectorModal from '../components/ForumSelectorModal'
-import { LinearGradient } from 'expo-linear-gradient'
+import Stories from '../components/Stories/Stories'
+import StoryFlow from '../components/Stories/StoryFlow'
+import StoryViewer from '../components/Stories/StoryViewer'
+import { useAppTheme } from './theme'
 import { useStoriesContext } from '../contexts/StoriesContext'
-import TagSelector from '../components/Forum/TagSelector'
-import PollBuilder from '../components/Forum/PollBuilder'
-import PollRenderer from '../components/Forum/PollRenderer'
-import RepostModal from '../components/Forum/RepostModal'
-import AnonymousMessageButton from '../components/Forum/AnonymousMessageButton'
-import PostTags from '../components/Forum/PostTags'
+import { hp, wp } from '../helpers/common'
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
 
@@ -428,8 +420,11 @@ const MOCK_POSTS = Array.from({ length: 60 }).map((_, index) => ({
 }))
 
 export default function Forum() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const params = useLocalSearchParams()
+  const insets = useSafeAreaInsets()
   const [posts, setPosts] = useState(MOCK_POSTS)
   const [activePost, setActivePost] = useState(null)
   const [activeAuthorPost, setActiveAuthorPost] = useState(null)
@@ -441,7 +436,8 @@ export default function Forum() {
   const [showTagSelector, setShowTagSelector] = useState(false)
   const [showPostAsModal, setShowPostAsModal] = useState(false)
   const [selectedTag, setSelectedTag] = useState(null)
-  const [draftLocation, setDraftLocation] = useState('Valley, RI') // Mock location
+  // Mock: Check if user is admin (in real app, this would come from auth context)
+  const isAdmin = false
   const [draftTags, setDraftTags] = useState([])
   const [draftPoll, setDraftPoll] = useState(null)
   const [showPollBuilder, setShowPollBuilder] = useState(false)
@@ -476,10 +472,10 @@ export default function Forum() {
   
   const currentForumId = currentForum?.id || 'forum-quad'
   
-  // Filter posts for current forum
+  // Filter posts for current forum and search
   const allPosts = useMemo(() => {
     // Filter regular posts by current forum
-    const forumPosts = posts.filter((post) => {
+    let forumPosts = posts.filter((post) => {
       // If forum property exists, match it
       if (post.forum) {
         // Map forum names to forum IDs
@@ -541,25 +537,37 @@ export default function Forum() {
 
   const handlePickMedia = async (kind) => {
     try {
+      console.log(`Picking ${kind}...`)
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
       if (!permission.granted) {
+        console.log('Permission not granted')
+        Alert.alert('Permission Required', 'Please grant access to your media library to select images or videos.')
         return
       }
 
+      const mediaType = kind === 'image' 
+        ? ImagePicker.MediaTypeOptions.Images 
+        : ImagePicker.MediaTypeOptions.Videos
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes:
-          kind === 'image'
-            ? ImagePicker.MediaType.Image
-            : ImagePicker.MediaType.Video,
+        mediaTypes: mediaType,
         allowsEditing: false,
         quality: 0.7,
+        allowsMultipleSelection: false,
       })
 
-      if (result.canceled) return
+      if (result.canceled) {
+        console.log('User canceled media picker')
+        return
+      }
 
       const asset = result.assets?.[0]
-      if (!asset) return
+      if (!asset) {
+        console.log('No asset selected')
+        return
+      }
 
+      console.log('Media selected:', asset.uri)
       setDraftMedia((prev) => [
         ...prev,
         {
@@ -568,7 +576,8 @@ export default function Forum() {
         },
       ])
     } catch (error) {
-      console.log('Media pick error', error)
+      console.error('Media pick error:', error)
+      Alert.alert('Error', 'Failed to pick media. Please try again.')
     }
   }
 
@@ -647,7 +656,7 @@ export default function Forum() {
 
     // Regular post
     return (
-      <AppCard style={styles.postCard}>
+      <View style={styles.postCard}>
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => setActivePost(item)}
@@ -659,11 +668,17 @@ export default function Forum() {
         activeOpacity={0.8}
         onPress={() => setActiveAuthorPost(item)}
       >
-        <View style={styles.postAvatar}>
+              <LinearGradient
+                colors={item.isAnon 
+                  ? ['#A855F7', '#9333EA'] 
+                  : [theme.colors.bondedPurple, theme.colors.bondedPurple + 'DD']
+                }
+                style={styles.postAvatar}
+              >
           <Text style={styles.postAvatarText}>
             {item.isAnon ? '?' : item.author.charAt(0).toUpperCase()}
           </Text>
-        </View>
+              </LinearGradient>
         <View style={styles.postAuthorInfo}>
           <Text style={styles.postAuthorName}>
             {item.isAnon ? 'Anonymous' : item.author}
@@ -675,8 +690,8 @@ export default function Forum() {
       </TouchableOpacity>
         <TouchableOpacity activeOpacity={0.7}>
           <MoreHorizontal
-            size={hp(2.4)}
-            color={theme.colors.softBlack}
+                size={hp(2.2)}
+                color={theme.colors.textSecondary}
             strokeWidth={2}
           />
         </TouchableOpacity>
@@ -684,18 +699,23 @@ export default function Forum() {
 
         {/* Content */}
         <View style={styles.postBody}>
+            {item.title && (
           <Text style={styles.postTitle}>{item.title}</Text>
+            )}
           <Text numberOfLines={3} style={styles.postBodyText}>
             {item.body}
           </Text>
 
           {/* Tags */}
           {item.tags && item.tags.length > 0 && (
+              <View style={styles.postTagsContainer}>
             <PostTags tags={item.tags} maxDisplay={2} />
+              </View>
           )}
 
           {/* Poll */}
           {polls[item.id] && (
+              <View style={styles.postPollContainer}>
             <PollRenderer
               poll={polls[item.id]}
               userVote={pollVotes[polls[item.id].poll_id]?.[currentUser.id]}
@@ -725,6 +745,7 @@ export default function Forum() {
               totalVotes={pollResults[polls[item.id].poll_id]?.totalVotes || 0}
               voteCounts={pollResults[polls[item.id].poll_id]?.voteCounts || []}
             />
+              </View>
           )}
 
           {item.media && item.media.length > 0 && (
@@ -737,7 +758,7 @@ export default function Forum() {
               ) : (
                 <View style={styles.postMediaVideo}>
                   <Video
-                    size={hp(4)}
+                      size={hp(3.5)}
                     color={theme.colors.white}
                     strokeWidth={2}
                     fill={theme.colors.white}
@@ -750,7 +771,7 @@ export default function Forum() {
         </View>
         </TouchableOpacity>
 
-        {/* Actions */}
+        {/* Actions - Compact Row */}
         <View style={styles.postActionsRow}>
         <View style={styles.postVotesRow}>
           <TouchableOpacity
@@ -765,8 +786,8 @@ export default function Forum() {
             }
           >
             <ArrowUpCircle
-              size={hp(2.8)}
-              color={item.upvotes > 0 ? '#2ecc71' : theme.colors.softBlack}
+                size={hp(2.4)}
+                color={item.upvotes > 0 ? theme.statusColors.success : theme.colors.textSecondary}
               strokeWidth={2}
               fill={item.upvotes > 0 ? '#2ecc71' : 'none'}
             />
@@ -792,8 +813,8 @@ export default function Forum() {
             }
           >
             <ArrowDownCircle
-              size={hp(2.8)}
-              color={item.upvotes < 0 ? '#e74c3c' : theme.colors.softBlack}
+                size={hp(2.4)}
+                color={item.upvotes < 0 ? theme.statusColors.error : theme.colors.textSecondary}
               strokeWidth={2}
               fill={item.upvotes < 0 ? '#e74c3c' : 'none'}
             />
@@ -801,22 +822,22 @@ export default function Forum() {
         </View>
 
         <TouchableOpacity
-          style={styles.postCommentsButton}
+            style={styles.postActionButton}
           activeOpacity={0.7}
           onPress={() => setActivePost(item)}
         >
           <MessageCircle
-            size={hp(2.2)}
-            color={theme.colors.softBlack}
+              size={hp(2)}
+              color={theme.colors.textSecondary}
             strokeWidth={2}
           />
-          <Text style={styles.postCommentsText}>
-            {item.commentsCount} comments
-          </Text>
+            {item.commentsCount > 0 && (
+              <Text style={styles.postActionText}>{item.commentsCount}</Text>
+            )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.postRepostButton}
+            style={styles.postActionButton}
           activeOpacity={0.7}
           onPress={() => {
             setRepostPost(item)
@@ -824,17 +845,17 @@ export default function Forum() {
           }}
         >
           <Repeat
-            size={hp(2.2)}
-            color={theme.colors.softBlack}
+              size={hp(2)}
+              color={theme.colors.textSecondary}
             strokeWidth={2}
           />
           {item.repostsCount > 0 && (
-            <Text style={styles.repostCount}>{item.repostsCount}</Text>
+              <Text style={styles.postActionText}>{item.repostsCount}</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.postShareButton}
+            style={styles.postActionButton}
           activeOpacity={0.7}
           onPress={() => {
             setShareContent({
@@ -845,13 +866,13 @@ export default function Forum() {
           }}
         >
           <Share2
-            size={hp(2.2)}
-            color={theme.colors.softBlack}
+              size={hp(2)}
+              color={theme.colors.textSecondary}
             strokeWidth={2}
           />
         </TouchableOpacity>
         </View>
-      </AppCard>
+      </View>
     )
   }
 
@@ -880,8 +901,11 @@ export default function Forum() {
           />
         </View>
 
-        <View style={styles.headerButton} />
+        <View style={styles.headerRight}>
+          {/* Empty space for balance */}
+        </View>
       </View>
+
 
       {/* Tag Filter Bar */}
       <ScrollView
@@ -939,14 +963,6 @@ export default function Forum() {
           ListHeaderComponent={renderListHeader}
         />
 
-        {/* Create Post FAB */}
-        <TouchableOpacity
-          style={styles.createPostFAB}
-          onPress={() => setIsCreateModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Add size={hp(2.5)} color={theme.colors.white} strokeWidth={2.5} />
-        </TouchableOpacity>
 
         {/* Post / Comments Modal Shell */}
         <Modal
@@ -973,7 +989,7 @@ export default function Forum() {
                     >
                       <X
                         size={hp(2.6)}
-                        color={theme.colors.charcoal}
+                        color={theme.colors.textPrimary}
                         strokeWidth={2.5}
                       />
                     </TouchableOpacity>
@@ -1086,28 +1102,24 @@ export default function Forum() {
                             return sortedComments
                           })().map((comment) => (
                             <View key={comment.id} style={styles.commentCard}>
-                            <View style={styles.commentHeader}>
-                              <View style={styles.commentAuthorRow}>
                                 <View style={styles.commentAvatar}>
                                   <Text style={styles.commentAvatarText}>
                                     {comment.isAnon ? '?' : comment.author.charAt(0).toUpperCase()}
                                   </Text>
                                 </View>
-                                <View style={styles.commentAuthorInfo}>
+                              <View style={{ flex: 1 }}>
+                                <View style={styles.commentHeader}>
                                   <Text style={styles.commentAuthorName}>
                                     {comment.isAnon ? 'Anonymous' : comment.author}
                                   </Text>
                                   <Text style={styles.commentMetaText}>
                                     {comment.timeAgo}
                                   </Text>
-                                </View>
-                              </View>
                             </View>
                             <Text style={styles.commentBody}>{comment.body}</Text>
                             <View style={styles.commentActions}>
-                              <View style={styles.commentVotesRow}>
                                 <TouchableOpacity
-                                  style={styles.commentVoteButton}
+                                    style={styles.commentLikeButton}
                                   activeOpacity={0.7}
                                   onPress={() => {
                                     const currentVote = userVotes[comment.id]
@@ -1118,82 +1130,42 @@ export default function Forum() {
                                       [activePost.id]: prev[activePost.id].map((c) => {
                                         if (c.id !== comment.id) return c
                                         let newUpvotes = c.upvotes
-                                        let newDownvotes = c.downvotes
                                         if (currentVote === 'up') {
                                           newUpvotes = Math.max(0, newUpvotes - 1)
-                                        } else if (currentVote === 'down') {
-                                          newDownvotes = Math.max(0, newDownvotes - 1)
-                                          newUpvotes += 1
                                         } else {
                                           newUpvotes += 1
                                         }
-                                        return { ...c, upvotes: newUpvotes, downvotes: newDownvotes }
+                                          return { ...c, upvotes: newUpvotes }
                                       }),
                                     }))
                                   }}
                                 >
-                                  <ArrowUpCircle
-                                    size={hp(2.2)}
-                                    color={userVotes[comment.id] === 'up' ? '#2ecc71' : theme.colors.softBlack}
-                                    strokeWidth={2}
-                                    fill={userVotes[comment.id] === 'up' ? '#2ecc71' : 'none'}
-                                  />
-                                </TouchableOpacity>
-                                <Text
-                                  style={[
-                                    styles.commentVoteCount,
-                                    (comment.upvotes - comment.downvotes) > 0 && styles.commentVotePositive,
-                                    (comment.upvotes - comment.downvotes) < 0 && styles.commentVoteNegative,
-                                  ]}
-                                >
-                                  {comment.upvotes - comment.downvotes}
+                                    {userVotes[comment.id] === 'up' ? (
+                                      <HeartFill size={hp(1.8)} color={theme.colors.info} strokeWidth={2} />
+                                    ) : (
+                                      <Heart size={hp(1.8)} color={theme.colors.textSecondary} strokeWidth={2} />
+                                    )}
+                                    {comment.upvotes > 0 && (
+                                      <Text style={[
+                                        styles.commentLikeText,
+                                        userVotes[comment.id] === 'up' && styles.commentLikeTextActive
+                                      ]}>
+                                        {comment.upvotes}
                                 </Text>
-                                <TouchableOpacity
-                                  style={styles.commentVoteButton}
-                                  activeOpacity={0.7}
-                                  onPress={() => {
-                                    const currentVote = userVotes[comment.id]
-                                    const newVote = currentVote === 'down' ? null : 'down'
-                                    setUserVotes((prev) => ({ ...prev, [comment.id]: newVote }))
-                                    setComments((prev) => ({
-                                      ...prev,
-                                      [activePost.id]: prev[activePost.id].map((c) => {
-                                        if (c.id !== comment.id) return c
-                                        let newUpvotes = c.upvotes
-                                        let newDownvotes = c.downvotes
-                                        if (currentVote === 'down') {
-                                          newDownvotes = Math.max(0, newDownvotes - 1)
-                                        } else if (currentVote === 'up') {
-                                          newUpvotes = Math.max(0, newUpvotes - 1)
-                                          newDownvotes += 1
-                                        } else {
-                                          newDownvotes += 1
-                                        }
-                                        return { ...c, upvotes: newUpvotes, downvotes: newDownvotes }
-                                      }),
-                                    }))
-                                  }}
-                                >
-                                  <ArrowDownCircle
-                                    size={hp(2.2)}
-                                    color={userVotes[comment.id] === 'down' ? '#e74c3c' : theme.colors.softBlack}
-                                    strokeWidth={2}
-                                    fill={userVotes[comment.id] === 'down' ? '#e74c3c' : 'none'}
-                                  />
+                                    )}
+                                    <Text style={[
+                                      styles.commentLikeLabel,
+                                      userVotes[comment.id] === 'up' && styles.commentLikeLabelActive
+                                    ]}>
+                                      Like
+                                    </Text>
                                 </TouchableOpacity>
-                              </View>
                               <TouchableOpacity
-                                style={styles.replyButton}
+                                    style={styles.commentReplyButton}
                                 activeOpacity={0.7}
                                 onPress={() => setReplyingTo(comment.id)}
                               >
-                                <MessageCircle
-                                  size={hp(1.8)}
-                                  color={theme.colors.softBlack}
-                                  strokeWidth={2}
-                                  style={{ marginRight: wp(1) }}
-                                />
-                                <Text style={styles.replyButtonText}>Reply</Text>
+                                    <Text style={styles.commentReplyText}>Reply</Text>
                               </TouchableOpacity>
                             </View>
 
@@ -1202,28 +1174,24 @@ export default function Forum() {
                               <View style={styles.repliesContainer}>
                                 {comment.replies.map((reply) => (
                                   <View key={reply.id} style={styles.replyCard}>
-                                    <View style={styles.replyHeader}>
-                                      <View style={styles.replyAuthorRow}>
                                         <View style={styles.replyAvatar}>
                                           <Text style={styles.replyAvatarText}>
                                             {reply.isAnon ? '?' : reply.author.charAt(0).toUpperCase()}
                                           </Text>
                                         </View>
-                                        <View style={styles.replyAuthorInfo}>
+                                        <View style={{ flex: 1 }}>
+                                          <View style={styles.replyHeader}>
                                           <Text style={styles.replyAuthorName}>
                                             {reply.isAnon ? 'Anonymous' : reply.author}
                                           </Text>
                                           <Text style={styles.replyMetaText}>
                                             {reply.timeAgo}
                                           </Text>
-                                        </View>
-                                      </View>
                                     </View>
                                     <Text style={styles.replyBody}>{reply.body}</Text>
                                     <View style={styles.replyActions}>
-                                      <View style={styles.commentVotesRow}>
                                         <TouchableOpacity
-                                          style={styles.commentVoteButton}
+                                              style={styles.commentLikeButton}
                                           activeOpacity={0.7}
                                           onPress={() => {
                                             const replyVoteKey = `${comment.id}-${reply.id}`
@@ -1239,78 +1207,48 @@ export default function Forum() {
                                                   replies: c.replies.map((r) => {
                                                     if (r.id !== reply.id) return r
                                                     let newUpvotes = r.upvotes
-                                                    let newDownvotes = r.downvotes
                                                     if (currentVote === 'up') {
                                                       newUpvotes = Math.max(0, newUpvotes - 1)
-                                                    } else if (currentVote === 'down') {
-                                                      newDownvotes = Math.max(0, newDownvotes - 1)
-                                                      newUpvotes += 1
                                                     } else {
                                                       newUpvotes += 1
                                                     }
-                                                    return { ...r, upvotes: newUpvotes, downvotes: newDownvotes }
+                                                        return { ...r, upvotes: newUpvotes }
                                                   }),
                                                 }
                                               }),
                                             }))
                                           }}
                                         >
-                                          <ArrowUpCircle
-                                            size={hp(1.8)}
-                                            color={userVotes[`${comment.id}-${reply.id}`] === 'up' ? '#2ecc71' : theme.colors.softBlack}
-                                            strokeWidth={2}
-                                            fill={userVotes[`${comment.id}-${reply.id}`] === 'up' ? '#2ecc71' : 'none'}
-                                          />
-                                        </TouchableOpacity>
-                                        <Text
-                                          style={[
-                                            styles.commentVoteCount,
-                                            { fontSize: hp(1.4) },
-                                            (reply.upvotes - reply.downvotes) > 0 && styles.commentVotePositive,
-                                            (reply.upvotes - reply.downvotes) < 0 && styles.commentVoteNegative,
-                                          ]}
-                                        >
-                                          {reply.upvotes - reply.downvotes}
+                                              {userVotes[`${comment.id}-${reply.id}`] === 'up' ? (
+                                                <HeartFill size={hp(1.6)} color={theme.colors.info} strokeWidth={2} />
+                                              ) : (
+                                                <Heart size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
+                                              )}
+                                              {reply.upvotes > 0 && (
+                                                <Text style={[
+                                                  styles.commentLikeText,
+                                                  { fontSize: hp(1.3) },
+                                                  userVotes[`${comment.id}-${reply.id}`] === 'up' && styles.commentLikeTextActive
+                                                ]}>
+                                                  {reply.upvotes}
                                         </Text>
+                                              )}
+                                              <Text style={[
+                                                styles.commentLikeLabel,
+                                                { fontSize: hp(1.3) },
+                                                userVotes[`${comment.id}-${reply.id}`] === 'up' && styles.commentLikeLabelActive
+                                              ]}>
+                                                Like
+                                              </Text>
+                                            </TouchableOpacity>
                                         <TouchableOpacity
-                                          style={styles.commentVoteButton}
+                                              style={styles.commentReplyButton}
                                           activeOpacity={0.7}
                                           onPress={() => {
-                                            const replyVoteKey = `${comment.id}-${reply.id}`
-                                            const currentVote = userVotes[replyVoteKey]
-                                            const newVote = currentVote === 'down' ? null : 'down'
-                                            setUserVotes((prev) => ({ ...prev, [replyVoteKey]: newVote }))
-                                            setComments((prev) => ({
-                                              ...prev,
-                                              [activePost.id]: prev[activePost.id].map((c) => {
-                                                if (c.id !== comment.id) return c
-                                                return {
-                                                  ...c,
-                                                  replies: c.replies.map((r) => {
-                                                    if (r.id !== reply.id) return r
-                                                    let newUpvotes = r.upvotes
-                                                    let newDownvotes = r.downvotes
-                                                    if (currentVote === 'down') {
-                                                      newDownvotes = Math.max(0, newDownvotes - 1)
-                                                    } else if (currentVote === 'up') {
-                                                      newUpvotes = Math.max(0, newUpvotes - 1)
-                                                      newDownvotes += 1
-                                                    } else {
-                                                      newDownvotes += 1
-                                                    }
-                                                    return { ...r, upvotes: newUpvotes, downvotes: newDownvotes }
-                                                  }),
-                                                }
-                                              }),
-                                            }))
-                                          }}
-                                        >
-                                          <ArrowDownCircle
-                                            size={hp(1.8)}
-                                            color={userVotes[`${comment.id}-${reply.id}`] === 'down' ? '#e74c3c' : theme.colors.softBlack}
-                                            strokeWidth={2}
-                                            fill={userVotes[`${comment.id}-${reply.id}`] === 'down' ? '#e74c3c' : 'none'}
-                                          />
+                                                // TODO: Implement reply to reply
+                                              }}
+                                            >
+                                              <Text style={[styles.commentReplyText, { fontSize: hp(1.3) }]}>Reply</Text>
                                         </TouchableOpacity>
                                       </View>
                                     </View>
@@ -1325,7 +1263,7 @@ export default function Forum() {
                                 <TextInput
                                   style={styles.replyInput}
                                   placeholder="Write a reply..."
-                                  placeholderTextColor={theme.colors.softBlack}
+                                      placeholderTextColor={theme.colors.textSecondary}
                                   value={replyText}
                                   onChangeText={setReplyText}
                                   multiline
@@ -1411,6 +1349,7 @@ export default function Forum() {
                                 </View>
                               </View>
                             )}
+                              </View>
                           </View>
                             ))}
                           </View>
@@ -1545,7 +1484,7 @@ export default function Forum() {
                     >
                       <X
                         size={hp(2.6)}
-                        color={theme.colors.charcoal}
+                        color={theme.colors.textPrimary}
                         strokeWidth={2.5}
                       />
                     </TouchableOpacity>
@@ -1616,28 +1555,33 @@ export default function Forum() {
         {/* New Post Modal - Fizz Style */}
         <Modal
           visible={isCreateModalVisible}
-          transparent={false}
+          transparent={true}
           animationType="slide"
           onRequestClose={() => setIsCreateModalVisible(false)}
+          presentationStyle="pageSheet"
         >
-          <SafeAreaView style={styles.fizzModalSafeArea} edges={['top', 'left', 'right']}>
+          <View style={styles.fizzModalWrapper}>
+            <SafeAreaView style={styles.fizzModalSafeArea} edges={['top', 'bottom', 'left', 'right']}>
             <KeyboardAvoidingView
               style={styles.fizzModalContainer}
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                keyboardVerticalOffset={0}
             >
               {/* Header */}
-              <View style={styles.fizzModalHeader}>
+              <View style={[styles.fizzModalHeader, { paddingTop: Math.max(insets.top, hp(2)) }]}>
                 <TouchableOpacity
                   onPress={() => setIsCreateModalVisible(false)}
                   activeOpacity={0.8}
                   style={styles.fizzHeaderButton}
                 >
-                  <X size={hp(2.5)} color={theme.colors.white} strokeWidth={2.5} />
+                  <X size={hp(2.5)} color={theme.colors.textPrimary} strokeWidth={2.5} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => setShowPostAsModal(true)}
+                  onPress={() => {
+                    Keyboard.dismiss()
+                    setShowPostAsModal(true)
+                  }}
                   activeOpacity={0.8}
                   style={styles.fizzHeaderCenter}
                 >
@@ -1645,10 +1589,11 @@ export default function Forum() {
                     <View style={styles.fizzAnonymousIcon}>
                       <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
                     </View>
-                    <Text style={styles.fizzAnonymousText}>Anonymous</Text>
-                    <ChevronDown size={hp(1.8)} color={theme.colors.white} strokeWidth={2.5} />
+                    <Text style={styles.fizzAnonymousText}>
+                      {draftIsAnon ? 'Anonymous' : 'Your Name'}
+                    </Text>
+                    <ChevronDown size={hp(1.8)} color={theme.colors.textPrimary} strokeWidth={2.5} />
                   </View>
-                  <Text style={styles.fizzLocationText}>{draftLocation}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1682,13 +1627,16 @@ export default function Forum() {
                     setSelectedTag(null)
                     setIsCreateModalVisible(false)
                   }}
-                  style={styles.fizzPostButton}
+                  style={[
+                    styles.fizzPostButton,
+                    !draftBody.trim() && styles.fizzPostButtonDisabled,
+                  ]}
                 >
                   <Text style={styles.fizzPostButtonText}>Post</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Content Area - Dark Mode */}
+              {/* Content Area */}
               <View style={styles.fizzContentArea}>
                 <TextInput
                   value={draftBody}
@@ -1702,11 +1650,44 @@ export default function Forum() {
                 />
               </View>
 
+              {/* Selected Tag Display - Moved above action bar */}
+              {selectedTag && (() => {
+                const tagColors = {
+                  'QUESTION': '#007AFF',
+                  'CONFESSION': '#FF6B6B',
+                  'CRUSH': '#FF69B4',
+                  'DM ME': '#00CED1',
+                  'EVENT': '#FF9500',
+                  'PSA': '#FF3B30',
+                  'SHOUTOUT': '#34C759',
+                  'DUB': '#FFD700',
+                  'RIP': '#808080',
+                  'MEME': '#A45CFF',
+                  'LOST & FOUND': '#D2691E',
+                }
+                const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
+                return (
+                  <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
+                    <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
+                    <TouchableOpacity
+                      onPress={() => setSelectedTag(null)}
+                      activeOpacity={0.8}
+                      style={styles.fizzSelectedTagClose}
+                    >
+                      <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
+                    </TouchableOpacity>
+                  </View>
+                )
+              })()}
+
               {/* Action Bar - Above Keyboard */}
               <View style={styles.fizzActionBar}>
                 <TouchableOpacity
                   style={styles.fizzTagButton}
-                  onPress={() => setShowTagSelector(true)}
+                  onPress={() => {
+                    Keyboard.dismiss()
+                    setShowTagSelector(true)
+                  }}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.fizzTagButtonText}>+ Tag</Text>
@@ -1718,68 +1699,92 @@ export default function Forum() {
                     onPress={() => handlePickMedia('image')}
                     activeOpacity={0.7}
                   >
-                    <ImageIcon size={hp(2.5)} color={theme.colors.white} strokeWidth={2} />
+                    <ImageIcon size={hp(2.5)} color={theme.colors.textPrimary} strokeWidth={2} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.fizzMediaIcon}
                     onPress={() => handlePickMedia('video')}
                     activeOpacity={0.7}
                   >
-                    <Video size={hp(2.5)} color={theme.colors.white} strokeWidth={2} />
+                    <Video size={hp(2.5)} color={theme.colors.textPrimary} strokeWidth={2} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.fizzMediaIcon}
+                    onPress={() => {
+                      // TODO: Implement meme picker
+                      console.log('Meme picker - to be implemented')
+                    }}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.fizzMemeText}>MEME</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.fizzMediaIcon}
+                    onPress={() => {
+                      // TODO: Implement GIF picker
+                      console.log('GIF picker - to be implemented')
+                    }}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.fizzGifText}>GIF</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
-              {/* Selected Tag Display */}
-              {selectedTag && (
-                <View style={styles.fizzSelectedTag}>
+              {selectedTag && (() => {
+                const tagColors = {
+                  'QUESTION': '#007AFF',
+                  'CONFESSION': '#FF6B6B',
+                  'CRUSH': '#FF69B4',
+                  'DM ME': '#00CED1',
+                  'EVENT': '#FF9500',
+                  'PSA': '#FF3B30',
+                  'SHOUTOUT': '#34C759',
+                  'DUB': '#FFD700',
+                  'RIP': '#808080',
+                  'MEME': '#A45CFF',
+                  'LOST & FOUND': '#D2691E',
+                }
+                const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
+                return (
+                  <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
                   <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
                   <TouchableOpacity
                     onPress={() => setSelectedTag(null)}
                     activeOpacity={0.8}
+                      style={styles.fizzSelectedTagClose}
                   >
-                    <X size={hp(1.8)} color={theme.colors.white} strokeWidth={2.5} />
+                      <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
                   </TouchableOpacity>
                 </View>
-              )}
-            </KeyboardAvoidingView>
-          </SafeAreaView>
-        </Modal>
+                )
+              })()}
 
-        {/* Tag Selector Modal - Fizz Style */}
-        <Modal
-          visible={showTagSelector}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowTagSelector(false)}
-        >
+              {/* Tag Selector Overlay - Inside create post modal */}
+              {showTagSelector && (
+                <View style={styles.tagSelectorOverlay}>
           <Pressable
-            style={styles.tagModalOverlay}
+                    style={styles.tagSelectorOverlayBackdrop}
             onPress={() => setShowTagSelector(false)}
           >
-            <View style={styles.tagModalContent}>
+                    <Pressable
+                      style={styles.tagSelectorOverlayContent}
+                      onPress={(e) => e.stopPropagation()}
+                    >
               <View style={styles.tagModalHeader}>
                 <Text style={styles.tagModalTitle}>Select Tag</Text>
                 <TouchableOpacity
                   onPress={() => setShowTagSelector(false)}
                   activeOpacity={0.8}
+                          style={styles.tagModalCloseButton}
                 >
-                  <X size={hp(2.5)} color={theme.colors.white} strokeWidth={2.5} />
+                          <X size={hp(2.2)} color={theme.colors.textSecondary} strokeWidth={2.5} />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.tagList} contentContainerStyle={styles.tagListContent}>
+                      <ScrollView 
+                        style={styles.tagList} 
+                        contentContainerStyle={styles.tagListContent}
+                        showsVerticalScrollIndicator={false}
+                      >
                 {[
                   { label: 'QUESTION', color: '#007AFF' },
                   { label: 'CONFESSION', color: '#FF6B6B' },
@@ -1795,7 +1800,14 @@ export default function Forum() {
                 ].map((tag) => (
                   <TouchableOpacity
                     key={tag.label}
-                    style={[styles.fizzTagPill, { backgroundColor: tag.color }]}
+                            style={[
+                              styles.fizzTagPill,
+                              { 
+                                backgroundColor: tag.color,
+                                borderWidth: selectedTag === tag.label ? 2 : 0,
+                                borderColor: theme.colors.textPrimary,
+                              }
+                            ]}
                     onPress={() => {
                       setSelectedTag(tag.label)
                       setShowTagSelector(false)
@@ -1806,45 +1818,51 @@ export default function Forum() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
           </Pressable>
-        </Modal>
+                  </Pressable>
+                </View>
+              )}
 
-        {/* Post As Modal - Fizz Style */}
-        <Modal
-          visible={showPostAsModal}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowPostAsModal(false)}
-        >
+              {/* Post As Overlay - Inside create post modal */}
+              {showPostAsModal && (
+                <View style={styles.postAsOverlay}>
           <Pressable
-            style={styles.postAsModalOverlay}
+                    style={styles.postAsOverlayBackdrop}
             onPress={() => setShowPostAsModal(false)}
           >
-            <View style={styles.postAsModalContent}>
+                    <View style={styles.postAsOverlayContent}>
               <View style={styles.postAsModalHandle} />
               <Text style={styles.postAsModalTitle}>Post as</Text>
               
-              {/* Location Option */}
+                      {/* Anonymous Option */}
               <TouchableOpacity
                 style={styles.postAsOption}
                 activeOpacity={0.8}
+                        onPress={() => {
+                          setDraftIsAnon(true)
+                          setShowPostAsModal(false)
+                        }}
               >
                 <View style={styles.postAsIcon}>
-                  <MapPin size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                          <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
                 </View>
                 <View style={styles.postAsOptionText}>
-                  <Text style={styles.postAsOptionTitle}>{draftLocation}</Text>
-                  <Text style={styles.postAsOptionSubtitle}>Not accurate? Update location</Text>
+                          <Text style={styles.postAsOptionTitle}>Anonymous</Text>
+                          <Text style={styles.postAsOptionSubtitle}>Post without revealing your identity</Text>
                 </View>
+                        {draftIsAnon && (
+                          <View style={styles.postAsCheck}>
+                            <Check size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                          </View>
+                        )}
               </TouchableOpacity>
 
-              {/* Anonymous Option */}
+                      {/* Your Name Option */}
               <TouchableOpacity
                 style={styles.postAsOption}
                 activeOpacity={0.8}
                 onPress={() => {
-                  setDraftIsAnon(true)
+                          setDraftIsAnon(false)
                   setShowPostAsModal(false)
                 }}
               >
@@ -1852,21 +1870,23 @@ export default function Forum() {
                   <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
                 </View>
                 <View style={styles.postAsOptionText}>
-                  <Text style={styles.postAsOptionTitle}>Anonymous</Text>
+                          <Text style={styles.postAsOptionTitle}>Your Name</Text>
+                          <Text style={styles.postAsOptionSubtitle}>Post with your name visible</Text>
                 </View>
-                {draftIsAnon && (
+                        {!draftIsAnon && (
                   <View style={styles.postAsCheck}>
                     <Check size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
                   </View>
                 )}
               </TouchableOpacity>
 
-              {/* Create Handle Option */}
+                      {/* Org Page Option (for admins) */}
+                      {isAdmin && (
               <TouchableOpacity
                 style={styles.postAsOption}
                 activeOpacity={0.8}
                 onPress={() => {
-                  setDraftIsAnon(false)
+                            // TODO: Set posting as org
                   setShowPostAsModal(false)
                 }}
               >
@@ -1874,12 +1894,20 @@ export default function Forum() {
                   <Add size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
                 </View>
                 <View style={styles.postAsOptionText}>
-                  <Text style={styles.postAsOptionTitle}>Create a handle</Text>
+                            <Text style={styles.postAsOptionTitle}>Organization Page</Text>
+                            <Text style={styles.postAsOptionSubtitle}>Post as your organization</Text>
                 </View>
               </TouchableOpacity>
+                      )}
             </View>
           </Pressable>
+                </View>
+              )}
+              </KeyboardAvoidingView>
+            </SafeAreaView>
+          </View>
         </Modal>
+
 
         {/* Story Flow (Create/Edit/Preview) */}
         <StoryFlow
@@ -1911,6 +1939,15 @@ export default function Forum() {
           }}
         />
 
+
+        {/* Floating Create Post Button */}
+        <TouchableOpacity
+          style={styles.floatingCreateButton}
+          onPress={() => setIsCreateModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Add size={hp(2.5)} color={theme.colors.white} strokeWidth={2.5} />
+        </TouchableOpacity>
 
         <BottomNav scrollY={scrollY} />
 
@@ -1956,10 +1993,10 @@ export default function Forum() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -1998,6 +2035,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: wp(2),
+  },
+  headerRight: {
+    width: hp(4.5),
+  },
+  searchContainer: {
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+    paddingBottom: hp(0.5),
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    gap: wp(2),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textPrimary,
+  },
+  clearButton: {
+    paddingHorizontal: wp(2),
+  },
+  clearButtonText: {
+    fontSize: hp(1.4),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.bondedPurple,
+    fontWeight: '600',
+  },
+  createPostIconButton: {
+    padding: hp(0.5),
   },
   createPostRowContainer: {
     paddingTop: hp(1.5), // Spacing between header and buttons
@@ -2077,11 +2162,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   storiesWrapper: {
-    marginBottom: hp(2.5),
+    marginBottom: hp(1.5),
     position: 'relative',
   },
   storiesGradient: {
-    paddingVertical: hp(1),
+    paddingVertical: hp(0.8),
     borderRadius: hp(1),
   },
   storiesRow: {
@@ -2095,7 +2180,7 @@ const styles = StyleSheet.create({
     width: wp(13),
     height: wp(13),
     borderRadius: wp(6.5),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 2.5,
     borderColor: theme.colors.bondedPurple,
     alignItems: 'center',
@@ -2124,12 +2209,12 @@ const styles = StyleSheet.create({
   },
   storyLabel: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
   },
   listHeader: {
-    paddingTop: hp(1),
-    paddingBottom: hp(2),
+    paddingTop: hp(0.5),
+    paddingBottom: hp(1.5),
   },
   postsList: {
     paddingBottom: hp(10),
@@ -2137,14 +2222,19 @@ const styles = StyleSheet.create({
   },
   postCard: {
     marginHorizontal: wp(4),
-    marginBottom: hp(3), // Increased spacing
-    paddingVertical: hp(2), // Increased padding
+    marginBottom: hp(2),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(4),
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: hp(1.5), // Increased spacing
+    marginBottom: hp(1.2),
   },
   postAuthorRow: {
     flexDirection: 'row',
@@ -2153,18 +2243,16 @@ const styles = StyleSheet.create({
     marginRight: wp(2),
   },
   postAvatar: {
-    width: hp(5.5), // Increased size
-    height: hp(5.5), // Increased size
-    borderRadius: hp(2.75),
-    backgroundColor: theme.colors.bondedPurple,
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: wp(3), // Increased spacing
-    opacity: 0.15,
+    marginRight: wp(2.5),
   },
   postAvatarText: {
-    fontSize: hp(2.3), // Increased size
-    color: theme.colors.bondedPurple,
+    fontSize: hp(2),
+    color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
   },
@@ -2172,58 +2260,65 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   postAuthorName: {
-    fontSize: hp(2), // Increased size
+    fontSize: hp(1.7),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
   },
   postMetaText: {
-    fontSize: hp(1.5), // Increased size
+    fontSize: hp(1.3),
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
-    marginTop: hp(0.2),
+    marginTop: hp(0.1),
     fontWeight: '400',
   },
   postBody: {
-    marginBottom: hp(1.5), // Increased spacing
+    marginBottom: hp(1),
   },
   postTitle: {
-    fontSize: hp(2.2), // Increased size
-    fontWeight: '700', // Bolder
+    fontSize: hp(2),
+    fontWeight: '700',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
-    marginBottom: hp(1), // Increased spacing
-    lineHeight: hp(2.8), // Increased line height
+    marginBottom: hp(0.6),
+    lineHeight: hp(2.6),
   },
   postBodyText: {
-    fontSize: hp(1.9), // Increased size
+    fontSize: hp(1.6),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    lineHeight: hp(2.8), // Increased line height
-    marginTop: hp(0.5),
+    lineHeight: hp(2.2),
+    marginTop: hp(0.2),
+  },
+  postTagsContainer: {
+    marginTop: hp(0.8),
+  },
+  postPollContainer: {
+    marginTop: hp(1),
   },
   postMediaPreview: {
-    marginTop: hp(1.2),
-    borderRadius: theme.radius.lg,
+    marginTop: hp(1),
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
     backgroundColor: theme.colors.border,
-    // Clean, minimal - no shadows
   },
   postMediaImage: {
     width: '100%',
-    height: hp(35), // Increased size (Instagram/Fizz style)
+    aspectRatio: 16 / 9,
+    maxHeight: hp(25),
     resizeMode: 'cover',
   },
   postMediaVideo: {
     width: '100%',
-    height: hp(35), // Increased size
+    aspectRatio: 16 / 9,
+    maxHeight: hp(25),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.charcoal,
   },
   postMediaVideoText: {
     marginTop: hp(0.5),
-    fontSize: hp(1.6),
+    fontSize: hp(1.5),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -2231,24 +2326,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: hp(1.5), // Increased spacing
-    paddingTop: hp(1.2),
+    marginTop: hp(1),
+    paddingTop: hp(1),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
   postVotesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(2),
+    gap: wp(1.5),
   },
   voteButton: {
-    padding: hp(0.8),
+    padding: hp(0.5),
     borderRadius: theme.radius.full,
   },
   postVoteCount: {
-    fontSize: hp(1.7), // Increased size
+    fontSize: hp(1.5),
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600', // Bolder
-    minWidth: wp(6),
+    fontWeight: '600',
+    minWidth: wp(5),
     textAlign: 'center',
   },
   postVotePositive: {
@@ -2257,38 +2354,18 @@ const styles = StyleSheet.create({
   postVoteNegative: {
     color: theme.colors.error,
   },
-  postCommentsButton: {
+  postActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1.5),
-    padding: hp(0.8),
+    gap: wp(1),
+    padding: hp(0.5),
     borderRadius: theme.radius.full,
   },
-  postCommentsText: {
-    fontSize: hp(1.7), // Increased size
+  postActionText: {
+    fontSize: hp(1.4),
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500', // Slightly bolder
-  },
-  createPostFAB: {
-    position: 'absolute',
-    bottom: hp(12), // Above BottomNav
-    right: wp(4),
-    width: hp(6),
-    height: hp(6),
-    borderRadius: hp(3),
-    backgroundColor: theme.colors.bondedPurple,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
@@ -2296,7 +2373,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   postModalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     paddingHorizontal: wp(6),
@@ -2320,27 +2397,48 @@ const styles = StyleSheet.create({
   },
   createModalSafeArea: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   createModalContainer: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
+  },
+  createPostButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.bondedPurple,
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.8),
+    borderRadius: theme.radius.xl,
+    gap: wp(1.5),
+  },
+  createPostButtonText: {
+    fontSize: hp(1.5),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    color: theme.colors.white,
   },
   fizzModalSafeArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: theme.colors.background,
+  },
+  fizzModalWrapper: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
   fizzModalContainer: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: theme.colors.background,
   },
   fizzModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
-    paddingTop: hp(1), // Reduced since SafeAreaView handles top inset
+    paddingTop: hp(2),
     paddingBottom: hp(1.5),
+    minHeight: hp(7),
   },
   fizzHeaderButton: {
     width: hp(4),
@@ -2370,20 +2468,17 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
-    color: theme.colors.white,
-  },
-  fizzLocationText: {
-    fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.textSecondary,
-    marginTop: hp(0.3),
+    color: theme.colors.textPrimary,
   },
   fizzPostButton: {
     paddingHorizontal: wp(5),
     paddingVertical: hp(0.8),
     borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.white,
+    backgroundColor: theme.colors.bondedPurple,
+  },
+  fizzPostButtonDisabled: {
+    backgroundColor: theme.colors.border,
+    opacity: 0.5,
   },
   fizzPostButtonText: {
     fontSize: hp(1.6),
@@ -2394,35 +2489,41 @@ const styles = StyleSheet.create({
   fizzContentArea: {
     flex: 1,
     paddingHorizontal: wp(4),
-    paddingTop: hp(2),
+    paddingTop: hp(1.5),
+    paddingBottom: hp(1),
   },
   fizzTextInput: {
     flex: 1,
-    fontSize: hp(2),
+    fontSize: hp(1.9),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.white,
-    minHeight: hp(40),
+    color: theme.colors.textPrimary,
+    minHeight: hp(20),
+    maxHeight: hp(50),
   },
   fizzActionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.5),
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: hp(1.2),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
+    minHeight: hp(6),
+    backgroundColor: theme.colors.background,
   },
   fizzTagButton: {
     paddingVertical: hp(0.8),
     paddingHorizontal: wp(3),
     borderRadius: theme.radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
   fizzTagButtonText: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.white,
+    color: theme.colors.textPrimary,
   },
   fizzMediaIconsRow: {
     flexDirection: 'row',
@@ -2439,86 +2540,216 @@ const styles = StyleSheet.create({
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.white,
+    color: theme.colors.textPrimary,
   },
   fizzGifText: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.white,
+    color: theme.colors.textPrimary,
   },
   fizzSelectedTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(5.5),
+    paddingVertical: hp(1.6),
+    marginHorizontal: wp(4),
+    marginTop: hp(1),
+    marginBottom: hp(0.5),
+    borderRadius: theme.radius.xl,
+    minHeight: hp(4.6),
     gap: wp(2),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   fizzSelectedTagText: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme.colors.white,
-  },
-  tagModalOverlay: {
+    letterSpacing: 0.3,
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  fizzSelectedTagClose: {
+    padding: hp(0.3),
+  },
+  tagSelectorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  tagSelectorOverlayBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tagModalContent: {
-    width: '90%',
-    maxHeight: '80%',
-    backgroundColor: '#1a1a1a',
+  tagSelectorOverlayContent: {
+    width: wp(85),
+    maxHeight: hp(70),
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
-    padding: wp(4),
+    padding: wp(5),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 24,
+      },
+    }),
+  },
+  tagModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  tagModalContent: {
+    width: wp(85),
+    maxHeight: hp(70),
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radius.xl,
+    padding: wp(5),
+    zIndex: 10000,
+    elevation: 10000,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 10000,
+      },
+    }),
   },
   tagModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: hp(2),
+    marginBottom: hp(2.5),
+    paddingBottom: hp(1.5),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
   },
   tagModalTitle: {
-    fontSize: hp(2),
+    fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.white,
+    color: theme.colors.textPrimary,
+  },
+  tagModalCloseButton: {
+    width: hp(4),
+    height: hp(4),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   tagList: {
-    maxHeight: hp(50),
+    maxHeight: hp(55),
   },
   tagListContent: {
-    gap: hp(1.5),
+    gap: hp(1.2),
+    paddingBottom: hp(1),
   },
   fizzTagPill: {
-    paddingVertical: hp(1.2),
-    paddingHorizontal: wp(4),
-    borderRadius: theme.radius.pill,
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(5),
+    borderRadius: theme.radius.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: hp(5),
   },
   fizzTagPillText: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '700',
     color: theme.colors.white,
+    letterSpacing: 0.3,
   },
-  postAsModalOverlay: {
+  postAsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  postAsOverlayBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
-  postAsModalContent: {
-    backgroundColor: '#1a1a1a',
+  postAsOverlayContent: {
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     paddingBottom: hp(4),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  postAsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  postAsModalContent: {
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    paddingBottom: hp(4),
+    zIndex: 10000,
+    elevation: 10000,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 10000,
+      },
+    }),
   },
   postAsModalHandle: {
     width: wp(12),
     height: hp(0.5),
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: theme.colors.border,
     borderRadius: theme.radius.pill,
     alignSelf: 'center',
     marginTop: hp(1),
@@ -2528,7 +2759,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.white,
+    color: theme.colors.textPrimary,
     paddingHorizontal: wp(4),
     marginBottom: hp(2),
   },
@@ -2554,7 +2785,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
-    color: theme.colors.white,
+    color: theme.colors.textPrimary,
   },
   postAsOptionSubtitle: {
     fontSize: hp(1.4),
@@ -2583,7 +2814,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   mediaIconsRow: {
     flexDirection: 'row',
@@ -2605,7 +2836,7 @@ const styles = StyleSheet.create({
     width: hp(4),
     height: hp(4),
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1.5,
     borderColor: theme.colors.bondedPurple,
     alignItems: 'center',
@@ -2624,7 +2855,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
   pollSection: {
@@ -2637,13 +2868,13 @@ const styles = StyleSheet.create({
     paddingVertical: hp(2),
     borderTopWidth: 1,
     borderTopColor: theme.colors.offWhite,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   postFooterButton: {
     width: '100%',
     paddingVertical: hp(1.8),
     borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2654,19 +2885,19 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   postModalTitle: {
     flex: 1,
     fontSize: hp(2.2),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginRight: wp(2),
   },
   postModalMeta: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
     marginBottom: hp(1),
@@ -2683,7 +2914,7 @@ const styles = StyleSheet.create({
   },
   postModalBodyText: {
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     lineHeight: hp(2.6),
     marginBottom: hp(2),
@@ -2697,12 +2928,12 @@ const styles = StyleSheet.create({
   commentsTitle: {
     fontSize: hp(1.9),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   commentsCount: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
   },
@@ -2710,29 +2941,14 @@ const styles = StyleSheet.create({
     gap: hp(1.5),
   },
   commentCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    padding: wp(4.5),
-    marginBottom: hp(1.5),
-    borderWidth: 1,
-    borderColor: 'rgba(164, 92, 255, 0.06)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    flexDirection: 'row',
+    paddingVertical: hp(1),
+    paddingRight: wp(4),
   },
   commentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: hp(0.8),
+    marginBottom: hp(0.5),
   },
   commentAuthorRow: {
     flexDirection: 'row',
@@ -2740,18 +2956,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   commentAvatar: {
-    width: hp(3.2),
-    height: hp(3.2),
-    borderRadius: hp(1.6),
+    width: hp(4),
+    height: hp(4),
+    borderRadius: hp(2),
     backgroundColor: theme.colors.bondedPurple,
-    opacity: 0.12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: wp(2.5),
+    marginRight: wp(2),
   },
   commentAvatarText: {
-    fontSize: hp(1.5),
-    color: theme.colors.bondedPurple,
+    fontSize: hp(1.8),
+    color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
   },
@@ -2760,105 +2975,99 @@ const styles = StyleSheet.create({
   },
   commentAuthorName: {
     fontSize: hp(1.6),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
+    marginRight: wp(1.5),
   },
   commentMetaText: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
-    opacity: 0.8,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     marginTop: hp(0.1),
   },
   commentBody: {
-    fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    fontSize: hp(1.7),
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    lineHeight: hp(2.5),
-    marginBottom: hp(1),
-    opacity: 0.95,
+    lineHeight: hp(2.3),
+    marginBottom: hp(0.5),
+    marginLeft: wp(14), // Align with text after avatar
   },
   commentActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: hp(0.5),
+    marginTop: hp(0.3),
+    marginLeft: wp(14), // Align with text after avatar
+    gap: wp(3),
   },
-  commentVotesRow: {
+  commentLikeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1),
+    paddingVertical: hp(0.5),
+    paddingHorizontal: wp(2),
   },
-  commentVoteButton: {
-    padding: hp(0.5),
-    borderRadius: theme.radius.sm,
-  },
-  commentVoteCount: {
-    fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+  commentLikeText: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    minWidth: wp(4),
-    textAlign: 'center',
   },
-  commentVotePositive: {
-    color: '#2ecc71',
+  commentLikeTextActive: {
+    color: theme.colors.info,
   },
-  commentVoteNegative: {
-    color: '#e74c3c',
-  },
-  replyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: hp(0.6),
-    paddingHorizontal: wp(2.5),
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.offWhite,
-  },
-  replyButtonText: {
-    fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+  commentLikeLabel: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  commentLikeLabelActive: {
+    color: theme.colors.info,
+  },
+  commentReplyButton: {
+    paddingVertical: hp(0.5),
+    paddingHorizontal: wp(2),
+  },
+  commentReplyText: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
   },
   repliesContainer: {
-    marginTop: hp(1.5),
-    marginLeft: wp(4),
-    paddingLeft: wp(3),
+    marginTop: hp(1),
+    marginLeft: wp(14), // Align with main comment content
+    paddingLeft: wp(2),
     borderLeftWidth: 2,
-    borderLeftColor: theme.colors.offWhite,
-    gap: hp(1),
+    borderLeftColor: theme.colors.border,
+    gap: hp(0.5),
   },
   replyCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.md,
-    padding: wp(3.5),
-    marginBottom: hp(0.8),
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.bondedPurple,
-    borderWidth: 1,
-    borderColor: 'rgba(164, 92, 255, 0.1)',
+    flexDirection: 'row',
+    paddingVertical: hp(0.8),
+    paddingRight: wp(2),
   },
   replyHeader: {
-    marginBottom: hp(0.5),
+    marginBottom: hp(0.3),
   },
   replyAuthorRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   replyAvatar: {
-    width: hp(2.2),
-    height: hp(2.2),
-    borderRadius: hp(1.1),
-    backgroundColor: theme.colors.offWhite,
+    width: hp(3.2),
+    height: hp(3.2),
+    borderRadius: hp(1.6),
+    backgroundColor: theme.colors.bondedPurple,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(1.5),
   },
   replyAvatarText: {
-    fontSize: hp(1.1),
-    color: theme.colors.charcoal,
+    fontSize: hp(1.5),
+    color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
   },
@@ -2867,40 +3076,42 @@ const styles = StyleSheet.create({
   },
   replyAuthorName: {
     fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
+    marginRight: wp(1.5),
   },
   replyMetaText: {
-    fontSize: hp(1.3),
-    color: theme.colors.softBlack,
-    opacity: 0.85,
+    fontSize: hp(1.2),
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     marginTop: hp(0.1),
   },
   replyBody: {
-    fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    fontSize: hp(1.6),
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    lineHeight: hp(2.3),
-    marginBottom: hp(0.5),
-    opacity: 0.95,
+    lineHeight: hp(2.2),
+    marginBottom: hp(0.3),
+    marginLeft: wp(10.5), // Align with text after avatar
   },
   replyActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: wp(10.5), // Align with text after avatar
+    gap: wp(3),
   },
   replyInputContainer: {
     marginTop: hp(1),
     padding: wp(3),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.offWhite,
   },
   replyInput: {
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     minHeight: hp(6),
     maxHeight: hp(12),
@@ -2921,7 +3132,7 @@ const styles = StyleSheet.create({
   },
   replyCancelText: {
     fontSize: hp(1.5),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
   },
   replySubmitButton: {
@@ -2943,9 +3154,9 @@ const styles = StyleSheet.create({
     padding: wp(4),
     paddingTop: hp(1.5),
     paddingBottom: hp(2),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    borderTopColor: theme.colors.border,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -2960,9 +3171,9 @@ const styles = StyleSheet.create({
   },
   newCommentInput: {
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: hp(1.2),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
@@ -3009,7 +3220,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(0.7),
     paddingHorizontal: wp(2.5),
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
     borderColor: theme.colors.bondedPurple,
   },
@@ -3026,7 +3237,7 @@ const styles = StyleSheet.create({
   emptyCommentsBox: {
     paddingVertical: hp(3),
     paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.xl,
     alignItems: 'center',
     borderWidth: 1,
@@ -3035,13 +3246,13 @@ const styles = StyleSheet.create({
   },
   emptyCommentsText: {
     fontSize: hp(1.8),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.7,
     textAlign: 'center',
   },
   profileModalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     paddingHorizontal: wp(6),
@@ -3061,13 +3272,13 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: hp(2.4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   profileSubText: {
     marginTop: hp(0.5),
     fontSize: hp(1.7),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
   },
@@ -3078,14 +3289,14 @@ const styles = StyleSheet.create({
     width: hp(7),
     height: hp(7),
     borderRadius: hp(3.5),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: hp(1.8),
   },
   profileAvatarLargeText: {
     fontSize: hp(3),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
   },
@@ -3098,14 +3309,14 @@ const styles = StyleSheet.create({
   profileMetaPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.pill,
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.8),
   },
   profileMetaPillText: {
     fontSize: hp(1.6),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   profileSection: {
@@ -3114,13 +3325,13 @@ const styles = StyleSheet.create({
   profileSectionLabel: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.6),
   },
   profileQuote: {
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     lineHeight: hp(2.6),
   },
@@ -3138,7 +3349,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
   },
   profileSecondaryButton: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   profilePrimaryButton: {
     backgroundColor: theme.colors.bondedPurple,
@@ -3160,13 +3371,13 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.5),
   },
   inputHint: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.8,
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -3174,11 +3385,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.offWhite,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   textArea: {
@@ -3202,7 +3413,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(0.9),
     paddingHorizontal: wp(3.4),
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   mediaButtonText: {
     fontSize: hp(1.6),
@@ -3228,7 +3439,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1),
     paddingHorizontal: wp(3),
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1.5,
     borderColor: theme.colors.bondedPurple,
     gap: wp(1.5),
@@ -3253,7 +3464,7 @@ const styles = StyleSheet.create({
   composeTitleInput: {
     fontSize: hp(1.8),
     fontWeight: '500',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     marginBottom: hp(1.5),
     paddingHorizontal: wp(4),
@@ -3262,7 +3473,7 @@ const styles = StyleSheet.create({
   composeInput: {
     flex: 1,
     fontSize: hp(1.8),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     lineHeight: hp(2.4),
     paddingHorizontal: wp(4),
@@ -3275,7 +3486,7 @@ const styles = StyleSheet.create({
   },
   composeCancelText: {
     fontSize: hp(1.7),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
   },
   composePostButton: {
@@ -3291,7 +3502,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   anonPill: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 1,
     borderColor: theme.colors.bondedPurple,
   },
@@ -3304,7 +3515,7 @@ const styles = StyleSheet.create({
   },
   mediaAttachedText: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
   },
@@ -3332,23 +3543,11 @@ const styles = StyleSheet.create({
   },
   tagFilterRow: {
     paddingHorizontal: wp(4),
-    paddingBottom: hp(0.5),
-    gap: wp(2),
+    paddingVertical: hp(0.5),
+    gap: wp(1.5),
   },
   tagFilterChip: {
     marginRight: wp(2),
-  },
-  postRepostButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1),
-    padding: hp(0.8),
-    borderRadius: theme.radius.full,
-  },
-  repostCount: {
-    fontSize: hp(1.3),
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
   },
   pollSection: {
     marginTop: hp(1),
@@ -3360,7 +3559,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(4),
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderStyle: 'dashed',
@@ -3386,20 +3585,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(2.5),
     paddingVertical: hp(0.5),
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   sortButtonActive: {
     backgroundColor: theme.colors.bondedPurple,
   },
   sortButtonText: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '500',
   },
   sortButtonTextActive: {
     color: theme.colors.white,
     fontWeight: '600',
+  },
+  floatingCreateButton: {
+    position: 'absolute',
+    bottom: hp(12),
+    right: wp(4),
+    width: hp(6.5),
+    height: hp(6.5),
+    borderRadius: hp(3.25),
+    backgroundColor: theme.colors.bondedPurple,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
 })
 

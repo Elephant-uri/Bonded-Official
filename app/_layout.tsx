@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { Stack, useRouter } from 'expo-router'
 import { Dimensions, View, Text, TouchableOpacity, ScrollView, Platform, Pressable, Image } from 'react-native'
 import { GestureHandlerRootView, DrawerLayout } from 'react-native-gesture-handler'
@@ -7,43 +7,47 @@ import QueryProvider from '../providers/QueryProvider'
 import { StoriesProvider } from '../contexts/StoriesContext'
 import { EventsProvider } from '../contexts/EventsContext'
 import { ClubsProvider, useClubsContext } from '../contexts/ClubsContext'
-import theme from '../constants/theme'
 import { hp, wp } from '../helpers/common'
-import { ThemeProvider } from './theme'
+import { ThemeProvider, useAppTheme } from './theme'
+import Loading from '../components/Loading'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-const DrawerItem = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => (
-  <TouchableOpacity
-    activeOpacity={0.7}
-    onPress={onPress}
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: hp(1.5),
-      marginBottom: hp(0.5),
-    }}
-  >
-    <Ionicons
-      name={icon as any}
-      size={hp(2.2)}
-      color={theme.colors.white}
-      style={{ opacity: 0.95, marginRight: wp(3) }}
-    />
-    <Text
+const DrawerItem = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => {
+  const theme = useAppTheme()
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
       style={{
-        fontSize: hp(1.8),
-        color: theme.colors.white,
-        fontFamily: theme.typography.fontFamily.body,
-        fontWeight: '500',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: hp(1.5),
+        marginBottom: hp(0.5),
       }}
     >
-      {label}
-    </Text>
-  </TouchableOpacity>
-)
+      <Ionicons
+        name={icon as any}
+        size={hp(2.2)}
+        color={theme.colors.textPrimary}
+        style={{ opacity: 0.95, marginRight: wp(3) }}
+      />
+      <Text
+        style={{
+          fontSize: hp(1.8),
+          color: theme.colors.textPrimary,
+          fontFamily: theme.typography.fontFamily.body,
+          fontWeight: '500',
+        }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  )
+}
 
 const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) => {
+  const theme = useAppTheme()
   // Get user clubs and admin clubs - wrapped in try-catch in case context isn't available
   let userClubs: any[] = []
   let adminClubs: any[] = []
@@ -82,12 +86,12 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
     <Pressable
       style={{
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: theme.colors.background,
         ...Platform.select({
           ios: {
             shadowColor: '#000',
             shadowOffset: { width: 4, height: 0 },
-            shadowOpacity: 0.3,
+            shadowOpacity: 0.1,
             shadowRadius: 12,
           },
           android: {
@@ -110,7 +114,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
             paddingHorizontal: wp(4),
             paddingBottom: hp(3),
             borderBottomWidth: 1,
-            borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+            borderBottomColor: theme.colors.border,
           }}
         >
             <View style={{ position: 'relative', alignItems: 'center', marginBottom: hp(2) }}>
@@ -125,14 +129,14 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 3,
-                    borderColor: theme.colors.charcoal,
+                    borderColor: theme.colors.white,
                   }}
                 >
                   <Text
                     style={{
                       fontSize: hp(4),
                       fontWeight: '800',
-                      color: theme.colors.white,
+                      color: theme.colors.textPrimary,
                       fontFamily: theme.typography.fontFamily.heading,
                     }}
                   >
@@ -148,7 +152,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 style={{
                   fontSize: hp(2.2),
                   fontWeight: '700',
-                  color: theme.colors.white,
+                  color: theme.colors.textPrimary,
                   fontFamily: theme.typography.fontFamily.heading,
                   marginRight: wp(1),
                 }}
@@ -173,7 +177,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
             <Text
               style={{
                 fontSize: hp(1.5),
-                color: theme.colors.offWhite,
+                color: theme.colors.textSecondary,
                 opacity: 0.9,
                 fontFamily: theme.typography.fontFamily.body,
                 textAlign: 'center',
@@ -189,7 +193,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
             <Text
               style={{
                 fontSize: hp(1.3),
-                color: theme.colors.offWhite,
+                color: theme.colors.textSecondary,
                 opacity: 0.7,
                 fontFamily: theme.typography.fontFamily.body,
                 textAlign: 'center',
@@ -207,11 +211,11 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               paddingVertical: hp(2),
               paddingHorizontal: wp(4),
               borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+              borderBottomColor: theme.colors.border,
             }}
           >
             <TouchableOpacity activeOpacity={0.7}>
-              <Text style={{ fontSize: hp(1.4), color: theme.colors.offWhite, opacity: 0.9, fontFamily: theme.typography.fontFamily.body }}>
+              <Text style={{ fontSize: hp(1.4), color: theme.colors.textSecondary, fontFamily: theme.typography.fontFamily.body }}>
                 <Text style={{ color: '#70B5F9', fontWeight: '600' }}>{mockUser.profileViewers}</Text> profile viewers
               </Text>
             </TouchableOpacity>
@@ -224,14 +228,14 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 paddingVertical: hp(2),
                 paddingHorizontal: wp(4),
                 borderBottomWidth: 1,
-                borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+                borderBottomColor: theme.colors.border,
               }}
             >
               <Text
                 style={{
                   fontSize: hp(1.6),
                   fontWeight: '600',
-                  color: theme.colors.white,
+                  color: theme.colors.textPrimary,
                   fontFamily: theme.typography.fontFamily.body,
                   marginBottom: hp(1.5),
                 }}
@@ -248,16 +252,15 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                       paddingVertical: hp(1),
                       paddingHorizontal: wp(3),
                       borderRadius: theme.radius.md,
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      backgroundColor: theme.colors.backgroundSecondary,
                     }}
                   >
                     <Ionicons name="logo-instagram" size={hp(2.2)} color="#E4405F" style={{ marginRight: wp(2) }} />
                     <Text
                       style={{
                         fontSize: hp(1.6),
-                        color: theme.colors.offWhite,
+                        color: theme.colors.textSecondary,
                         fontFamily: theme.typography.fontFamily.body,
-                        opacity: 0.9,
                       }}
                     >
                       {mockUser.socialLinks.instagram}
@@ -273,16 +276,15 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                       paddingVertical: hp(1),
                       paddingHorizontal: wp(3),
                       borderRadius: theme.radius.md,
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      backgroundColor: theme.colors.backgroundSecondary,
                     }}
                   >
                     <Ionicons name="musical-notes" size={hp(2.2)} color="#1DB954" style={{ marginRight: wp(2) }} />
                     <Text
                       style={{
                         fontSize: hp(1.6),
-                        color: theme.colors.offWhite,
+                        color: theme.colors.textSecondary,
                         fontFamily: theme.typography.fontFamily.body,
-                        opacity: 0.9,
                       }}
                     >
                       {mockUser.socialLinks.spotify}
@@ -298,16 +300,15 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                       paddingVertical: hp(1),
                       paddingHorizontal: wp(3),
                       borderRadius: theme.radius.md,
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      backgroundColor: theme.colors.backgroundSecondary,
                     }}
                   >
                     <Ionicons name="musical-note" size={hp(2.2)} color="#FA243C" style={{ marginRight: wp(2) }} />
                     <Text
                       style={{
                         fontSize: hp(1.6),
-                        color: theme.colors.offWhite,
+                        color: theme.colors.textSecondary,
                         fontFamily: theme.typography.fontFamily.body,
-                        opacity: 0.9,
                       }}
                     >
                       {mockUser.socialLinks.appleMusic}
@@ -324,14 +325,14 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               paddingVertical: hp(2),
               paddingHorizontal: wp(4),
               borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+              borderBottomColor: theme.colors.border,
             }}
           >
             <Text
               style={{
                 fontSize: hp(1.6),
                 fontWeight: '600',
-                color: theme.colors.white,
+                color: theme.colors.textPrimary,
                 fontFamily: theme.typography.fontFamily.body,
                 marginBottom: hp(1.5),
               }}
@@ -347,7 +348,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 paddingVertical: hp(1.2),
                 paddingHorizontal: wp(3),
                 borderRadius: theme.radius.lg,
-                backgroundColor: 'rgba(164, 92, 255, 0.1)',
+                backgroundColor: theme.colors.backgroundSecondary,
                 marginBottom: hp(0.5),
               }}
               activeOpacity={0.7}
@@ -366,7 +367,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               <Text
                 style={{
                   fontSize: hp(1.8),
-                  color: theme.colors.white,
+                  color: theme.colors.textPrimary,
                   fontFamily: theme.typography.fontFamily.body,
                   fontWeight: '600',
                 }}
@@ -395,7 +396,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                     width: hp(2.8),
                     height: hp(2.8),
                     borderRadius: hp(1.4),
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    backgroundColor: theme.colors.backgroundSecondary,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: wp(3),
@@ -404,13 +405,13 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   <Ionicons
                     name="school-outline"
                     size={hp(2)}
-                    color={theme.colors.offWhite}
+                    color={theme.colors.textSecondary}
                   />
                 </View>
                 <Text
                   style={{
                     fontSize: hp(1.8),
-                    color: theme.colors.white,
+                    color: theme.colors.textPrimary,
                     fontFamily: theme.typography.fontFamily.body,
                     fontWeight: '500',
                   }}
@@ -421,7 +422,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               <Ionicons
                 name={classesExpanded ? 'chevron-up' : 'chevron-down'}
                 size={hp(2.2)}
-                color={theme.colors.offWhite}
+                color={theme.colors.textSecondary}
                 style={{ opacity: 0.7 }}
               />
             </TouchableOpacity>
@@ -467,19 +468,19 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                           width: hp(3),
                           height: hp(3),
                           borderRadius: hp(1.5),
-                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          backgroundColor: theme.colors.backgroundSecondary,
                           marginRight: wp(2),
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <Ionicons name="school-outline" size={hp(1.5)} color={theme.colors.offWhite} />
+                        <Ionicons name="school-outline" size={hp(1.5)} color={theme.colors.textSecondary} />
                       </View>
                     )}
                     <Text
                       style={{
                         fontSize: hp(1.6),
-                        color: theme.colors.offWhite,
+                        color: theme.colors.textSecondary,
                         fontFamily: theme.typography.fontFamily.body,
                         opacity: 0.85,
                       }}
@@ -510,7 +511,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                     width: hp(2.8),
                     height: hp(2.8),
                     borderRadius: hp(1.4),
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    backgroundColor: theme.colors.backgroundSecondary,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: wp(3),
@@ -519,13 +520,13 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   <Ionicons
                     name="people-outline"
                     size={hp(2)}
-                    color={theme.colors.offWhite}
+                    color={theme.colors.textSecondary}
                   />
                 </View>
                 <Text
                   style={{
                     fontSize: hp(1.8),
-                    color: theme.colors.white,
+                    color: theme.colors.textPrimary,
                     fontFamily: theme.typography.fontFamily.body,
                     fontWeight: '500',
                   }}
@@ -536,7 +537,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               <Ionicons
                 name={publicExpanded ? 'chevron-up' : 'chevron-down'}
                 size={hp(2.2)}
-                color={theme.colors.offWhite}
+                color={theme.colors.textSecondary}
                 style={{ opacity: 0.7 }}
               />
             </TouchableOpacity>
@@ -581,19 +582,19 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                           width: hp(3),
                           height: hp(3),
                           borderRadius: hp(1.5),
-                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          backgroundColor: theme.colors.backgroundSecondary,
                           marginRight: wp(2),
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <Ionicons name="people-outline" size={hp(1.5)} color={theme.colors.offWhite} />
+                        <Ionicons name="people-outline" size={hp(1.5)} color={theme.colors.textSecondary} />
                       </View>
                     )}
                     <Text
                       style={{
                         fontSize: hp(1.6),
-                        color: theme.colors.offWhite,
+                        color: theme.colors.textSecondary,
                         fontFamily: theme.typography.fontFamily.body,
                         opacity: 0.85,
                       }}
@@ -624,7 +625,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                     width: hp(2.8),
                     height: hp(2.8),
                     borderRadius: hp(1.4),
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    backgroundColor: theme.colors.backgroundSecondary,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: wp(3),
@@ -633,13 +634,13 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   <Ionicons
                     name="lock-closed-outline"
                     size={hp(2)}
-                    color={theme.colors.offWhite}
+                    color={theme.colors.textSecondary}
                   />
                 </View>
                 <Text
                   style={{
                     fontSize: hp(1.8),
-                    color: theme.colors.white,
+                    color: theme.colors.textPrimary,
                     fontFamily: theme.typography.fontFamily.body,
                     fontWeight: '500',
                   }}
@@ -650,7 +651,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               <Ionicons
                 name={privateExpanded ? 'chevron-up' : 'chevron-down'}
                 size={hp(2.2)}
-                color={theme.colors.offWhite}
+                color={theme.colors.textSecondary}
                 style={{ opacity: 0.7 }}
               />
             </TouchableOpacity>
@@ -695,19 +696,19 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                           width: hp(3),
                           height: hp(3),
                           borderRadius: hp(1.5),
-                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          backgroundColor: theme.colors.backgroundSecondary,
                           marginRight: wp(2),
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <Ionicons name="lock-closed-outline" size={hp(1.5)} color={theme.colors.offWhite} />
+                        <Ionicons name="lock-closed-outline" size={hp(1.5)} color={theme.colors.textSecondary} />
                       </View>
                     )}
                     <Text
                       style={{
                         fontSize: hp(1.6),
-                        color: theme.colors.offWhite,
+                        color: theme.colors.textSecondary,
                         fontFamily: theme.typography.fontFamily.body,
                         opacity: 0.85,
                       }}
@@ -726,14 +727,14 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 paddingVertical: hp(2),
                 paddingHorizontal: wp(4),
                 borderBottomWidth: 1,
-                borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+                borderBottomColor: theme.colors.border,
               }}
             >
               <Text
                 style={{
                   fontSize: hp(1.6),
                   fontWeight: '600',
-                  color: theme.colors.white,
+                  color: theme.colors.textPrimary,
                   fontFamily: theme.typography.fontFamily.body,
                   marginBottom: hp(1.5),
                 }}
@@ -766,7 +767,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                       style={{
                         fontSize: hp(1.5),
                         fontWeight: '700',
-                        color: theme.colors.white,
+                        color: theme.colors.textPrimary,
                       }}
                     >
                       {club.name.charAt(0)}
@@ -775,7 +776,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   <Text
                     style={{
                       fontSize: hp(1.5),
-                      color: theme.colors.offWhite,
+                      color: theme.colors.textSecondary,
                       opacity: 0.9,
                       fontFamily: theme.typography.fontFamily.body,
                       flex: 1,
@@ -794,7 +795,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               paddingVertical: hp(2),
               paddingHorizontal: wp(4),
               borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+              borderBottomColor: theme.colors.border,
             }}
           >
             <TouchableOpacity
@@ -811,7 +812,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   width: hp(3.5),
                   height: hp(3.5),
                   borderRadius: hp(0.5),
-                  backgroundColor: 'rgba(164, 92, 255, 0.2)',
+                  backgroundColor: theme.colors.backgroundSecondary,
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: wp(2),
@@ -893,7 +894,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               paddingTop: hp(2),
               paddingHorizontal: wp(4),
               borderTopWidth: 1,
-              borderTopColor: 'rgba(255, 255, 255, 0.1)',
+              borderTopColor: theme.colors.border,
             }}
           >
             <TouchableOpacity
@@ -908,13 +909,13 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               <Ionicons
                 name="settings-outline"
                 size={hp(2.2)}
-                color={theme.colors.offWhite}
-                style={{ opacity: 0.9, marginRight: wp(3) }}
+                color={theme.colors.textSecondary}
+                style={{ marginRight: wp(3) }}
               />
               <Text
                 style={{
                   fontSize: hp(1.8),
-                  color: theme.colors.white,
+                  color: theme.colors.textPrimary,
                   fontFamily: theme.typography.fontFamily.body,
                   fontWeight: '500',
                 }}
@@ -931,6 +932,56 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
 const RootLayout = () => {
   const router = useRouter()
   const drawerRef = useRef<DrawerLayout | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [showContent, setShowContent] = useState(false)
+
+  useEffect(() => {
+    const preloadResources = async () => {
+      try {
+        // Preload all background images used across the app
+        const backgroundImages = [
+          require('../assets/images/bonded-gradient.jpg'),
+          require('../assets/images/bonded-gradient2.jpg'),
+        ]
+
+        // Preload all background images in parallel
+        const preloadPromises = backgroundImages.map(async (image) => {
+          try {
+            const imageUri = Image.resolveAssetSource(image).uri
+            await Image.prefetch(imageUri)
+            console.log('✅ Preloaded background image:', imageUri)
+            return true
+          } catch (error) {
+            console.warn('⚠️ Failed to preload image:', error)
+            return false
+          }
+        })
+
+        // Wait for all images to preload
+        await Promise.all(preloadPromises)
+        
+        // Also preload the logo used in loading animation
+        const logoImage = require('../assets/images/transparent-bonded.png')
+        const logoUri = Image.resolveAssetSource(logoImage).uri
+        await Image.prefetch(logoUri)
+        
+        // Give time for other resources to load
+        // Also allows stories context to initialize
+        await new Promise((resolve) => setTimeout(resolve, 500)) // Minimum loading time
+      } catch (error) {
+        console.log('Error preloading resources:', error)
+        // Continue even if preload fails
+      } finally {
+        // Start fade out animation, then hide after fade completes
+        setTimeout(() => {
+          // Trigger fade out
+          setIsLoading(false)
+        }, 1500) // Start fade after 1.5 seconds
+      }
+    }
+
+    preloadResources()
+  }, [])
 
   const navigateAndClose = (path: string) => {
     router.push(path as never)
@@ -939,6 +990,24 @@ const RootLayout = () => {
 
   const renderDrawer = () => {
     return <DrawerContent onNavigate={navigateAndClose} />
+  }
+
+  // Show loading screen while resources load
+  if (!showContent) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <Loading 
+            size={80} 
+            duration={1200}
+            fadeOut={!isLoading}
+            onFadeComplete={() => {
+              setShowContent(true)
+            }}
+          />
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    )
   }
 
   return (

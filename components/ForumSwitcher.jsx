@@ -1,10 +1,12 @@
 import React from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 
 const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const getForumIcon = (type) => {
     switch (type) {
       case 'main':
@@ -77,11 +79,11 @@ const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
 
 export default ForumSwitcher
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   switcher: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     borderRadius: theme.radius.lg,

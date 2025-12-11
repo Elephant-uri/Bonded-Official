@@ -2,10 +2,11 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native'
 import React, { useState } from 'react'
 import Picker from '../../Picker'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
-import theme from '../../../constants/theme'
+import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 
 const LivingHabitsStep = ({ formData, updateFormData, onScroll }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   const [localData, setLocalData] = useState({
     sleepSchedule: formData.livingHabits?.sleepSchedule || null,
     cleanliness: formData.livingHabits?.cleanliness || null,
@@ -68,6 +69,7 @@ const LivingHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={sleepScheduleOptions}
         onValueChange={(value) => handleChange('sleepSchedule', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       <Picker
@@ -77,6 +79,7 @@ const LivingHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={cleanlinessOptions}
         onValueChange={(value) => handleChange('cleanliness', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       <Picker
@@ -86,6 +89,7 @@ const LivingHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={socialLevelOptions}
         onValueChange={(value) => handleChange('socialLevel', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       <Picker
@@ -95,6 +99,7 @@ const LivingHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={guestsOptions}
         onValueChange={(value) => handleChange('guests', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
     </ScrollView>
   )
@@ -102,7 +107,7 @@ const LivingHabitsStep = ({ formData, updateFormData, onScroll }) => {
 
 export default LivingHabitsStep
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -113,15 +118,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     marginBottom: hp(4),
     textAlign: 'center',
   },

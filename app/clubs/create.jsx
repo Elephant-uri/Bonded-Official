@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../theme'
 import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import Picker from '../../components/Picker'
@@ -32,6 +32,8 @@ const CATEGORIES = [
 ]
 
 export default function CreateOrg() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const { createClub } = useClubsContext()
 
@@ -171,7 +173,7 @@ export default function CreateOrg() {
               value={name}
               onChangeText={setName}
               placeholder="e.g., Computer Science Club"
-              placeholderTextColor={theme.colors.softBlack + '60'}
+              placeholderTextColor={theme.colors.textSecondary + '60'}
             />
           </View>
 
@@ -183,7 +185,7 @@ export default function CreateOrg() {
               value={description}
               onChangeText={setDescription}
               placeholder="Tell people about your organization..."
-              placeholderTextColor={theme.colors.softBlack + '60'}
+              placeholderTextColor={theme.colors.textSecondary + '60'}
               multiline
               numberOfLines={4}
             />
@@ -215,10 +217,10 @@ export default function CreateOrg() {
                 value={isPublic}
                 onValueChange={setIsPublic}
                 trackColor={{
-                  false: theme.colors.offWhite,
+                  false: theme.colors.backgroundSecondary,
                   true: theme.colors.bondedPurple + '50',
                 }}
-                thumbColor={isPublic ? theme.colors.bondedPurple : theme.colors.softBlack}
+                thumbColor={isPublic ? theme.colors.bondedPurple : theme.colors.textSecondary}
               />
             </View>
 
@@ -238,7 +240,7 @@ export default function CreateOrg() {
                     true: theme.colors.bondedPurple + '50',
                   }}
                   thumbColor={
-                    requiresApproval ? theme.colors.bondedPurple : theme.colors.softBlack
+                    requiresApproval ? theme.colors.bondedPurple : theme.colors.textSecondary
                   }
                 />
               </View>
@@ -261,10 +263,10 @@ export default function CreateOrg() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -280,7 +282,7 @@ const styles = StyleSheet.create({
     fontSize: hp(3),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(2),
   },
   inputGroup: {
@@ -290,26 +292,26 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
   input: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   textArea: {
     minHeight: hp(10),
     textAlignVertical: 'top',
   },
   imagePickerButton: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: hp(3),
     alignItems: 'center',
@@ -343,21 +345,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: hp(1),
     right: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.full,
   },
   section: {
     marginTop: hp(2),
     marginBottom: hp(2),
     padding: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
   },
   sectionTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   switchRow: {
@@ -366,7 +368,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: hp(1),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   switchLabel: {
     flex: 1,
@@ -375,13 +377,13 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
   switchSubtext: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   createButton: {

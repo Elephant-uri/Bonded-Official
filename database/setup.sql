@@ -6,7 +6,11 @@
 -- Step 1: Add missing fields to profiles table (if they don't exist)
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS verification_expires_at timestamp with time zone,
-ADD COLUMN IF NOT EXISTS onboarding_complete boolean DEFAULT false;
+ADD COLUMN IF NOT EXISTS onboarding_complete boolean DEFAULT false,
+ADD COLUMN IF NOT EXISTS role text DEFAULT 'user' CHECK (role IN ('user', 'admin', 'moderator'));
+
+-- Create index for admin checks
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role) WHERE role IN ('admin', 'moderator');
 
 -- Step 2: Create or replace auth trigger to auto-create profile
 -- This runs when a new user signs up via Supabase Auth

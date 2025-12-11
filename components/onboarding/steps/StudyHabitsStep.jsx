@@ -2,10 +2,11 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native'
 import React, { useState } from 'react'
 import Picker from '../../Picker'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
-import theme from '../../../constants/theme'
+import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 
 const StudyHabitsStep = ({ formData, updateFormData, onScroll }) => {
+  const styles = createStyles(ONBOARDING_THEME)
   const [localData, setLocalData] = useState({
     preferredStudyTime: formData.studyHabits?.preferredStudyTime || null,
     studyLocation: formData.studyHabits?.studyLocation || null,
@@ -74,6 +75,7 @@ const StudyHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={preferredStudyTimeOptions}
         onValueChange={(value) => handleChange('preferredStudyTime', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       <Picker
@@ -83,6 +85,7 @@ const StudyHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={studyLocationOptions}
         onValueChange={(value) => handleChange('studyLocation', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       <Picker
@@ -92,6 +95,7 @@ const StudyHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={studyStyleOptions}
         onValueChange={(value) => handleChange('studyStyle', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
 
       <Picker
@@ -101,6 +105,7 @@ const StudyHabitsStep = ({ formData, updateFormData, onScroll }) => {
         options={noiseLevelOptions}
         onValueChange={(value) => handleChange('noiseLevel', value)}
         containerStyle={styles.inputGroup}
+        theme={ONBOARDING_THEME}
       />
     </ScrollView>
   )
@@ -108,7 +113,7 @@ const StudyHabitsStep = ({ formData, updateFormData, onScroll }) => {
 
 export default StudyHabitsStep
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -119,15 +124,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(4),
     fontWeight: '800',
-    color: theme.colors.charcoal,
-    fontFamily: theme.typography.fontFamily.heading,
+    color: '#1A1A1A',
+    fontFamily: 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: theme.colors.softBlack,
-    fontFamily: theme.typography.fontFamily.body,
+    color: '#8E8E8E',
+    fontFamily: 'System',
     marginBottom: hp(4),
     textAlign: 'center',
   },

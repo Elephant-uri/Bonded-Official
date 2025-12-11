@@ -14,10 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../theme'
 import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import { useMockEvents } from '../../hooks/events/useMockEvents'
+import { getStaticMapUrl } from '../../helpers/mapUtils'
 import { 
   Calendar, 
   MapPin, 
@@ -31,6 +32,8 @@ import {
 } from '../../components/Icons'
 
 export default function EventDetail() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const { data: allEvents = [] } = useMockEvents()
@@ -194,15 +197,47 @@ export default function EventDetail() {
 
             {/* Location - Clickable for Maps */}
             {event.location_name && (
-              <TouchableOpacity
-                style={styles.infoRow}
-                onPress={openMaps}
-                activeOpacity={0.7}
-              >
-                <MapPin size={hp(2.2)} color={theme.colors.bondedPurple} />
-                <Text style={[styles.infoValue, styles.locationLink]}>{event.location_name}</Text>
-                <ChevronRight size={hp(1.8)} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.infoRow}
+                  onPress={openMaps}
+                  activeOpacity={0.7}
+                >
+                  <MapPin size={hp(2.2)} color={theme.colors.bondedPurple} />
+                  <Text style={[styles.infoValue, styles.locationLink]}>{event.location_name}</Text>
+                  <ChevronRight size={hp(1.8)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+                
+                {/* Map Preview (Eventbrite style) */}
+                <TouchableOpacity
+                  style={styles.mapPreviewContainer}
+                  onPress={openMaps}
+                  activeOpacity={0.9}
+                >
+                  <Image
+                    source={{
+                      uri: getStaticMapUrl(
+                        event.location_name,
+                        wp(92),
+                        hp(20)
+                      ) || `https://via.placeholder.com/${wp(92)}x${hp(20)}/E5E5E5/737373?text=Map+Preview`,
+                    }}
+                    style={styles.mapPreviewImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.mapPreviewOverlay}>
+                    <View style={styles.mapPreviewContent}>
+                      <MapPin size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                      <Text style={styles.mapPreviewText} numberOfLines={1}>
+                        {event.location_name}
+                      </Text>
+                    </View>
+                    <View style={styles.mapPreviewBadge}>
+                      <Text style={styles.mapPreviewBadgeText}>Tap to open in Maps</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </>
             )}
 
             {/* Organizer Section */}
@@ -341,10 +376,10 @@ export default function EventDetail() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -407,7 +442,7 @@ const styles = StyleSheet.create({
     fontSize: hp(3.5),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(2),
   },
   infoRow: {
@@ -420,17 +455,66 @@ const styles = StyleSheet.create({
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     flex: 1,
   },
   locationLink: {
     textDecorationLine: 'underline',
   },
+  mapPreviewContainer: {
+    width: '100%',
+    height: hp(20),
+    marginTop: hp(1.5),
+    marginBottom: hp(1),
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  mapPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mapPreviewOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: wp(3),
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  mapPreviewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    marginBottom: hp(0.5),
+  },
+  mapPreviewText: {
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    color: theme.colors.white,
+    flex: 1,
+  },
+  mapPreviewBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.4),
+    borderRadius: theme.radius.pill,
+  },
+  mapPreviewBadgeText: {
+    fontSize: hp(1.1),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '500',
+    color: theme.colors.white,
+  },
   organizerSection: {
     marginTop: hp(2),
     marginBottom: hp(2),
     padding: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.offWhite,
@@ -473,7 +557,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   followButton: {
     flexDirection: 'row',
@@ -483,7 +567,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1.5,
     borderColor: theme.colors.bondedPurple,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     gap: wp(1.5),
   },
   followButtonActive: {
@@ -503,7 +587,7 @@ const styles = StyleSheet.create({
     marginTop: hp(2),
     marginBottom: hp(2),
     padding: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.offWhite,
@@ -518,7 +602,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   guestListAvatars: {
     flexDirection: 'row',
@@ -544,7 +628,7 @@ const styles = StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -565,7 +649,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     maxHeight: '80%',
@@ -577,13 +661,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   modalCloseText: {
     fontSize: hp(1.6),
@@ -606,7 +690,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: hp(1.5),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   guestListItemAvatar: {
     width: hp(5),
@@ -627,7 +711,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   descriptionSection: {
     marginTop: hp(2),
@@ -637,13 +721,13 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
   descriptionText: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     lineHeight: hp(2.4),
   },
   goingSection: {
@@ -654,7 +738,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
   goingAvatars: {
@@ -680,7 +764,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   actionSection: {
     flexDirection: 'row',
@@ -689,14 +773,14 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#4ECDC4',
+    backgroundColor: theme.colors.bondedPurple,
     paddingVertical: hp(1.8),
     borderRadius: theme.radius.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtonActive: {
-    backgroundColor: '#4ECDC4',
+    backgroundColor: theme.colors.bondedPurple,
   },
   actionButtonText: {
     fontSize: hp(1.8),
@@ -709,7 +793,7 @@ const styles = StyleSheet.create({
   },
   declineButton: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 2,
     borderColor: theme.colors.bondedPurple,
     paddingVertical: hp(1.8),
@@ -732,7 +816,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     marginBottom: hp(2),
   },
   backButton: {

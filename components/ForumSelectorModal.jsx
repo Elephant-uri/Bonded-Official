@@ -12,11 +12,13 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 import AppCard from './AppCard'
 
 const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, onClose, onCreateForum }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedSections, setExpandedSections] = useState({
     pinned: true,
@@ -306,7 +308,7 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
 
 export default ForumSelectorModal
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -403,7 +405,7 @@ const styles = StyleSheet.create({
   forumItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     padding: hp(1.5),
     borderRadius: theme.radius.md,
     marginBottom: hp(0.5),
@@ -485,7 +487,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(2),
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   createButton: {
     flexDirection: 'row',

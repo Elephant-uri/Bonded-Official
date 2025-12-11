@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } fr
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
@@ -61,6 +61,8 @@ const MOCK_NOTIFICATIONS = [
 ]
 
 export default function Notifications() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS)
   const [refreshing, setRefreshing] = useState(false)
@@ -119,7 +121,7 @@ export default function Notifications() {
               <Ionicons
                 name={item.icon}
                 size={hp(2.2)}
-                color={item.read ? '#8E8E93' : theme.colors.bondedPurple}
+                color={item.read ? theme.colors.textSecondary : theme.colors.bondedPurple}
               />
             </View>
             <View style={styles.notificationContent}>
@@ -167,10 +169,10 @@ export default function Notifications() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -202,7 +204,7 @@ const styles = StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(3),
@@ -213,7 +215,7 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: hp(1.9),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.4),
   },
@@ -222,14 +224,14 @@ const styles = StyleSheet.create({
   },
   notificationBody: {
     fontSize: hp(1.7),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     lineHeight: hp(2.4),
     marginBottom: hp(0.5),
   },
   notificationTime: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     fontFamily: theme.typography.fontFamily.body,
   },

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, Pressable } from 'react-native'
 import React from 'react'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 
 const Button = ({
@@ -10,12 +10,28 @@ const Button = ({
     onPress = () => {},
     loading = false,
     hasShadow = true,
+    theme: customTheme, // Optional theme override (for onboarding) - when provided, completely bypasses app theme
 }) => {
-    const shadowStyle = {
-        
-    }
+  // Always call hook (React rules), but ignore if customTheme provided
+  const appTheme = useAppTheme()
+  const theme = customTheme || appTheme // Use custom theme if provided, otherwise use app theme
+  
+  // Debug: Log when using custom theme (remove after testing)
+  if (customTheme && __DEV__) {
+    console.log('Button using ONBOARDING_THEME:', {
+      backgroundColor: theme.colors.bondedPurple,
+      textColor: theme.colors.white
+    })
+  }
+  
+  const styles = createStyles(theme)
+  
+  // Handle shadows - use custom theme shadows first, then app theme, then empty
+  const shadowStyle = hasShadow ? (theme.shadows?.md || (!customTheme && appTheme?.shadows?.md) || {}) : {}
+  
+  // buttonStyle comes last to ensure it overrides default styles
   return (
-    <Pressable onPress={onPress} style={[styles.button, buttonStyle, hasShadow && shadowStyle]}>
+    <Pressable onPress={onPress} style={[styles.button, shadowStyle, buttonStyle]}>
       <Text style={[styles.text, textStyle]}>{title}</Text>
     </Pressable>
   )
@@ -23,12 +39,12 @@ const Button = ({
 
 export default Button
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     button: {
         backgroundColor: theme.colors.bondedPurple,
         paddingVertical: hp(2),
         paddingHorizontal: wp(6),
-        borderRadius: 999,
+        borderRadius: theme.radius.full,
         alignItems: 'center',
         justifyContent: 'center',
     },

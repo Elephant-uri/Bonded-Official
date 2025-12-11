@@ -2,6 +2,7 @@ import React from 'react'
 import { Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../helpers/common'
+import { useAppTheme } from '../app/theme'
 
 const SecondaryButton = ({
   label,
@@ -12,6 +13,9 @@ const SecondaryButton = ({
   style,
   textStyle,
 }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
+  
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -23,7 +27,7 @@ const SecondaryButton = ({
         <Ionicons
           name={icon}
           size={hp(2)}
-          color="#000000"
+          color={theme.colors.textPrimary}
           style={{ marginRight: wp(2) }}
         />
       )}
@@ -32,7 +36,7 @@ const SecondaryButton = ({
         <Ionicons
           name={icon}
           size={hp(2)}
-          color="#000000"
+          color={theme.colors.textPrimary}
           style={{ marginLeft: wp(2) }}
         />
       )}
@@ -42,14 +46,14 @@ const SecondaryButton = ({
 
 export default SecondaryButton
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   button: {
     paddingVertical: hp(1.5),
     paddingHorizontal: wp(5),
-    borderRadius: hp(1.2),
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
-    backgroundColor: '#FFFFFF',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -60,7 +64,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: '#000000',
+    color: theme.colors.textPrimary,
   },
 })
 

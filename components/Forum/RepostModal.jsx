@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 import AppHeader from '../AppHeader'
 import AppCard from '../AppCard'
 
@@ -23,6 +23,8 @@ export default function RepostModal({
   onRepost,
   groups = [],
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [repostType, setRepostType] = useState('raw') // 'raw' or 'caption'
   const [caption, setCaption] = useState('')
   const [selectedGroup, setSelectedGroup] = useState(null)
@@ -162,7 +164,7 @@ export default function RepostModal({
                 <TextInput
                   style={styles.captionInput}
                   placeholder="What are your thoughts?"
-                  placeholderTextColor={theme.colors.softBlack}
+                  placeholderTextColor={theme.colors.textSecondary}
                   value={caption}
                   onChangeText={setCaption}
                   multiline
@@ -231,10 +233,10 @@ export default function RepostModal({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -270,26 +272,26 @@ const styles = StyleSheet.create({
   },
   previewAuthor: {
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
   },
   previewMeta: {
     fontSize: hp(1.35),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     marginTop: hp(0.1),
   },
   previewTitle: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.5),
   },
   previewBody: {
     fontSize: hp(1.65),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     lineHeight: hp(2.4),
   },
@@ -306,7 +308,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(1.7),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
   },
@@ -322,7 +324,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(4),
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 2,
     borderColor: theme.colors.bondedPurple,
     gap: wp(1.5),
@@ -341,11 +343,11 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
   },
   captionInput: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     padding: wp(3),
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     minHeight: hp(12),
     textAlignVertical: 'top',
@@ -354,7 +356,7 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     textAlign: 'right',
     marginTop: hp(0.5),
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(0.9),
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
     borderColor: theme.colors.border,
     marginRight: wp(2),
@@ -379,7 +381,7 @@ const styles = StyleSheet.create({
   groupChipText: {
     fontSize: hp(1.5),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   groupChipTextActive: {

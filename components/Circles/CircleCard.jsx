@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 export default function CircleCard({
   topic,
@@ -15,6 +15,8 @@ export default function CircleCard({
   onPress,
   onSubmitAnswer,
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   return (
     <TouchableOpacity
       style={styles.container}
@@ -89,7 +91,7 @@ export default function CircleCard({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     marginHorizontal: wp(4),
     marginVertical: hp(1),

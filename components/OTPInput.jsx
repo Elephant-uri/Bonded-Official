@@ -1,9 +1,11 @@
 import { View, TextInput, StyleSheet, Platform } from 'react-native'
 import React, { useRef, useState } from 'react'
-import theme from '../constants/theme'
+import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 
 const OTPInput = ({ length = 4, onComplete, value, onChangeText }) => {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const inputRefs = useRef([])
   const [codes, setCodes] = useState(Array(length).fill(''))
 
@@ -63,7 +65,7 @@ const OTPInput = ({ length = 4, onComplete, value, onChangeText }) => {
 
 export default OTPInput
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -76,11 +78,11 @@ const styles = StyleSheet.create({
     height: wp(15),
     borderRadius: theme.radius.md,
     borderWidth: 2,
-    borderColor: theme.colors.offWhite,
-    backgroundColor: theme.colors.white,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
     fontSize: hp(3),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     ...Platform.select({
       ios: {

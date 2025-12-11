@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { hp, wp } from '../helpers/common'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
 import Picker from '../components/Picker'
@@ -173,6 +173,8 @@ const SORT_OPTIONS = [
 ]
 
 export default function RateProfessor() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
@@ -334,7 +336,7 @@ export default function RateProfessor() {
         }}
         activeOpacity={0.7}
       >
-        <Ionicons name="share-outline" size={hp(2)} color={theme.colors.softBlack} />
+        <Ionicons name="share-outline" size={hp(2)} color={theme.colors.textSecondary} />
         <Text style={styles.shareButtonText}>Share</Text>
       </TouchableOpacity>
     </TouchableOpacity>
@@ -808,7 +810,7 @@ function AddReviewModal({ professor, onClose }) {
               <TextInput
                 style={styles.reviewTextInput}
                 placeholder="Share your experience with this professor..."
-                placeholderTextColor={theme.colors.softBlack + '60'}
+                placeholderTextColor={theme.colors.textSecondary + '60'}
                 value={reviewText}
                 onChangeText={setReviewText}
                 multiline
@@ -823,10 +825,10 @@ function AddReviewModal({ professor, onClose }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -845,25 +847,25 @@ const styles = StyleSheet.create({
     fontSize: hp(3.5),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   subtitle: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     marginBottom: hp(2),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   searchIcon: {
     marginRight: wp(2),
@@ -873,7 +875,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   clearButton: {
     padding: hp(0.5),
@@ -890,13 +892,13 @@ const styles = StyleSheet.create({
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
   resultsCount: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginBottom: hp(1.5),
   },
@@ -904,11 +906,11 @@ const styles = StyleSheet.create({
     gap: hp(2),
   },
   professorCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   professorHeader: {
     flexDirection: 'row',
@@ -923,13 +925,13 @@ const styles = StyleSheet.create({
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
   professorDept: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   ratingBadge: {
@@ -957,7 +959,7 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   statsRow: {
@@ -974,13 +976,13 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginBottom: hp(0.5),
   },
   difficultyBar: {
     height: hp(0.6),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.sm,
     marginBottom: hp(0.3),
     overflow: 'hidden',
@@ -993,7 +995,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   coursesRow: {
     flexDirection: 'row',
@@ -1006,7 +1008,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginRight: wp(1),
   },
   courseTag: {
@@ -1027,7 +1029,7 @@ const styles = StyleSheet.create({
     gap: wp(1.5),
   },
   tag: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     paddingHorizontal: wp(2.5),
     paddingVertical: hp(0.5),
     borderRadius: theme.radius.pill,
@@ -1035,11 +1037,11 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: hp(1.2),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   modalSafeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   modalContainer: {
     flex: 1,
@@ -1052,7 +1054,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(2),
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.offWhite,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   modalCloseButton: {
     padding: hp(0.5),
@@ -1061,7 +1063,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   modalAddButton: {
     padding: hp(0.5),
@@ -1083,7 +1085,7 @@ const styles = StyleSheet.create({
     paddingBottom: hp(10),
   },
   professorDetailHeader: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     marginBottom: hp(2),
@@ -1092,13 +1094,13 @@ const styles = StyleSheet.create({
     fontSize: hp(3),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   professorDetailDept: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginBottom: hp(2),
   },
@@ -1116,7 +1118,7 @@ const styles = StyleSheet.create({
     fontSize: hp(4.5),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '800',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   ratingDisplayStars: {
@@ -1127,7 +1129,7 @@ const styles = StyleSheet.create({
   ratingDisplayCount: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   professorDetailStats: {
@@ -1137,7 +1139,7 @@ const styles = StyleSheet.create({
   },
   detailStatCard: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.lg,
     padding: wp(3),
     alignItems: 'center',
@@ -1146,13 +1148,13 @@ const styles = StyleSheet.create({
     fontSize: hp(2.5),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
   detailStatLabel: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginBottom: hp(0.5),
   },
@@ -1163,7 +1165,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
   coursesGrid: {
@@ -1208,12 +1210,12 @@ const styles = StyleSheet.create({
     color: theme.colors.bondedPurple,
   },
   reviewCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     marginBottom: hp(2),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -1228,7 +1230,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   reviewRating: {
@@ -1238,7 +1240,7 @@ const styles = StyleSheet.create({
   reviewDate: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   reviewStats: {
@@ -1258,12 +1260,12 @@ const styles = StyleSheet.create({
   reviewStatText: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   reviewText: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     lineHeight: hp(2.4),
     marginBottom: hp(1),
   },
@@ -1281,31 +1283,31 @@ const styles = StyleSheet.create({
   helpfulText: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   noReviews: {
     alignItems: 'center',
     paddingVertical: hp(6),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
   },
   noReviewsText: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginTop: hp(1.5),
     marginBottom: hp(0.5),
   },
   noReviewsSubtext: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
   },
   addReviewContainer: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
   },
@@ -1313,13 +1315,13 @@ const styles = StyleSheet.create({
     fontSize: hp(2.5),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
   addReviewProfessorDept: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     opacity: 0.7,
     marginBottom: hp(3),
   },
@@ -1330,7 +1332,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
   ratingSelector: {
@@ -1349,7 +1351,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: hp(1.5),
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -1363,7 +1365,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   difficultyButtonTextActive: {
     color: theme.colors.bondedPurple,
@@ -1377,7 +1379,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 2,
     borderColor: 'transparent',
     minWidth: wp(12),
@@ -1391,7 +1393,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   gradeButtonTextActive: {
     color: theme.colors.bondedPurple,
@@ -1406,19 +1408,19 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
   },
   toggleButtonTextActive: {
     color: theme.colors.bondedPurple,
     fontWeight: '600',
   },
   reviewTextInput: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     minHeight: hp(15),
     textAlignVertical: 'top',
   },

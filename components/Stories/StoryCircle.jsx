@@ -3,9 +3,11 @@ import { TouchableOpacity, View, Text, StyleSheet, Image, Platform } from 'react
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 export default function StoryCircle({ story, onPress, isOwn = false }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const hasUnviewed = story.hasUnviewed
 
   return (
@@ -60,7 +62,7 @@ export default function StoryCircle({ story, onPress, isOwn = false }) {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -94,7 +96,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: hp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     overflow: 'hidden',
   },
   image: {
@@ -141,7 +143,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
     textAlign: 'center',

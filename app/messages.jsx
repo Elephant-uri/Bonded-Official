@@ -1,14 +1,11 @@
-import React, { useState } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ScrollView, Image, Modal, Pressable, Platform } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { hp, wp } from '../helpers/common'
-import AppTopBar from '../components/AppTopBar'
+import React, { useState } from 'react'
+import { FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import BottomNav from '../components/BottomNav'
+import { hp, wp } from '../helpers/common'
 import { useAppTheme } from './theme'
-import ThemedView from './components/ThemedView'
-import ThemedText from './components/ThemedText'
 
 const MOCK_SUGGESTED_PEOPLE = [
   { id: 'suggest-1', name: 'Alex', photoUrl: 'https://randomuser.me/api/portraits/men/1.jpg' },
@@ -213,18 +210,17 @@ export default function Messages() {
             activeOpacity={0.6}
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={hp(2.2)} color="#000000" />
+            <Ionicons name="arrow-back" size={hp(2.4)} color={theme.colors.textPrimary} />
           </TouchableOpacity>
           
-          {/* Centered Link Icon in Soft Capsule */}
-          <View style={styles.logoCapsule}>
-            <View style={styles.logoCapsuleInner}>
-              <Image
-                source={require('../assets/images/transparent-bonded.png')}
-                style={styles.headerLogo}
-                resizeMode="contain"
-              />
-            </View>
+          {/* Centered Bonded Logo with Text - Like Yearbook */}
+          <View style={styles.bondedLogoContainer}>
+            <Image
+              source={require('../assets/images/transparent-bonded.png')}
+              style={styles.bondedLogo}
+              resizeMode="contain"
+            />
+            <Text style={styles.bondedText}>Bonded</Text>
           </View>
           
           <TouchableOpacity
@@ -232,7 +228,7 @@ export default function Messages() {
             activeOpacity={0.6}
             onPress={() => setIsNewChatModalVisible(true)}
           >
-            <Ionicons name="create-outline" size={hp(2.2)} color="#000000" />
+            <Ionicons name="create-outline" size={hp(2.4)} color={theme.colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -242,12 +238,12 @@ export default function Messages() {
             <Ionicons
               name="search-outline"
               size={hp(1.8)}
-              color="#8E8E93"
+              color={theme.colors.textSecondary}
             />
             <TextInput
               style={styles.searchInput}
               placeholder="Search"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -262,7 +258,7 @@ export default function Messages() {
               <Ionicons
                 name="chevron-forward"
                 size={hp(1.8)}
-                color="#8E8E93"
+                color={theme.colors.textSecondary}
               />
             </TouchableOpacity>
           </View>
@@ -374,7 +370,7 @@ export default function Messages() {
                 <Ionicons
                   name="search-outline"
                   size={hp(2.2)}
-                  color={theme.colors.softBlack}
+                  color={theme.colors.textSecondary}
                   style={{ opacity: 0.6 }}
                 />
                 <TextInput
@@ -505,7 +501,7 @@ export default function Messages() {
                       <Ionicons
                         name="close"
                         size={hp(2.6)}
-                        color={theme.colors.charcoal}
+                        color={theme.colors.textPrimary}
                       />
                     </TouchableOpacity>
                   </View>
@@ -574,7 +570,7 @@ export default function Messages() {
 const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -585,55 +581,38 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.2),
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 0.5 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    paddingVertical: hp(1.5),
+    backgroundColor: theme.colors.background,
+    height: hp(5.5),
   },
   backButton: {
-    width: hp(4),
-    height: hp(4),
+    width: hp(4.5),
+    height: hp(4.5),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoCapsule: {
+  bondedLogoContainer: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: wp(4),
+    gap: wp(1.5),
   },
-  logoCapsuleInner: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: hp(2),
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(0.6),
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+  bondedLogo: {
+    height: hp(2.5),
+    width: hp(2.5),
   },
-  headerLogo: {
-    height: hp(2),
-    width: hp(8),
+  bondedText: {
+    fontSize: hp(2),
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   composeButton: {
-    width: hp(4),
-    height: hp(4),
+    width: hp(4.5),
+    height: hp(4.5),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -646,7 +625,7 @@ const createStyles = (theme) => StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5E5EA',
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: hp(1.2),
     paddingHorizontal: wp(3.5),
     paddingVertical: hp(0.9),
@@ -662,7 +641,7 @@ const createStyles = (theme) => StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: hp(1.6),
-    color: '#000000',
+    color: theme.colors.textPrimary,
     marginLeft: wp(2),
     fontWeight: '400',
   },
@@ -670,7 +649,7 @@ const createStyles = (theme) => StyleSheet.create({
   suggestedSection: {
     paddingTop: hp(1.2),
     paddingBottom: hp(1.5),
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   suggestedHeader: {
     flexDirection: 'row',
@@ -682,7 +661,7 @@ const createStyles = (theme) => StyleSheet.create({
   suggestedTitle: {
     fontSize: hp(1.6),
     fontWeight: '500',
-    color: '#000000',
+    color: theme.colors.textPrimary,
     letterSpacing: -0.1,
   },
   suggestedList: {
@@ -702,7 +681,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderColor: theme.colors.bondedPurple,
     marginBottom: hp(0.6),
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   suggestedAvatarImage: {
     width: '100%',
@@ -710,7 +689,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   suggestedName: {
     fontSize: hp(1.3),
-    color: '#000000',
+    color: theme.colors.textPrimary,
     fontWeight: '400',
     textAlign: 'center',
   },
@@ -724,9 +703,9 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     paddingVertical: hp(1.8),
     paddingHorizontal: wp(4),
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: theme.colors.border,
   },
   avatarContainer: {
     position: 'relative',
@@ -749,7 +728,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(5.5),
     height: hp(5.5),
     borderRadius: hp(2.75),
-    backgroundColor: '#E5E5EA',
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   onlineIndicator: {
     position: 'absolute',
@@ -760,7 +739,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: hp(0.7),
     backgroundColor: '#34C759',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: theme.colors.white,
   },
   messageContent: {
     flex: 1,
@@ -774,7 +753,7 @@ const createStyles = (theme) => StyleSheet.create({
   userName: {
     fontSize: hp(1.7),
     fontWeight: '500',
-    color: '#000000',
+    color: theme.colors.textPrimary,
     flex: 1,
     letterSpacing: -0.1,
   },
@@ -796,12 +775,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   messagePreview: {
     fontSize: hp(1.5),
-    color: '#707070',
+    color: theme.colors.textSecondary,
     flex: 1,
     fontWeight: '400',
   },
   unreadBadge: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.info,
     borderRadius: theme.radius.full,
     minWidth: hp(2),
     height: hp(2),
@@ -817,7 +796,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   separator: {
     height: 0.5,
-    backgroundColor: '#E5E5EA', // iOS separator
+    backgroundColor: theme.colors.backgroundSecondary, // iOS separator
     marginLeft: wp(15),
   },
   modalOverlay: {

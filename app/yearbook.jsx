@@ -1,19 +1,18 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, Pressable, ScrollView, Platform, Animated } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Filter, ArrowLeft, MoreHorizontal, School, Calendar, User, MapPin, UserPlus, MessageCircle, X } from '../components/Icons'
-import { useRouter } from 'expo-router'
-import { hp, wp } from '../helpers/common'
-import BottomNav from '../components/BottomNav'
-import Picker from '../components/Picker'
-import AppTopBar from '../components/AppTopBar'
-import AppCard from '../components/AppCard'
+import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Animated, FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import AppCard from '../components/AppCard'
+import AppTopBar from '../components/AppTopBar'
+import BottomNav from '../components/BottomNav'
+import { ArrowLeft, Calendar, Filter, MapPin, MessageCircle, MoreHorizontal, School, User, UserPlus, X } from '../components/Icons'
+import Picker from '../components/Picker'
+import { hp, wp } from '../helpers/common'
 import { generateProfiles } from '../services/profileGenerator'
 import { fetchMultiplePhotos, getPhotoUrl } from '../services/unsplashService'
 import { useAppTheme } from './theme'
-import ThemedView from './components/ThemedView'
-import ThemedText from './components/ThemedText'
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
 
@@ -276,17 +275,30 @@ export default function Yearbook() {
             <Text style={styles.universityYearTitle}>
               University of Rhode Island {selectedYear}
             </Text>
-            <TouchableOpacity
-              style={styles.filterIconButton}
-              activeOpacity={0.7}
-              onPress={() => setIsFilterModalVisible(true)}
-            >
-              <Filter
-                size={hp(2.2)}
-                color={theme.colors.textSecondary}
-                strokeWidth={2}
-              />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.headerIconButton}
+                activeOpacity={0.7}
+                onPress={() => router.push('/notifications')}
+              >
+                <Ionicons
+                  name="notifications-outline"
+                  size={hp(2.2)}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.filterIconButton}
+                activeOpacity={0.7}
+                onPress={() => setIsFilterModalVisible(true)}
+              >
+                <Filter
+                  size={hp(2.2)}
+                  color={theme.colors.textSecondary}
+                  strokeWidth={2}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </Animated.View>
 
@@ -523,7 +535,7 @@ export default function Yearbook() {
                 >
                   <X
                     size={hp(2.6)}
-                    color={theme.colors.charcoal}
+                    color={theme.colors.textPrimary}
                     strokeWidth={2.5}
                   />
                 </TouchableOpacity>
@@ -640,6 +652,14 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: hp(1),
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+  },
+  headerIconButton: {
+    padding: hp(0.5),
+  },
   filterIconButton: {
     padding: hp(0.5),
   },
@@ -733,7 +753,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     paddingHorizontal: wp(6),
@@ -912,7 +932,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: hp(1.3),
     borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: wp(2),
@@ -948,7 +968,7 @@ const createStyles = (theme) => StyleSheet.create({
   profileModalMetaPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.pill,
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.8),
@@ -980,7 +1000,7 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: wp(3.5),
     paddingVertical: hp(0.9),
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -1002,7 +1022,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
   },
   profileModalGroupJamScore: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     marginBottom: hp(2.5),

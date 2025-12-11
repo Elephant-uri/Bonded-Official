@@ -20,7 +20,10 @@ const UNSPLASH_ACCESS_KEY = process.env.EXPO_PUBLIC_UNSPLASH_ACCESS_KEY || null
 
 // Debug: Log if key is found (remove in production)
 if (__DEV__) {
-  console.log('Unsplash API Key loaded:', UNSPLASH_ACCESS_KEY ? 'Yes' : 'No (using fallback)')
+  console.log('Unsplash API Key loaded:', UNSPLASH_ACCESS_KEY ? `Yes (${UNSPLASH_ACCESS_KEY.substring(0, 10)}...)` : 'No (using fallback)')
+  if (UNSPLASH_ACCESS_KEY) {
+    console.log('Full key length:', UNSPLASH_ACCESS_KEY.length)
+  }
 }
 const UNSPLASH_API_URL = 'https://api.unsplash.com'
 
@@ -55,26 +58,43 @@ const SEARCH_TERMS = [
 export const fetchUnsplashPhoto = async (searchTerm = null, width = 400, height = 400) => {
   // If no API key is set, use fallback immediately
   if (!UNSPLASH_ACCESS_KEY || UNSPLASH_ACCESS_KEY === 'YOUR_UNSPLASH_ACCESS_KEY') {
+    console.log('⚠️ No Unsplash API key found, using fallback')
     return getFallbackPhoto()
   }
 
   try {
     const term = searchTerm || SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]
     
-    const response = await fetch(
-      `${UNSPLASH_API_URL}/photos/random?query=${encodeURIComponent(term)}&orientation=portrait&w=${width}&h=${height}&client_id=${UNSPLASH_ACCESS_KEY}`
-    )
+    // Correct Unsplash API format: client_id should be in query params, not w/h (those are for URL sizes)
+    const url = `${UNSPLASH_API_URL}/photos/random?client_id=${UNSPLASH_ACCESS_KEY}&query=${encodeURIComponent(term)}&orientation=portrait`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Accept-Version': 'v1',
+      },
+    })
 
     if (!response.ok) {
-      // Fallback to a placeholder service if Unsplash fails
-      console.warn('Unsplash API failed, using fallback')
+      const errorText = await response.text()
+      console.warn(`❌ Unsplash API failed (${response.status}):`, errorText.substring(0, 200))
+      console.warn('API Key present:', UNSPLASH_ACCESS_KEY ? 'Yes' : 'No')
       return getFallbackPhoto()
     }
 
     const data = await response.json()
-    return data.urls?.regular || data.urls?.small || getFallbackPhoto()
+    // Use the appropriate size URL based on requested dimensions
+    let imageUrl = data.urls?.regular || data.urls?.small || data.urls?.thumb
+    
+    // If we need specific dimensions, use Unsplash's URL parameters
+    if (imageUrl && (width !== 400 || height !== 400)) {
+      // Replace the size parameters in the URL if present, or append them
+      imageUrl = imageUrl.split('?')[0] + `?w=${width}&h=${height}&fit=crop`
+    }
+    
+    return imageUrl || getFallbackPhoto()
   } catch (error) {
-    console.error('Error fetching Unsplash photo:', error)
+    console.error('❌ Error fetching Unsplash photo:', error.message)
+    console.error('Full error:', error)
     return getFallbackPhoto()
   }
 }
@@ -125,7 +145,12 @@ export const fetchMultiplePhotos = async (count = 10) => {
       const searchTerm = searchTerms[i % searchTerms.length]
       
       const response = await fetch(
-        `${UNSPLASH_API_URL}/photos/random?count=${batchSize}&query=${encodeURIComponent(searchTerm)}&orientation=portrait&client_id=${UNSPLASH_ACCESS_KEY}`
+        `${UNSPLASH_API_URL}/photos/random?client_id=${UNSPLASH_ACCESS_KEY}&count=${batchSize}&query=${encodeURIComponent(searchTerm)}&orientation=portrait`,
+        {
+          headers: {
+            'Accept-Version': 'v1',
+          },
+        }
       )
 
       if (!response.ok) {

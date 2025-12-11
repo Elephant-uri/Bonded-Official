@@ -9,7 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 export default function PollRenderer({
   poll,
@@ -18,6 +18,8 @@ export default function PollRenderer({
   totalVotes = 0,
   voteCounts = [],
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [localVote, setLocalVote] = useState(userVote)
   const [hasVoted, setHasVoted] = useState(!!userVote)
 
@@ -129,9 +131,9 @@ export default function PollRenderer({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(4),
     marginVertical: hp(1),
@@ -148,14 +150,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: hp(1.8),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   optionsContainer: {
     gap: hp(1),
   },
   option: {
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.md,
     padding: wp(3),
     borderWidth: 2,
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
   optionText: {
     flex: 1,
     fontSize: hp(1.6),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '500',
   },
@@ -222,7 +224,7 @@ const styles = StyleSheet.create({
   },
   optionVotes: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
   },
   checkIcon: {
@@ -230,7 +232,7 @@ const styles = StyleSheet.create({
   },
   totalVotes: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     marginTop: hp(1),
     textAlign: 'center',

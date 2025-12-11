@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import AppHeader from '../components/AppHeader'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 
 // Mock AI responses based on queries
@@ -179,6 +179,8 @@ const INITIAL_MESSAGES = [
 ]
 
 export default function LinkAI() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [inputText, setInputText] = useState('')
@@ -400,7 +402,7 @@ export default function LinkAI() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -481,7 +483,7 @@ const styles = StyleSheet.create({
   },
   resultCard: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     padding: wp(3),
     borderWidth: 1,
@@ -541,7 +543,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
   },
   clubCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     overflow: 'hidden',
     borderWidth: 1,
@@ -587,7 +589,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
   },

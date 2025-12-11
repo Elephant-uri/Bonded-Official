@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 // Speaker Avatar Component (Twitter Spaces style)
 const SpeakerAvatar = ({ speaker, isAnonymous, isSpeaking = true }) => {
@@ -81,6 +81,8 @@ export default function CircleRoom({
   onClose,
   onUpdateViewpoint,
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [showUpdateModal, setShowUpdateModal] = useState(false)
 
   // Mock data
@@ -237,7 +239,7 @@ export default function CircleRoom({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
   },

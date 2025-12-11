@@ -17,10 +17,12 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 // import * as Location from 'expo-location' // Uncomment when expo-location is installed
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../theme'
 import { Calendar as CalendarIcon, MapPin, ChevronRight, Users, Lock } from '../../components/Icons'
 
 export default function CreateEvent() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
 
   const [eventName, setEventName] = useState('')
@@ -657,14 +659,14 @@ export default function CreateEvent() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -689,7 +691,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   createText: {
     fontSize: hp(1.6),
@@ -714,9 +716,9 @@ const styles = StyleSheet.create({
   imagePlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 2,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     borderStyle: 'dashed',
     borderRadius: theme.radius.lg,
     alignItems: 'center',
@@ -731,7 +733,7 @@ const styles = StyleSheet.create({
   imagePlaceholderText: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontWeight: '500',
   },
   eventImage: {
@@ -746,40 +748,40 @@ const styles = StyleSheet.create({
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   inputWithIcon: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     gap: wp(2),
   },
   dateTimeField: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     marginBottom: hp(1),
   },
   dateTimeContent: {
@@ -790,7 +792,7 @@ const styles = StyleSheet.create({
   dateTimeText: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   timeRow: {
     flexDirection: 'row',
@@ -804,12 +806,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   selectFieldLeft: {
     flexDirection: 'row',
@@ -819,7 +821,7 @@ const styles = StyleSheet.create({
   selectFieldText: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   lockIcon: {
     fontSize: hp(2),
@@ -828,12 +830,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   inviteAvatars: {
     flexDirection: 'row',
@@ -857,12 +859,12 @@ const styles = StyleSheet.create({
   inviteText: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   footer: {
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopWidth: 1,
     borderTopColor: theme.colors.offWhite,
   },
@@ -899,16 +901,16 @@ const styles = StyleSheet.create({
   mapPreview: {
     marginTop: hp(1),
     padding: wp(4),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   mapPreviewText: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   mapPreviewSubtext: {
@@ -922,7 +924,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     maxHeight: '80%',
@@ -940,7 +942,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   modalCloseText: {
     fontSize: hp(1.6),
@@ -960,9 +962,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     borderRadius: theme.radius.md,
     marginBottom: hp(1),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   optionRowSelected: {
     backgroundColor: theme.colors.bondedPurple + '10',
@@ -971,7 +973,7 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   optionTextSelected: {
     color: theme.colors.bondedPurple,
@@ -990,9 +992,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     borderRadius: theme.radius.md,
     marginBottom: hp(1),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   inviteeRowSelected: {
     backgroundColor: theme.colors.bondedPurple + '10',
@@ -1025,7 +1027,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
   inviteeType: {
@@ -1039,7 +1041,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   pickerModalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     paddingBottom: hp(2),
@@ -1057,7 +1059,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   pickerModalButton: {
     paddingVertical: hp(0.5),
@@ -1074,15 +1076,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   locationInput: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     marginBottom: hp(2),
   },
   mapPreviewContainer: {
@@ -1090,12 +1092,12 @@ const styles = StyleSheet.create({
   },
   mapPreviewPlaceholder: {
     height: hp(20),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     borderStyle: 'dashed',
   },
   mapPreviewPlaceholderText: {

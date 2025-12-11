@@ -1,14 +1,34 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
+import { fetchUnsplashPhoto } from '../services/unsplashService'
 
 const StoriesContext = createContext()
 
+// Story-appropriate search terms for Unsplash
+const STORY_SEARCH_TERMS = [
+  'campus life',
+  'college lifestyle',
+  'student life',
+  'university campus',
+  'college dorm',
+  'study session',
+  'campus event',
+  'college party',
+  'university library',
+  'college sports',
+  'campus dining',
+  'college friends',
+  'university quad',
+  'college graduation',
+  'campus architecture',
+]
+
 // Generate mock stories for testing
-const generateMockStories = () => {
+const generateMockStories = async () => {
   const now = new Date()
   const stories = {}
   
   // Helper to create story with variety
-  const createStory = (userId, userName, userAvatar, forumId, hoursAgo, textContent = null, stickerEmoji = null) => {
+  const createStory = async (userId, userName, userAvatar, forumId, hoursAgo, textContent = null, stickerEmoji = null) => {
     const createdAt = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000)
     const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000)
     
@@ -30,13 +50,17 @@ const generateMockStories = () => {
     const randomText = textContent || (Math.random() > 0.5 ? textVariations[Math.floor(Math.random() * textVariations.length)] : null)
     const randomSticker = stickerEmoji || (Math.random() > 0.6 ? stickerVariations[Math.floor(Math.random() * stickerVariations.length)] : null)
     
+    // Fetch Unsplash image for story (portrait orientation, suitable for stories)
+    const searchTerm = STORY_SEARCH_TERMS[Math.floor(Math.random() * STORY_SEARCH_TERMS.length)]
+    const imageUri = await fetchUnsplashPhoto(searchTerm, 400, 800) // 400x800 for story format
+    
     const story = {
       id: `story-${userId}-${Date.now()}-${Math.random()}`,
       userId,
       userName,
       userAvatar,
       forumId,
-      imageUri: `https://picsum.photos/400/800?random=${userId}${Math.random()}`,
+      imageUri,
       videoUri: null,
       mediaType: 'image',
       textElements: randomText ? [
@@ -78,42 +102,61 @@ const generateMockStories = () => {
   const forumAcademic = 'forum-academic'
   
   // Quad forum stories - lots of variety
-  createStory('user-1', 'Sarah Johnson', 'https://randomuser.me/api/portraits/women/1.jpg', forumQuad, 1)
-  createStory('user-2', 'Mike Chen', 'https://randomuser.me/api/portraits/men/2.jpg', forumQuad, 2)
-  createStory('user-3', 'Emma Davis', 'https://randomuser.me/api/portraits/women/3.jpg', forumQuad, 3)
-  createStory('user-4', 'Alex Rodriguez', 'https://randomuser.me/api/portraits/men/4.jpg', forumQuad, 4)
-  createStory('user-5', 'Jessica Lee', 'https://randomuser.me/api/portraits/women/5.jpg', forumQuad, 5)
-  createStory('user-6', 'David Kim', 'https://randomuser.me/api/portraits/men/6.jpg', forumQuad, 6)
-  createStory('user-7', 'Olivia Brown', 'https://randomuser.me/api/portraits/women/7.jpg', forumQuad, 7)
-  createStory('user-15', 'James Wilson', 'https://randomuser.me/api/portraits/men/15.jpg', forumQuad, 8)
-  createStory('user-16', 'Lily Martinez', 'https://randomuser.me/api/portraits/women/16.jpg', forumQuad, 9)
-  createStory('user-17', 'Daniel Taylor', 'https://randomuser.me/api/portraits/men/17.jpg', forumQuad, 10)
-  createStory('user-18', 'Sophie Garcia', 'https://randomuser.me/api/portraits/women/17.jpg', forumQuad, 11)
-  createStory('user-19', 'Ryan Anderson', 'https://randomuser.me/api/portraits/men/18.jpg', forumQuad, 12)
+  await createStory('user-1', 'Sarah Johnson', 'https://randomuser.me/api/portraits/women/1.jpg', forumQuad, 1)
+  await createStory('user-2', 'Mike Chen', 'https://randomuser.me/api/portraits/men/2.jpg', forumQuad, 2)
+  await createStory('user-3', 'Emma Davis', 'https://randomuser.me/api/portraits/women/3.jpg', forumQuad, 3)
+  await createStory('user-4', 'Alex Rodriguez', 'https://randomuser.me/api/portraits/men/4.jpg', forumQuad, 4)
+  await createStory('user-5', 'Jessica Lee', 'https://randomuser.me/api/portraits/women/5.jpg', forumQuad, 5)
+  await createStory('user-6', 'David Kim', 'https://randomuser.me/api/portraits/men/6.jpg', forumQuad, 6)
+  await createStory('user-7', 'Olivia Brown', 'https://randomuser.me/api/portraits/women/7.jpg', forumQuad, 7)
+  await createStory('user-15', 'James Wilson', 'https://randomuser.me/api/portraits/men/15.jpg', forumQuad, 8)
+  await createStory('user-16', 'Lily Martinez', 'https://randomuser.me/api/portraits/women/16.jpg', forumQuad, 9)
+  await createStory('user-17', 'Daniel Taylor', 'https://randomuser.me/api/portraits/men/17.jpg', forumQuad, 10)
+  await createStory('user-18', 'Sophie Garcia', 'https://randomuser.me/api/portraits/women/17.jpg', forumQuad, 11)
+  await createStory('user-19', 'Ryan Anderson', 'https://randomuser.me/api/portraits/men/18.jpg', forumQuad, 12)
   
   // Events forum stories
-  createStory('user-8', 'Chris Wilson', 'https://randomuser.me/api/portraits/men/8.jpg', forumEvents, 1)
-  createStory('user-9', 'Sophia Martinez', 'https://randomuser.me/api/portraits/women/9.jpg', forumEvents, 2)
-  createStory('user-10', 'Ryan Taylor', 'https://randomuser.me/api/portraits/men/10.jpg', forumEvents, 3)
-  createStory('user-11', 'Isabella Garcia', 'https://randomuser.me/api/portraits/women/11.jpg', forumEvents, 4)
-  createStory('user-20', 'Mason White', 'https://randomuser.me/api/portraits/men/19.jpg', forumEvents, 5)
-  createStory('user-21', 'Ava Harris', 'https://randomuser.me/api/portraits/women/18.jpg', forumEvents, 6)
-  createStory('user-22', 'Lucas Clark', 'https://randomuser.me/api/portraits/men/20.jpg', forumEvents, 7)
+  await createStory('user-8', 'Chris Wilson', 'https://randomuser.me/api/portraits/men/8.jpg', forumEvents, 1)
+  await createStory('user-9', 'Sophia Martinez', 'https://randomuser.me/api/portraits/women/9.jpg', forumEvents, 2)
+  await createStory('user-10', 'Ryan Taylor', 'https://randomuser.me/api/portraits/men/10.jpg', forumEvents, 3)
+  await createStory('user-11', 'Isabella Garcia', 'https://randomuser.me/api/portraits/women/11.jpg', forumEvents, 4)
+  await createStory('user-20', 'Mason White', 'https://randomuser.me/api/portraits/men/19.jpg', forumEvents, 5)
+  await createStory('user-21', 'Ava Harris', 'https://randomuser.me/api/portraits/women/18.jpg', forumEvents, 6)
+  await createStory('user-22', 'Lucas Clark', 'https://randomuser.me/api/portraits/men/20.jpg', forumEvents, 7)
   
   // Academic forum stories
-  createStory('user-12', 'Noah Anderson', 'https://randomuser.me/api/portraits/men/12.jpg', forumAcademic, 2)
-  createStory('user-13', 'Mia Thomas', 'https://randomuser.me/api/portraits/women/13.jpg', forumAcademic, 4)
-  createStory('user-14', 'Ethan Jackson', 'https://randomuser.me/api/portraits/men/14.jpg', forumAcademic, 6)
-  createStory('user-23', 'Charlotte Lewis', 'https://randomuser.me/api/portraits/women/19.jpg', forumAcademic, 8)
-  createStory('user-24', 'Benjamin Walker', 'https://randomuser.me/api/portraits/men/21.jpg', forumAcademic, 10)
-  createStory('user-25', 'Amelia Hall', 'https://randomuser.me/api/portraits/women/20.jpg', forumAcademic, 12)
+  await createStory('user-12', 'Noah Anderson', 'https://randomuser.me/api/portraits/men/12.jpg', forumAcademic, 2)
+  await createStory('user-13', 'Mia Thomas', 'https://randomuser.me/api/portraits/women/13.jpg', forumAcademic, 4)
+  await createStory('user-14', 'Ethan Jackson', 'https://randomuser.me/api/portraits/men/14.jpg', forumAcademic, 6)
+  await createStory('user-23', 'Charlotte Lewis', 'https://randomuser.me/api/portraits/women/19.jpg', forumAcademic, 8)
+  await createStory('user-24', 'Benjamin Walker', 'https://randomuser.me/api/portraits/men/21.jpg', forumAcademic, 10)
+  await createStory('user-25', 'Amelia Hall', 'https://randomuser.me/api/portraits/women/20.jpg', forumAcademic, 12)
   
   return stories
 }
 
 export function StoriesProvider({ children }) {
-  // Initialize with mock stories
-  const [forumStories, setForumStories] = useState(generateMockStories())
+  // Initialize with mock stories - will be populated asynchronously
+  const [forumStories, setForumStories] = useState({})
+  const [isLoadingStories, setIsLoadingStories] = useState(true)
+
+  // Load stories asynchronously on mount
+  useEffect(() => {
+    const loadStories = async () => {
+      try {
+        setIsLoadingStories(true)
+        const stories = await generateMockStories()
+        setForumStories(stories)
+      } catch (error) {
+        console.error('Error loading stories:', error)
+        // Fallback to empty stories if there's an error
+        setForumStories({})
+      } finally {
+        setIsLoadingStories(false)
+      }
+    }
+    loadStories()
+  }, [])
 
   const [userStories, setUserStories] = useState([])
   const [viewedStories, setViewedStories] = useState(new Set())

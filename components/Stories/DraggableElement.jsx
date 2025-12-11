@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import { View, StyleSheet, PanResponder, Dimensions, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -18,6 +18,8 @@ export default function DraggableElement({
   onDelete,
   isSelected = false,
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [position, setPosition] = useState({ x: initialX, y: initialY })
   const [scale, setScale] = useState(initialScale)
   const [rotation, setRotation] = useState(initialRotation)
@@ -167,7 +169,7 @@ export default function DraggableElement({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     position: 'absolute',
     alignItems: 'center',

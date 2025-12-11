@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 import AppHeader from '../AppHeader'
 import AppCard from '../AppCard'
 
@@ -21,6 +21,8 @@ export default function AnonymousMessageButton({
   userName,
   onSendMessage,
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -121,7 +123,7 @@ export default function AnonymousMessageButton({
                 <TextInput
                   style={styles.messageInput}
                   placeholder="Type your anonymous message here..."
-                  placeholderTextColor={theme.colors.softBlack}
+                  placeholderTextColor={theme.colors.textSecondary}
                   value={message}
                   onChangeText={setMessage}
                   multiline
@@ -153,7 +155,7 @@ export default function AnonymousMessageButton({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,7 +176,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -195,25 +197,25 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: hp(1.8),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   infoText: {
     fontSize: hp(1.5),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     lineHeight: hp(2.2),
     marginBottom: hp(1),
   },
   infoNote: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     fontStyle: 'italic',
     opacity: 0.7,
   },
   recipientCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     padding: wp(4),
     marginBottom: hp(2),
@@ -222,7 +224,7 @@ const styles = StyleSheet.create({
   },
   recipientLabel: {
     fontSize: hp(1.4),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     marginBottom: hp(1),
     opacity: 0.7,
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
   recipientName: {
     fontSize: hp(1.7),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   inputSection: {
@@ -259,16 +261,16 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: hp(1.6),
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
   },
   messageInput: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     padding: wp(4),
     fontSize: hp(1.7),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     minHeight: hp(20),
     textAlignVertical: 'top',
@@ -277,7 +279,7 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: hp(1.3),
-    color: theme.colors.softBlack,
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     textAlign: 'right',
     marginTop: hp(0.5),

@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../../app/theme'
 import DraggableElement from './DraggableElement'
 
 const TEXT_COLORS = [
@@ -70,6 +70,8 @@ export default function StoryEditor({
   onClose,
   onPost,
 }) {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const [textElements, setTextElements] = useState([])
   const [stickerElements, setStickerElements] = useState([])
   const [isAddingText, setIsAddingText] = useState(false)
@@ -433,10 +435,10 @@ export default function StoryEditor({
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.charcoal,
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',

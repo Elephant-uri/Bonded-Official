@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { hp, wp } from '../../helpers/common'
-import theme from '../../constants/theme'
+import { useAppTheme } from '../theme'
 import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import { ChevronLeft, Check, X } from '../../components/Icons'
@@ -25,6 +25,8 @@ const MOCK_INVITEES = [
 ]
 
 export default function InviteRequests() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const params = useLocalSearchParams()
   const { eventId, title, isMandatory } = params
@@ -171,10 +173,10 @@ export default function InviteRequests() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -186,7 +188,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   backButton: {
     width: hp(4),
@@ -195,19 +197,19 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   eventInfo: {
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   eventTitle: {
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
   mandatoryBadge: {
@@ -228,7 +230,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: hp(2),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.offWhite,
+    borderBottomColor: theme.colors.border,
   },
   statItem: {
     alignItems: 'center',
@@ -237,7 +239,7 @@ const styles = StyleSheet.create({
     fontSize: hp(2.5),
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   statLabel: {
@@ -256,11 +258,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: hp(1.5),
     paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.lg,
     marginBottom: hp(1.5),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -297,7 +299,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
   },
   statusButtons: {
     flexDirection: 'row',
@@ -314,11 +316,11 @@ const styles = StyleSheet.create({
   },
   statusButtonGoing: {
     borderColor: theme.colors.bondedPurple,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
   },
   statusButtonNotGoing: {
-    borderColor: theme.colors.offWhite,
-    backgroundColor: theme.colors.white,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   statusButtonActive: {
     backgroundColor: theme.colors.bondedPurple,

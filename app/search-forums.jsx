@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import theme from '../constants/theme'
+import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
 import AppTopBar from '../components/AppTopBar'
 
@@ -15,6 +15,8 @@ const MOCK_FORUMS = [
 ]
 
 export default function SearchForums() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const router = useRouter()
   const [query, setQuery] = useState('')
 
@@ -38,13 +40,13 @@ export default function SearchForums() {
           <Ionicons
             name="search-outline"
             size={hp(2.2)}
-            color={theme.colors.softBlack}
+            color={theme.colors.textSecondary}
             style={{ marginRight: wp(2) }}
           />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by name, class, or topic..."
-            placeholderTextColor={theme.colors.softBlack}
+            placeholderTextColor={theme.colors.textSecondary}
             value={query}
             onChangeText={setQuery}
           />
@@ -80,7 +82,7 @@ export default function SearchForums() {
               <Ionicons
                 name="chevron-forward"
                 size={hp(2)}
-                color={theme.colors.softBlack}
+                color={theme.colors.textSecondary}
               />
             </TouchableOpacity>
           )}
@@ -90,10 +92,10 @@ export default function SearchForums() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   container: {
     flex: 1,
@@ -105,24 +107,24 @@ const styles = StyleSheet.create({
     marginBottom: hp(1),
     fontSize: hp(2.4),
     fontWeight: '700',
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     paddingHorizontal: wp(4),
     paddingVertical: hp(0.9),
     borderWidth: 1,
-    borderColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
     marginBottom: hp(1.5),
   },
   searchInput: {
     flex: 1,
     fontSize: hp(1.9),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
   list: {
@@ -142,7 +144,7 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: hp(1.9),
-    color: theme.colors.charcoal,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
 })
