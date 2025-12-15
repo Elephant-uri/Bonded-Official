@@ -130,10 +130,10 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
           </svg>
         </div>
         <h3 className="text-2xl font-semibold mb-3 text-gray-900">
-          You're on the list!
+          You&apos;re on the list!
         </h3>
         <p className="text-gray-600">
-          We'll notify you when Bonded launches at your campus.
+          We&apos;ll notify you when Bonded launches at your campus.
         </p>
       </motion.div>
     )
@@ -194,7 +194,7 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
       </motion.button>
 
       <p className="text-sm text-center text-gray-500">
-        We'll only use your email to notify you about Bonded. No spam, ever.
+        We&apos;ll only use your email to notify you about Bonded. No spam, ever.
       </p>
     </motion.form>
   )

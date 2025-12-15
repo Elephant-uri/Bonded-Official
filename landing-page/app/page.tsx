@@ -317,7 +317,7 @@ export default function Home() {
               transition={{ duration: 0.8, delay: 0.5 }}
               className="text-lg text-gray-500 max-w-3xl mx-auto mb-12"
             >
-              Join the waitlist from any school. We're expanding to campuses with the most interest.
+              Join the waitlist from any school. We&apos;re expanding to campuses with the most interest.
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
