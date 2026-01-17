@@ -70,67 +70,70 @@ const InterestsStep = ({ formData, updateFormData, onScroll }) => {
 
 export default InterestsStep
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
   },
   contentContainer: {
     paddingVertical: hp(2),
+    paddingHorizontal: wp(5),
     paddingBottom: hp(20), // Extra padding for fixed navigation buttons at bottom
   },
   title: {
-    fontSize: hp(4),
+    fontSize: hp(3.5),
     fontWeight: '800',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary || '#1A1A1A',
+    fontFamily: theme.typography?.fontFamily?.heading || 'System',
     marginBottom: hp(1),
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: hp(2.2),
-    color: '#8E8E8E',
-    fontFamily: 'System',
-    marginBottom: hp(4),
+    fontSize: hp(2),
+    color: theme.colors.textSecondary || '#8E8E8E',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
+    marginBottom: hp(5),
     textAlign: 'center',
   },
   section: {
     marginBottom: hp(4),
   },
   sectionTitle: {
-    fontSize: hp(2.5),
+    fontSize: hp(2.2),
     fontWeight: '700',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary || '#1A1A1A',
+    fontFamily: theme.typography?.fontFamily?.heading || 'System',
     marginBottom: hp(0.5),
   },
   sectionSubtitle: {
-    fontSize: hp(1.8),
-    color: '#8E8E8E',
-    fontFamily: 'System',
-    marginBottom: hp(2),
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary || '#8E8E8E',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
+    marginBottom: hp(2.5),
     opacity: 0.7,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: wp(2),
+    gap: wp(2.5),
   },
   tag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: hp(1.2),
-    paddingHorizontal: wp(4),
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingVertical: hp(1.1),
+    paddingHorizontal: wp(3.5),
     borderRadius: 9999,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   tagSelected: {
-    backgroundColor: '#A45CFF',
-    borderColor: '#A45CFF',
+    backgroundColor: theme.colors.primary || '#A45CFF',
+    borderColor: theme.colors.primary || '#A45CFF',
   },
   tagText: {
-    fontSize: hp(1.8),
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    fontSize: hp(1.7),
+    color: theme.colors.textPrimary || '#1A1A1A',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
+    fontWeight: '500',
   },
   tagTextSelected: {
     color: '#FFFFFF',

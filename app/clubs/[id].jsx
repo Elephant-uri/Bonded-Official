@@ -1,58 +1,83 @@
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
-    FlatList,
-    Image,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
   Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import EventPost from '../../components/Events/EventPost'
 import InviteModal from '../../components/InviteModal'
-import ShareModal from '../../components/ShareModal'
 import { useClubsContext } from '../../contexts/ClubsContext'
-import { useEventsContext } from '../../contexts/EventsContext'
+import { resolveMediaUrls, uploadImageToBondedMedia } from '../../helpers/mediaStorage'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../stores/authStore'
+import { useCreatePost } from '../../hooks/useCreatePost'
 import { hp, wp } from '../../helpers/common'
 import { useAppTheme } from '../theme'
 
 export default function ClubDetail() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const { id } = useLocalSearchParams()
+  const { user } = useAuthStore()
   const {
     getClub,
     isUserMember,
     hasUserRequested,
-    isUserInterested,
     requestToJoin,
-    showInterest,
-    removeInterest,
+    approveRequest,
+    rejectRequest,
     leaveClub,
     isUserAdmin,
     removeMember,
+    ensureClubForum,
     currentUserId,
   } = useClubsContext()
-  const { getAllEvents } = useEventsContext()
+  const createPostMutation = useCreatePost()
   const [activeTab, setActiveTab] = useState('posts') // Default to posts for Instagram-like view
   const [viewMode, setViewMode] = useState('member') // LinkedIn-style view switcher ('member' | 'admin')
-  const [showShareModal, setShowShareModal] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [isHydratingClub, setIsHydratingClub] = useState(true)
+  const [memberProfiles, setMemberProfiles] = useState([])
+  const [adminProfiles, setAdminProfiles] = useState([])
+  const [pendingProfiles, setPendingProfiles] = useState([])
+  const [clubPosts, setClubPosts] = useState([])
+  const [postsCount, setPostsCount] = useState(0)
+  const [clubEvents, setClubEvents] = useState([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [postsLoading, setPostsLoading] = useState(false)
+  const [eventsLoading, setEventsLoading] = useState(false)
+  const [showMembersModal, setShowMembersModal] = useState(false)
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false)
+  const [postCaption, setPostCaption] = useState('')
+  const [postImage, setPostImage] = useState(null)
+  const [isCreatingPost, setIsCreatingPost] = useState(false)
+  const [campusForumId, setCampusForumId] = useState(null)
 
   const club = getClub(id)
-  const allEvents = getAllEvents()
-  const clubEvents = allEvents.filter((event) =>
-    club?.events?.includes(event.id)
-  )
   const isAdmin = club ? isUserAdmin(club.id) : false
+
+  const forumId = useMemo(() => {
+    if (!club?.forumId) return null
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    return uuidRegex.test(club.forumId) ? club.forumId : null
+  }, [club?.forumId])
 
   // Auto-switch to admin view if user is admin
   useEffect(() => {
@@ -60,6 +85,180 @@ export default function ClubDetail() {
       setViewMode('admin')
     }
   }, [isAdmin])
+
+  // Hydration timeout for club loading
+  useEffect(() => {
+    if (club) {
+      setIsHydratingClub(false)
+      return
+    }
+    const timeout = setTimeout(() => setIsHydratingClub(false), 600)
+    return () => clearTimeout(timeout)
+  }, [club])
+
+  const fetchMembers = useCallback(async () => {
+    if (!club?.id) return
+    setMembersLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('org_members')
+        .select('user_id, role, joined_at, profile:profiles(id, full_name, username, avatar_url, major, graduation_year)')
+        .eq('organization_id', club.id)
+
+      if (error) {
+        console.warn('Failed to load org members:', error)
+        setMemberProfiles([])
+        setAdminProfiles([])
+        setPendingProfiles([])
+        return
+      }
+
+      const members = (data || []).filter((row) => row.role !== 'pending')
+      const admins = (data || []).filter((row) => row.role === 'admin' || row.role === 'owner')
+      const pending = (data || []).filter((row) => row.role === 'pending')
+
+      setMemberProfiles(members)
+      setAdminProfiles(admins)
+      setPendingProfiles(pending)
+    } finally {
+      setMembersLoading(false)
+    }
+  }, [club?.id])
+
+  useEffect(() => {
+    fetchMembers()
+  }, [fetchMembers])
+
+  useEffect(() => {
+    if (!club?.id) return
+
+    const fetchEvents = async () => {
+      setEventsLoading(true)
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('org_id', club.id)
+          .order('start_at', { ascending: true })
+
+        if (error) {
+          console.warn('Failed to load club events:', error)
+          setClubEvents([])
+          return
+        }
+        setClubEvents(data || [])
+      } finally {
+        setEventsLoading(false)
+      }
+    }
+
+    fetchEvents()
+  }, [club?.id])
+
+  useEffect(() => {
+    if (!club?.id) return
+
+    const fetchCampusForum = async () => {
+      if (!user?.id) return
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('university_id')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError || !profile?.university_id) return
+
+        const { data: forums, error: forumsError } = await supabase
+          .from('forums')
+          .select('id, type')
+          .eq('university_id', profile.university_id)
+          .eq('type', 'campus')
+          .limit(1)
+
+        if (!forumsError && forums?.[0]?.id) {
+          setCampusForumId(forums[0].id)
+        }
+      } catch (error) {
+        // Non-blocking.
+      }
+    }
+
+    fetchCampusForum()
+  }, [club?.id, user?.id])
+
+  const fetchPosts = useCallback(async () => {
+    if (!club?.id) return
+    setPostsLoading(true)
+    try {
+      let targetForumId = campusForumId || forumId
+
+      if (!targetForumId && isAdmin) {
+        targetForumId = await ensureClubForum(club.id)
+      }
+
+      if (!targetForumId) {
+        setClubPosts([])
+        setPostsCount(0)
+        return
+      }
+
+      const orgTag = `org:${club.id}`
+      const { data, error, count } = await supabase
+        .from('posts')
+        .select('id, title, body, created_at, user_id, media_urls, tags', { count: 'exact' })
+        .eq('forum_id', targetForumId)
+        .contains('tags', [orgTag])
+        .order('created_at', { ascending: false })
+        .limit(25)
+
+      if (error) {
+        console.warn('Failed to load club posts:', error)
+        setClubPosts([])
+        setPostsCount(0)
+        return
+      }
+
+      const withMedia = await Promise.all(
+        (data || []).map(async (post) => {
+          const resolvedMedia = await resolveMediaUrls(post.media_urls || [])
+          return {
+            ...post,
+            media: resolvedMedia,
+          }
+        })
+      )
+
+      setClubPosts(withMedia)
+      setPostsCount(count || data?.length || 0)
+    } finally {
+      setPostsLoading(false)
+    }
+  }, [club?.id, forumId, campusForumId, isAdmin, ensureClubForum])
+
+  useEffect(() => {
+    fetchPosts()
+  }, [fetchPosts])
+
+  if (!club && isHydratingClub) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <AppTopBar
+            schoolName="Your University"
+            onPressProfile={() => router.push('/profile')}
+            onPressSchool={() => {}}
+            onPressNotifications={() => router.push('/notifications')}
+          />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
+            <Text style={styles.loadingText}>Loading organization...</Text>
+          </View>
+          <BottomNav />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   if (!club) {
     return (
@@ -86,51 +285,124 @@ export default function ClubDetail() {
     )
   }
 
-  const isMember = isUserMember(club.id)
-  const hasRequested = hasUserRequested(club.id)
-  const interested = isUserInterested(club.id)
-  const memberCount = club.members?.length || 0
+  const isMember = memberProfiles.some((member) => member.user_id === currentUserId) || isUserMember(club.id)
+  const hasRequested = pendingProfiles.some((member) => member.user_id === currentUserId) || hasUserRequested(club.id)
+  const memberCount = memberProfiles.length || club.members?.length || 0
+  const requiresApproval = club.requiresApproval === true
+  const needsApproval = requiresApproval || club.isPublic === false
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (isMember) {
-      leaveClub(club.id)
+      await leaveClub(club.id)
+      setMemberProfiles((prev) => prev.filter((member) => member.user_id !== currentUserId))
+      return
     } else {
-      requestToJoin(club.id)
+      const result = await requestToJoin(club.id)
+      if (!result?.ok) {
+        Alert.alert('Request failed', result?.error || 'Unable to join this organization.')
+        return
+      }
+      await fetchMembers()
     }
   }
 
-  const handleInterest = () => {
-    if (interested) {
-      removeInterest(club.id)
-    } else {
-      showInterest(club.id)
+  const pickPostImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Please grant photo library access')
+        return
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 0.85,
+      })
+
+      if (!result.canceled && result.assets?.[0]) {
+        setPostImage(result.assets[0].uri)
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image')
     }
   }
 
-  const renderMember = ({ item: userId }) => {
-    // Mock member data - replace with real user data
-    const memberNames = {
-      'user-1': 'Alex Johnson',
-      'user-2': 'Sarah Williams',
-      'user-3': 'Mike Chen',
-      'user-4': 'Emily Davis',
-      'user-123': 'You',
-    }
-    const memberAvatars = {
-      'user-1': 'https://randomuser.me/api/portraits/men/20.jpg',
-      'user-2': 'https://randomuser.me/api/portraits/women/21.jpg',
-      'user-3': 'https://randomuser.me/api/portraits/men/22.jpg',
-      'user-4': 'https://randomuser.me/api/portraits/women/23.jpg',
-      'user-123': 'https://randomuser.me/api/portraits/men/1.jpg',
+  const handleCreateOrgPost = async () => {
+    if (!club?.id || !user?.id) return
+    if (!postImage) {
+      Alert.alert('Add a photo', 'Please select a photo for this post.')
+      return
     }
 
+    const targetForumId = campusForumId || forumId
+    if (!targetForumId) {
+      Alert.alert('Forum missing', 'Your campus forum is not available yet.')
+      return
+    }
+
+    if (isCreatingPost) return
+    setIsCreatingPost(true)
+
+    const caption = postCaption.trim()
+    const body = caption.length > 0 ? caption : `${club.name} shared a photo.`
+    const tags = ['org_post', `org:${club.id}`]
+
+    try {
+      const result = await createPostMutation.mutateAsync({
+        forumId: targetForumId,
+        title: '',
+        body,
+        tags,
+        mediaUrls: [],
+        isAnonymous: false,
+      })
+
+      const createdPost = result?.post || result
+
+      if (createdPost?.id) {
+        const uploadResult = await uploadImageToBondedMedia({
+          fileUri: postImage,
+          mediaType: 'post',
+          ownerType: 'org',
+          ownerId: club.id,
+          userId: user.id,
+          postId: createdPost.id,
+        })
+
+        if (uploadResult?.path) {
+          await supabase
+            .from('posts')
+            .update({ media_urls: [uploadResult.path] })
+            .eq('id', createdPost.id)
+        }
+      }
+
+      setPostCaption('')
+      setPostImage(null)
+      setShowCreatePostModal(false)
+      // Refresh posts list
+      await fetchPosts()
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Failed to create post.')
+    } finally {
+      setIsCreatingPost(false)
+    }
+  }
+
+  const renderMember = ({ item }) => {
+    const profile = item.profile || {}
+    const userId = item.user_id
+    const displayName = profile.full_name || profile.username || 'Member'
     const isCurrentUser = userId === currentUserId
-    const canRemove = isAdmin && viewMode === 'admin' && !isCurrentUser && !club.admins?.includes(userId)
+    const adminIds = adminProfiles.map((admin) => admin.user_id)
+    const canRemove = isAdmin && viewMode === 'admin' && !isCurrentUser && !adminIds.includes(userId)
 
     const handleRemoveMember = () => {
       Alert.alert(
         'Remove Member',
-        `Are you sure you want to remove ${memberNames[userId] || 'this member'} from ${club.name}?`,
+        `Are you sure you want to remove ${displayName} from ${club.name}?`,
         [
           {
             text: 'Cancel',
@@ -139,9 +411,10 @@ export default function ClubDetail() {
           {
             text: 'Remove',
             style: 'destructive',
-            onPress: () => {
-              const success = removeMember(club.id, userId)
+            onPress: async () => {
+              const success = await removeMember(club.id, userId)
               if (success) {
+                setMemberProfiles((prev) => prev.filter((member) => member.user_id !== userId))
                 Alert.alert('Success', 'Member removed successfully')
               } else {
                 Alert.alert('Error', 'Failed to remove member')
@@ -154,12 +427,17 @@ export default function ClubDetail() {
 
     return (
       <View style={styles.memberItem}>
-        <Image
-          source={{ uri: memberAvatars[userId] || 'https://randomuser.me/api/portraits/men/1.jpg' }}
-          style={styles.memberAvatar}
-        />
+        {profile.avatar_url ? (
+          <Image source={{ uri: profile.avatar_url }} style={styles.memberAvatar} />
+        ) : (
+          <View style={styles.memberAvatarFallback}>
+            <Text style={styles.memberAvatarInitial}>
+              {(displayName?.charAt(0) || 'M').toUpperCase()}
+            </Text>
+          </View>
+        )}
         <Text style={styles.memberName} numberOfLines={1}>
-          {memberNames[userId] || 'Member'}
+          {displayName}
         </Text>
         {canRemove && (
           <TouchableOpacity
@@ -175,18 +453,22 @@ export default function ClubDetail() {
   }
 
   const renderPost = ({ item }) => (
-    <View style={styles.postCard}>
-      <View style={styles.postHeader}>
-        <Text style={styles.postTitle}>{item.title || 'Club Post'}</Text>
-        <Text style={styles.postDate}>
-          {new Date(item.createdAt).toLocaleDateString()}
+    <View style={styles.orgPostCard}>
+      {item.media?.[0] ? (
+        <Image source={{ uri: item.media[0] }} style={styles.orgPostImage} />
+      ) : (
+        <View style={styles.orgPostImagePlaceholder}>
+          <Ionicons name="image-outline" size={hp(3.5)} color={theme.colors.textSecondary} />
+        </View>
+      )}
+      <View style={styles.orgPostContent}>
+        <Text style={styles.orgPostCaption} numberOfLines={3}>
+          {item.body || 'New post'}
+        </Text>
+        <Text style={styles.orgPostDate}>
+          {new Date(item.created_at || item.createdAt).toLocaleDateString()}
         </Text>
       </View>
-      {item.body && (
-        <Text style={styles.postBody} numberOfLines={3}>
-          {item.body}
-        </Text>
-      )}
     </View>
   )
 
@@ -206,131 +488,165 @@ export default function ClubDetail() {
           showsVerticalScrollIndicator={false}
         >
           {/* Cover Image / Banner */}
-          <View style={styles.coverImageContainer}>
+          <View style={styles.heroSection}>
             {club.coverImage ? (
-              <Image source={{ uri: club.coverImage }} style={styles.coverImage} />
+              <Image source={{ uri: club.coverImage }} style={styles.heroImage} />
             ) : (
-              <View style={styles.coverImagePlaceholder}>
+              <View style={styles.heroPlaceholder}>
                 <Ionicons name="image-outline" size={hp(4)} color={theme.colors.softBlack} style={{ opacity: 0.3 }} />
               </View>
             )}
-            {/* Avatar / Profile Picture */}
-            <View style={styles.avatarContainer}>
-              {club.avatar ? (
-                <Image source={{ uri: club.avatar }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarPlaceholderText}>
-                    {club.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
-            </View>
           </View>
 
-          {/* Club Header */}
-          <View style={styles.clubHeader}>
-            <View style={styles.clubInfo}>
-              <Text style={styles.clubName}>{club.name}</Text>
-              <View style={styles.clubMeta}>
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>
-                    {club.category.charAt(0).toUpperCase() + club.category.slice(1)}
-                  </Text>
+          <View style={styles.contentSection}>
+            <View style={styles.profileHeader}>
+              <View style={styles.avatarContainer}>
+                {club.avatar ? (
+                  <Image source={{ uri: club.avatar }} style={styles.avatar} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Text style={styles.avatarPlaceholderText}>
+                      {club.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.profileText}>
+                <View style={styles.clubNameRow}>
+                  <Text style={styles.clubName}>{club.name}</Text>
+                  {isAdmin && (
+                    <View style={styles.adminBadge}>
+                      <Text style={styles.adminBadgeText}>Admin</Text>
+                    </View>
+                  )}
                 </View>
-                <View style={styles.memberCount}>
-                  <Ionicons
-                    name="people"
-                    size={hp(1.8)}
-                    color={theme.colors.textSecondary}
-                  />
-                  <Text style={styles.memberCountText}>{memberCount} members</Text>
-                </View>
+                <Text style={styles.clubHandle}>
+                  {(club.category.charAt(0).toUpperCase() + club.category.slice(1))} · {club.isPublic ? 'Public' : 'Private'}
+                </Text>
               </View>
             </View>
 
-            {/* Action Buttons */}
-            <View style={styles.actionButtons}>
+            <View style={styles.actionButtonsRow}>
+              {hasRequested ? (
+                <View style={[styles.actionButtonSecondary, styles.actionButton]}>
+                  <Ionicons name="time-outline" size={hp(2)} color={theme.colors.bondedPurple} />
+                  <Text style={styles.actionButtonText}>Request Pending</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.actionButtonPrimary]}
+                  onPress={handleJoin}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={isMember ? 'checkmark-circle' : 'add-circle-outline'}
+                    size={hp(2)}
+                    color={theme.colors.white}
+                  />
+                  <Text style={styles.actionButtonPrimaryText}>
+                    {isMember ? 'Leave Club' : (needsApproval ? 'Request to join' : 'Join Club')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {isMember && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.actionButtonSecondary]}
+                  onPress={async () => {
+                    const forumId = await ensureClubForum(club.id)
+                    const destination = forumId || club.forumId
+                    if (!destination) return
+                    router.push(
+                      `/chat?forumId=${destination}&forumName=${encodeURIComponent(club.name)}&isGroupChat=true`
+                    )
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={hp(2)} color={theme.colors.textPrimary} />
+                  <Text style={styles.actionButtonText}>Message</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {isAdmin && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.shareButton]}
-                onPress={() => setShowShareModal(true)}
-                activeOpacity={0.7}
+                style={styles.createOrgPostButton}
+                onPress={() => setShowCreatePostModal(true)}
+                activeOpacity={0.8}
               >
-                <Ionicons
-                  name="share-outline"
-                  size={hp(2)}
-                  color={theme.colors.bondedPurple}
-                />
+                <Ionicons name="add-circle-outline" size={hp(2.2)} color={theme.colors.white} />
+                <Text style={styles.createOrgPostText}>Create post</Text>
               </TouchableOpacity>
+            )}
+
+            {isAdmin && (
               <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  interested && styles.interestButtonActive,
-                ]}
-                onPress={handleInterest}
+                style={styles.createOrgEventButton}
+                onPress={() => router.push({ pathname: '/events/create', params: { orgId: club.id } })}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="calendar-outline" size={hp(2.2)} color={theme.colors.white} />
+                <Text style={styles.createOrgPostText}>Create event</Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={styles.statsRow}>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={() => setShowMembersModal(true)}
                 activeOpacity={0.7}
               >
-                <Ionicons
-                  name={interested ? 'heart' : 'heart-outline'}
-                  size={hp(2)}
-                  color={interested ? theme.colors.white : theme.colors.bondedPurple}
-                />
+                <Text style={styles.statValue}>{memberCount}</Text>
+                <Text style={styles.statLabel}>Members</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.statItem} onPress={() => setActiveTab('posts')} activeOpacity={0.7}>
+                <Text style={styles.statValue}>{postsCount}</Text>
+                <Text style={styles.statLabel}>Posts</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.statItem} onPress={() => setActiveTab('events')} activeOpacity={0.7}>
+                <Text style={styles.statValue}>{clubEvents.length}</Text>
+                <Text style={styles.statLabel}>Events</Text>
               </TouchableOpacity>
             </View>
-          </View>
 
-          {/* Description */}
-          <Text style={styles.description}>{club.description}</Text>
+            <View style={styles.bioSection}>
+              <Text style={styles.sectionTitle}>Bio</Text>
+              <Text style={styles.bioText}>{club.description || 'No bio yet.'}</Text>
+            </View>
 
-          {/* Meeting Information */}
-          {(club.meetingTimes || club.meetingLocation) && (
-            <View style={styles.meetingInfoSection}>
-              <Text style={styles.sectionTitle}>Meeting Information</Text>
-              {club.meetingTimes && club.meetingTimes.length > 0 && (
-                <View style={styles.meetingTimesContainer}>
-                  {club.meetingTimes.map((meeting, index) => (
-                    <View key={index} style={styles.meetingTimeCard}>
-                      <View style={styles.meetingTimeHeader}>
-                        <Ionicons name="time-outline" size={hp(2)} color={theme.colors.accent} />
-                        <Text style={styles.meetingDay}>{meeting.day}</Text>
-                        {!club.isMeetingPublic && (
-                          <Ionicons name="lock-closed-outline" size={hp(1.5)} color={theme.colors.textSecondary} style={{ marginLeft: theme.spacing.xs }} />
-                        )}
+            {(club.meetingTimes || club.meetingLocation) && (
+              <View style={styles.meetingInfoSection}>
+                <Text style={styles.sectionTitle}>Meeting Info</Text>
+                {club.meetingTimes && club.meetingTimes.length > 0 && (
+                  <View style={styles.meetingTimesContainer}>
+                    {club.meetingTimes.map((meeting, index) => (
+                      <View key={index} style={styles.meetingTimeCard}>
+                        <View style={styles.meetingTimeHeader}>
+                          <Ionicons name="time-outline" size={hp(2)} color={theme.colors.accent} />
+                          <Text style={styles.meetingDay}>{meeting.day}</Text>
+                          {!club.isMeetingPublic && (
+                            <Ionicons name="lock-closed-outline" size={hp(1.5)} color={theme.colors.textSecondary} style={{ marginLeft: theme.spacing.xs }} />
+                          )}
+                        </View>
+                        <Text style={styles.meetingTime}>
+                          {new Date(meeting.time).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </Text>
                       </View>
-                      <Text style={styles.meetingTime}>
-                        {new Date(meeting.time).toLocaleTimeString('en-US', { 
-                          hour: 'numeric', 
-                          minute: '2-digit',
-                          hour12: true 
-                        })}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-              {club.meetingLocation && (
-                <View style={styles.meetingLocationCard}>
-                  <Ionicons name="location-outline" size={hp(2)} color={theme.colors.accent} />
-                  <Text style={styles.meetingLocationText}>{club.meetingLocation}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Stats Row - Instagram style */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{memberCount}</Text>
-              <Text style={styles.statLabel}>members</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{club.posts?.length || 0}</Text>
-              <Text style={styles.statLabel}>posts</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{clubEvents.length}</Text>
-              <Text style={styles.statLabel}>events</Text>
-            </View>
+                    ))}
+                  </View>
+                )}
+                {club.meetingLocation && (
+                  <View style={styles.meetingLocationCard}>
+                    <Ionicons name="location-outline" size={hp(2)} color={theme.colors.accent} />
+                    <Text style={styles.meetingLocationText}>{club.meetingLocation}</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* View Switcher - LinkedIn style (Admin only) */}
@@ -375,93 +691,37 @@ export default function ClubDetail() {
             </View>
           )}
 
-          {/* Action Buttons Row */}
-          {isAdmin ? (
-            <View style={styles.adminActionsRow}>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => {
-                  router.push(`/clubs/create?id=${club.id}&edit=true`)
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.editButtonText}>Edit Profile</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.settingsButton}
-                onPress={() => {
-                  // TODO: Navigate to settings
-                  Alert.alert('Settings', 'Club settings coming soon')
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="settings-outline" size={hp(2.2)} color={theme.colors.charcoal} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.actionButtonsRow}>
-              {hasRequested ? (
-                <View style={styles.requestedBadge}>
-                  <Ionicons
-                    name="time-outline"
-                    size={hp(2)}
-                    color={theme.colors.bondedPurple}
-                  />
-                  <Text style={styles.requestedText}>Request Pending</Text>
-                </View>
-              ) : (
+          {isAdmin && (
+            <View style={styles.adminToolsSection}>
+              <Text style={styles.sectionTitle}>Admin tools</Text>
+              <View style={styles.adminToolsRow}>
                 <TouchableOpacity
-                  style={[
-                    styles.joinButton,
-                    isMember && styles.leaveButton,
-                  ]}
-                  onPress={handleJoin}
+                  style={styles.adminToolButton}
+                  onPress={() => Alert.alert('Manage members', 'Member management coming soon')}
                   activeOpacity={0.8}
                 >
-                  <Ionicons
-                    name={isMember ? 'checkmark-circle' : 'add-circle-outline'}
-                    size={hp(2)}
-                    color={theme.colors.white}
-                  />
-                  <Text style={styles.joinButtonText}>
-                    {isMember ? 'Leave Club' : 'Join Club'}
-                  </Text>
+                  <Ionicons name="people-outline" size={hp(2)} color={theme.colors.bondedPurple} />
+                  <Text style={styles.adminToolText}>Members</Text>
                 </TouchableOpacity>
-              )}
-              
-              {/* Invite Button - Only show if member */}
-              {isMember && (
                 <TouchableOpacity
-                  style={styles.inviteButton}
+                  style={styles.adminToolButton}
                   onPress={() => setShowInviteModal(true)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons
-                    name="person-add-outline"
-                    size={hp(2)}
-                    color={theme.colors.bondedPurple}
-                  />
-                  <Text style={styles.inviteButtonText}>Invite</Text>
+                  <Ionicons name="person-add-outline" size={hp(2)} color={theme.colors.bondedPurple} />
+                  <Text style={styles.adminToolText}>Invites</Text>
                 </TouchableOpacity>
-              )}
+                <TouchableOpacity
+                  style={styles.adminToolButton}
+                  onPress={() => Alert.alert('Manage posts', 'Post management coming soon')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="albums-outline" size={hp(2)} color={theme.colors.bondedPurple} />
+                  <Text style={styles.adminToolText}>Posts</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
-
-          {/* Forum Button - Navigate to organization's forum */}
-          {isMember && (
-            <TouchableOpacity
-              style={styles.forumButton}
-              onPress={() => {
-                // Navigate to forum with the club's forumId
-                router.push(`/forum?forumId=${club.forumId}`)
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="chatbubbles" size={hp(2)} color={theme.colors.white} />
-              <Text style={styles.forumButtonText}>View Forum</Text>
-            </TouchableOpacity>
-          )}
-
           {/* Create Post Button - Admin only */}
           {isAdmin && (
             <TouchableOpacity
@@ -480,7 +740,7 @@ export default function ClubDetail() {
           {/* Tabs - Instagram style */}
           <View style={styles.tabs}>
             {isAdmin && viewMode === 'admin'
-              ? ['posts', 'events', 'members', 'requests', 'analytics'].map((tab) => (
+              ? ['posts', 'events', 'requests'].map((tab) => (
                   <TouchableOpacity
                     key={tab}
                     style={[
@@ -494,9 +754,8 @@ export default function ClubDetail() {
                       name={
                         tab === 'posts' ? 'grid-outline' :
                         tab === 'events' ? 'calendar-outline' :
-                        tab === 'members' ? 'people-outline' :
                         tab === 'requests' ? 'person-add-outline' :
-                        'stats-chart-outline'
+                        'albums-outline'
                       }
                       size={hp(2.2)}
                       color={activeTab === tab ? theme.colors.textPrimary : theme.colors.textSecondary}
@@ -512,7 +771,7 @@ export default function ClubDetail() {
                     </Text>
                   </TouchableOpacity>
                 ))
-              : ['posts', 'events', 'members'].map((tab) => (
+              : ['posts', 'events'].map((tab) => (
                   <TouchableOpacity
                     key={tab}
                     style={[
@@ -526,7 +785,7 @@ export default function ClubDetail() {
                       name={
                         tab === 'posts' ? 'grid-outline' :
                         tab === 'events' ? 'calendar-outline' :
-                        'people-outline'
+                        'grid-outline'
                       }
                       size={hp(2.2)}
                       color={activeTab === tab ? theme.colors.textPrimary : theme.colors.textSecondary}
@@ -548,14 +807,16 @@ export default function ClubDetail() {
           {activeTab === 'overview' && (
             <View style={styles.tabContent}>
               {/* Leadership */}
-              {club.leadership && club.leadership.length > 0 && (
+              {adminProfiles.length > 0 && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Leadership</Text>
-                  {club.leadership.map((leader, index) => (
-                    <View key={index} style={styles.leaderItem}>
+                  {adminProfiles.map((leader) => (
+                    <View key={leader.user_id} style={styles.leaderItem}>
                       <View style={styles.leaderInfo}>
-                        <Text style={styles.leaderName}>{leader.name}</Text>
-                        <Text style={styles.leaderRole}>{leader.role}</Text>
+                        <Text style={styles.leaderName}>
+                          {leader.profile?.full_name || leader.profile?.username || 'Admin'}
+                        </Text>
+                        <Text style={styles.leaderRole}>Admin</Text>
                       </View>
                     </View>
                   ))}
@@ -569,7 +830,7 @@ export default function ClubDetail() {
                   <Text style={styles.statLabel}>Members</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{club.posts?.length || 0}</Text>
+                  <Text style={styles.statValue}>{postsCount}</Text>
                   <Text style={styles.statLabel}>Posts</Text>
                 </View>
                 <View style={styles.statCard}>
@@ -582,9 +843,13 @@ export default function ClubDetail() {
 
           {activeTab === 'posts' && (
             <View style={styles.tabContent}>
-              {club.posts && club.posts.length > 0 ? (
+              {postsLoading ? (
+                <View style={styles.loadingBlock}>
+                  <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
+                </View>
+              ) : clubPosts.length > 0 ? (
                 <FlatList
-                  data={club.posts}
+                  data={clubPosts}
                   renderItem={renderPost}
                   keyExtractor={(item) => item.id}
                   scrollEnabled={false}
@@ -605,7 +870,11 @@ export default function ClubDetail() {
 
           {activeTab === 'events' && (
             <View style={styles.tabContent}>
-              {clubEvents.length > 0 ? (
+              {eventsLoading ? (
+                <View style={styles.loadingBlock}>
+                  <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
+                </View>
+              ) : clubEvents.length > 0 ? (
                 <FlatList
                   data={clubEvents}
                   renderItem={({ item }) => (
@@ -628,74 +897,53 @@ export default function ClubDetail() {
             </View>
           )}
 
-          {activeTab === 'members' && (
-            <View style={styles.tabContent}>
-              <Text style={styles.sectionTitle}>Members ({memberCount})</Text>
-              {club.members && club.members.length > 0 ? (
-                <FlatList
-                  data={club.members}
-                  renderItem={renderMember}
-                  keyExtractor={(item) => item}
-                  numColumns={2}
-                  scrollEnabled={false}
-                  columnWrapperStyle={styles.membersRow}
-                />
-              ) : (
-                <View style={styles.emptyState}>
-                  <Ionicons
-                    name="people-outline"
-                    size={hp(5)}
-                    color={theme.colors.textSecondary}
-                    style={{ opacity: 0.3 }}
-                  />
-                  <Text style={styles.emptyStateText}>No members yet</Text>
-                </View>
-              )}
-            </View>
-          )}
-
           {activeTab === 'requests' && isAdmin && viewMode === 'admin' && (
             <View style={styles.tabContent}>
-              <Text style={styles.sectionTitle}>Join Requests ({club.requests?.length || 0})</Text>
-              {club.requests && club.requests.length > 0 ? (
+              <Text style={styles.sectionTitle}>Join Requests ({pendingProfiles.length})</Text>
+              {pendingProfiles.length > 0 ? (
                 <FlatList
-                  data={club.requests}
-                  renderItem={({ item: userId }) => {
-                    const memberNames = {
-                      'user-1': 'Alex Johnson',
-                      'user-2': 'Sarah Williams',
-                      'user-3': 'Mike Chen',
-                    }
-                    const memberAvatars = {
-                      'user-1': 'https://randomuser.me/api/portraits/men/20.jpg',
-                      'user-2': 'https://randomuser.me/api/portraits/women/21.jpg',
-                      'user-3': 'https://randomuser.me/api/portraits/men/22.jpg',
-                    }
+                  data={pendingProfiles}
+                  renderItem={({ item }) => {
+                    const profile = item.profile || {}
+                    const userId = item.user_id
+                    const displayName = profile.full_name || profile.username || 'User'
                     return (
                       <View style={styles.requestItem}>
-                        <Image
-                          source={{ uri: memberAvatars[userId] || 'https://randomuser.me/api/portraits/men/1.jpg' }}
-                          style={styles.requestAvatar}
-                        />
+                        {profile.avatar_url ? (
+                          <Image source={{ uri: profile.avatar_url }} style={styles.requestAvatar} />
+                        ) : (
+                          <View style={styles.requestAvatarFallback}>
+                            <Text style={styles.memberAvatarInitial}>
+                              {(displayName?.charAt(0) || 'U').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
                         <View style={styles.requestInfo}>
-                          <Text style={styles.requestName}>{memberNames[userId] || 'User'}</Text>
-                          <Text style={styles.requestTime}>Requested 2 days ago</Text>
+                          <Text style={styles.requestName}>{displayName}</Text>
+                          <Text style={styles.requestTime}>
+                            Requested {item.joined_at ? new Date(item.joined_at).toLocaleDateString() : 'recently'}
+                          </Text>
                         </View>
                         <View style={styles.requestActions}>
                           <TouchableOpacity
                             style={styles.approveButton}
-                            onPress={() => {
-                              // TODO: Approve request
-                              Alert.alert('Approved', 'User request approved')
+                            onPress={async () => {
+                              const success = await approveRequest(club.id, userId)
+                              if (success) {
+                                setPendingProfiles((prev) => prev.filter((member) => member.user_id !== userId))
+                                setMemberProfiles((prev) => [...prev, { ...item, role: 'member' }])
+                              }
                             }}
                           >
                             <Ionicons name="checkmark" size={hp(2)} color={theme.colors.white} />
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.rejectButton}
-                            onPress={() => {
-                              // TODO: Reject request
-                              Alert.alert('Rejected', 'User request rejected')
+                            onPress={async () => {
+                              const success = await rejectRequest(club.id, userId)
+                              if (success) {
+                                setPendingProfiles((prev) => prev.filter((member) => member.user_id !== userId))
+                              }
                             }}
                           >
                             <Ionicons name="close" size={hp(2)} color={theme.colors.white} />
@@ -721,79 +969,7 @@ export default function ClubDetail() {
             </View>
           )}
 
-          {activeTab === 'analytics' && isAdmin && viewMode === 'admin' && (
-            <View style={styles.tabContent}>
-              <Text style={styles.sectionTitle}>Analytics</Text>
-              
-              {/* Stats Cards */}
-              <View style={styles.analyticsGrid}>
-                <View style={styles.analyticsCard}>
-                  <Text style={styles.analyticsValue}>{memberCount}</Text>
-                  <Text style={styles.analyticsLabel}>Total Members</Text>
-                  <Text style={styles.analyticsChange}>+12% this month</Text>
-                </View>
-                <View style={styles.analyticsCard}>
-                  <Text style={styles.analyticsValue}>{club.posts?.length || 0}</Text>
-                  <Text style={styles.analyticsLabel}>Total Posts</Text>
-                  <Text style={styles.analyticsChange}>+5 this week</Text>
-                </View>
-                <View style={styles.analyticsCard}>
-                  <Text style={styles.analyticsValue}>{clubEvents.length}</Text>
-                  <Text style={styles.analyticsLabel}>Events</Text>
-                  <Text style={styles.analyticsChange}>3 upcoming</Text>
-                </View>
-                <View style={styles.analyticsCard}>
-                  <Text style={styles.analyticsValue}>89%</Text>
-                  <Text style={styles.analyticsLabel}>Engagement</Text>
-                  <Text style={styles.analyticsChange}>↑ 4% from last month</Text>
-                </View>
-              </View>
-
-              {/* Recent Activity */}
-              <View style={styles.analyticsSection}>
-                <Text style={styles.analyticsSectionTitle}>Recent Activity</Text>
-                <View style={styles.activityItem}>
-                  <View style={styles.activityIcon}>
-                    <Ionicons name="person-add" size={hp(2)} color={theme.colors.success} />
-                  </View>
-                  <View style={styles.activityContent}>
-                    <Text style={styles.activityText}>5 new members joined this week</Text>
-                    <Text style={styles.activityTime}>2 hours ago</Text>
-                  </View>
-                </View>
-                <View style={styles.activityItem}>
-                  <View style={styles.activityIcon}>
-                    <Ionicons name="calendar" size={hp(2)} color={theme.colors.info} />
-                  </View>
-                  <View style={styles.activityContent}>
-                    <Text style={styles.activityText}>New event created: "Hackathon 2025"</Text>
-                    <Text style={styles.activityTime}>1 day ago</Text>
-                  </View>
-                </View>
-                <View style={styles.activityItem}>
-                  <View style={styles.activityIcon}>
-                    <Ionicons name="chatbubble" size={hp(2)} color={theme.colors.accent} />
-                  </View>
-                  <View style={styles.activityContent}>
-                    <Text style={styles.activityText}>3 new posts in the forum</Text>
-                    <Text style={styles.activityTime}>2 days ago</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
-
         </ScrollView>
-
-        {/* Share Modal */}
-        <ShareModal
-          visible={showShareModal}
-          content={{
-            type: 'club',
-            data: club,
-          }}
-          onClose={() => setShowShareModal(false)}
-        />
 
         {/* Invite Modal */}
         <InviteModal
@@ -805,6 +981,72 @@ export default function ClubDetail() {
             Alert.alert('Success', `Invited ${userIds.length} people to ${club.name}`)
           }}
         />
+
+        <Modal visible={showCreatePostModal} animationType="slide" onRequestClose={() => setShowCreatePostModal(false)}>
+          <SafeAreaView style={styles.createPostModalSafeArea} edges={['top', 'bottom']}>
+            <View style={styles.createPostHeader}>
+              <TouchableOpacity onPress={() => setShowCreatePostModal(false)} style={styles.createPostClose}>
+                <Ionicons name="close" size={hp(3)} color={theme.colors.charcoal} />
+              </TouchableOpacity>
+              <Text style={styles.createPostTitle}>New post</Text>
+              <TouchableOpacity onPress={handleCreateOrgPost} disabled={isCreatingPost} style={styles.createPostSubmit}>
+                <Text style={styles.createPostSubmitText}>{isCreatingPost ? 'Posting...' : 'Post'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.createPostBody}>
+              <TouchableOpacity style={styles.createPostImagePicker} onPress={pickPostImage} activeOpacity={0.8}>
+                {postImage ? (
+                  <Image source={{ uri: postImage }} style={styles.createPostImage} />
+                ) : (
+                  <View style={styles.createPostImagePlaceholder}>
+                    <Ionicons name="image-outline" size={hp(3.5)} color={theme.colors.textSecondary} />
+                    <Text style={styles.createPostImageText}>Add a photo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TextInput
+                style={styles.createPostCaption}
+                placeholder="Write a caption..."
+                placeholderTextColor={theme.colors.textSecondary}
+                value={postCaption}
+                onChangeText={setPostCaption}
+                multiline
+              />
+            </View>
+          </SafeAreaView>
+        </Modal>
+
+        <Modal visible={showMembersModal} animationType="slide" onRequestClose={() => setShowMembersModal(false)}>
+          <SafeAreaView style={styles.membersModalSafeArea} edges={['top', 'bottom']}>
+            <View style={[styles.membersModalHeader, { paddingTop: Math.max(hp(1.5), insets.top * 0.6) }]}>
+              <TouchableOpacity onPress={() => setShowMembersModal(false)} style={styles.membersModalClose}>
+                <Ionicons name="close" size={hp(3)} color={theme.colors.charcoal} />
+              </TouchableOpacity>
+              <Text style={styles.membersModalTitle}>Members</Text>
+              <View style={styles.membersModalSpacer} />
+            </View>
+            {membersLoading ? (
+              <View style={styles.loadingBlock}>
+                <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
+              </View>
+            ) : memberProfiles.length > 0 ? (
+              <FlatList
+                data={memberProfiles}
+                renderItem={renderMember}
+                keyExtractor={(item) => item.user_id}
+                numColumns={2}
+                columnWrapperStyle={styles.membersRow}
+                contentContainerStyle={styles.membersModalList}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={hp(5)} color={theme.colors.textSecondary} style={{ opacity: 0.3 }} />
+                <Text style={styles.emptyStateText}>No members yet</Text>
+              </View>
+            )}
+          </SafeAreaView>
+        </Modal>
 
         <BottomNav />
       </View>
@@ -824,42 +1066,55 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: hp(10),
+    paddingBottom: hp(18),
   },
-  coverImageContainer: {
-    position: 'relative',
+  heroSection: {
     width: '100%',
-    height: hp(25),
-    backgroundColor: theme.colors.bondedPurple + '15',
+    height: hp(42),
+    backgroundColor: theme.colors.bondedPurple + '10',
   },
-  coverImage: {
+  heroImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
-  coverImagePlaceholder: {
+  heroPlaceholder: {
     width: '100%',
     height: '100%',
     backgroundColor: theme.colors.bondedPurple + '10',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarContainer: {
-    position: 'absolute',
-    bottom: -hp(4),
-    left: wp(4),
-    width: hp(12),
-    height: hp(12),
-    borderRadius: hp(6),
-    borderWidth: 4,
-    borderColor: theme.colors.white,
+  contentSection: {
     backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    marginTop: -hp(3),
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2.5),
+    paddingBottom: hp(6),
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+    marginBottom: hp(2),
+  },
+  avatarContainer: {
+    width: hp(8.5),
+    height: hp(8.5),
+    borderRadius: hp(4.25),
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
       },
       android: {
         elevation: 4,
@@ -869,156 +1124,287 @@ const createStyles = (theme) => StyleSheet.create({
   avatar: {
     width: '100%',
     height: '100%',
-    borderRadius: hp(6),
+    borderRadius: hp(4.25),
     resizeMode: 'cover',
   },
   avatarPlaceholder: {
     width: '100%',
     height: '100%',
-    borderRadius: hp(6),
-    backgroundColor: theme.colors.bondedPurple,
+    borderRadius: hp(4.25),
+    backgroundColor: theme.colors.bondedPurple + '20',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarPlaceholderText: {
-    fontSize: hp(4),
+    fontSize: hp(3.2),
     fontWeight: '800',
-    color: theme.colors.white,
+    color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
   },
-  clubHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: wp(4),
-    paddingTop: hp(6),
-    backgroundColor: theme.colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  clubInfo: {
+  profileText: {
     flex: 1,
+    gap: hp(0.6),
   },
-  clubName: {
-    fontSize: hp(3),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
-    color: theme.colors.textPrimary,
-    marginBottom: hp(0.5),
-  },
-  clubMeta: {
+  clubNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2),
+    flexWrap: 'wrap',
   },
-  categoryBadge: {
-    backgroundColor: theme.colors.bondedPurple + '15',
-    paddingHorizontal: wp(2.5),
+  clubName: {
+    fontSize: hp(2.6),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '800',
+    color: theme.colors.textPrimary,
+  },
+  clubHandle: {
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+  },
+  adminBadge: {
+    backgroundColor: theme.colors.info + '20',
+    paddingHorizontal: wp(2),
     paddingVertical: hp(0.3),
     borderRadius: theme.radius.sm,
   },
-  categoryText: {
+  adminBadgeText: {
     fontSize: hp(1.2),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
-    color: theme.colors.bondedPurple,
-    textTransform: 'capitalize',
-  },
-  memberCount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1),
-  },
-  memberCountText: {
-    fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.textSecondary,
-    opacity: 0.7,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: wp(2),
-  },
-  actionButton: {
-    width: hp(4.5),
-    height: hp(4.5),
-    borderRadius: hp(2.25),
-    backgroundColor: theme.colors.bondedPurple + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.bondedPurple,
-  },
-  shareButton: {},
-  interestButtonActive: {
-    backgroundColor: theme.colors.bondedPurple,
-    borderColor: theme.colors.bondedPurple,
-  },
-  description: {
-    fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.textPrimary,
-    lineHeight: hp(2.6),
-    padding: wp(4),
-    backgroundColor: theme.colors.background,
+    color: theme.colors.info,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: hp(2),
-    paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.background,
+    justifyContent: 'space-between',
+    paddingVertical: hp(1.5),
+    marginBottom: hp(2),
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
   statItem: {
     alignItems: 'center',
+    gap: hp(0.4),
   },
   statValue: {
-    fontSize: hp(2.2),
+    fontSize: hp(2.1),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontWeight: '800',
     color: theme.colors.textPrimary,
-    marginBottom: hp(0.3),
   },
   statLabel: {
-    fontSize: hp(1.4),
+    fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
-    opacity: 0.7,
   },
-  adminActionsRow: {
+  actionButtonsRow: {
     flexDirection: 'row',
-    gap: wp(2),
-    paddingHorizontal: wp(4),
-    marginVertical: hp(2),
+    gap: wp(3),
+    marginBottom: hp(2),
   },
-  editButton: {
+  actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: hp(1.3),
+    borderRadius: theme.radius.lg,
+    gap: wp(2),
+  },
+  actionButtonPrimary: {
+    backgroundColor: theme.colors.bondedPurple,
+  },
+  actionButtonPrimaryText: {
+    fontSize: hp(1.6),
+    fontWeight: '600',
+    color: theme.colors.white,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  actionButtonSecondary: {
     backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+  },
+  actionButtonText: {
+    fontSize: hp(1.6),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  bioSection: {
+    marginBottom: hp(2),
+  },
+  bioText: {
+    fontSize: hp(1.7),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textPrimary,
+    lineHeight: hp(2.5),
+  },
+  membersModalSafeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  membersModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  membersModalClose: {
+    padding: wp(1),
+  },
+  membersModalTitle: {
+    fontSize: hp(2),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+  },
+  membersModalSpacer: {
+    width: hp(3),
+  },
+  membersModalList: {
+    padding: wp(4),
+  },
+  createPostModalSafeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  createPostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  createPostClose: {
+    padding: wp(1),
+  },
+  createPostTitle: {
+    fontSize: hp(2),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+  },
+  createPostSubmit: {
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.6),
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.bondedPurple,
+  },
+  createPostSubmitText: {
+    fontSize: hp(1.5),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '700',
+    color: theme.colors.white,
+  },
+  createPostBody: {
+    padding: wp(5),
+    gap: hp(2),
+  },
+  createPostImagePicker: {
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
+  createPostImage: {
+    width: '100%',
+    height: hp(34),
+    resizeMode: 'cover',
+  },
+  createPostImagePlaceholder: {
+    height: hp(34),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: hp(1),
+  },
+  createPostImageText: {
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+  },
+  createPostCaption: {
+    minHeight: hp(12),
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    paddingVertical: hp(1.5),
-    borderRadius: theme.radius.lg,
+    padding: wp(4),
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textPrimary,
+    textAlignVertical: 'top',
   },
-  editButtonText: {
-    fontSize: hp(1.7),
+  orgPostCard: {
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    marginBottom: hp(2),
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  orgPostImage: {
+    width: '100%',
+    height: hp(28),
+    resizeMode: 'cover',
+  },
+  orgPostImagePlaceholder: {
+    height: hp(28),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
+  orgPostContent: {
+    padding: wp(4),
+    gap: hp(0.8),
+  },
+  orgPostCaption: {
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textPrimary,
+    lineHeight: hp(2.4),
+  },
+  orgPostDate: {
+    fontSize: hp(1.3),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+  },
+  adminToolsSection: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(2),
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  adminToolsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+  },
+  adminToolButton: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    paddingVertical: hp(1.3),
+    paddingHorizontal: wp(3),
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
+  adminToolText: {
+    fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
     color: theme.colors.textPrimary,
-  },
-  settingsButton: {
-    width: hp(5.5),
-    height: hp(5.5),
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   createPostButton: {
     flexDirection: 'row',
@@ -1037,67 +1423,31 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.white,
   },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: wp(2),
-    paddingHorizontal: wp(4),
-    marginVertical: hp(2),
-  },
-  joinButton: {
-    flex: 1,
+  createOrgPostButton: {
+    marginBottom: hp(2),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.bondedPurple,
-    paddingVertical: hp(1.8),
+    paddingVertical: hp(1.6),
     borderRadius: theme.radius.xl,
     gap: wp(2),
   },
-  inviteButton: {
+  createOrgEventButton: {
+    marginBottom: hp(2),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.background,
-    borderWidth: 2,
-    borderColor: theme.colors.bondedPurple,
-    paddingVertical: hp(1.8),
-    paddingHorizontal: wp(4),
+    backgroundColor: theme.colors.accent,
+    paddingVertical: hp(1.6),
     borderRadius: theme.radius.xl,
     gap: wp(2),
   },
-  inviteButtonText: {
-    fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
-    color: theme.colors.bondedPurple,
-  },
-  leaveButton: {
-    backgroundColor: theme.colors.error,
-  },
-  joinButtonText: {
-    fontSize: hp(1.8),
+  createOrgPostText: {
+    fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '700',
     color: theme.colors.white,
-  },
-  requestedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.bondedPurple + '15',
-    paddingVertical: hp(1.8),
-    marginHorizontal: wp(4),
-    marginVertical: hp(2),
-    borderRadius: theme.radius.xl,
-    gap: wp(2),
-    borderWidth: 1,
-    borderColor: theme.colors.bondedPurple,
-  },
-  requestedText: {
-    fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
-    color: theme.colors.bondedPurple,
   },
   tabs: {
     flexDirection: 'row',
@@ -1145,6 +1495,11 @@ const createStyles = (theme) => StyleSheet.create({
   },
   meetingInfoSection: {
     marginBottom: hp(2),
+    paddingHorizontal: wp(4),
+    backgroundColor: theme.colors.background,
+    paddingBottom: hp(1.5),
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   meetingTimesContainer: {
     gap: theme.spacing.sm,
@@ -1212,31 +1567,6 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     opacity: 0.7,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: hp(2),
-    paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: hp(2.2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-    marginBottom: hp(0.3),
-  },
-  statLabel: {
-    fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.textSecondary,
-    opacity: 0.7,
-  },
   postCard: {
     backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.lg,
@@ -1283,6 +1613,23 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(6),
     borderRadius: hp(3),
     marginBottom: hp(0.5),
+  },
+  memberAvatarFallback: {
+    width: hp(6),
+    height: hp(6),
+    borderRadius: hp(3),
+    marginBottom: hp(0.5),
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  memberAvatarInitial: {
+    fontSize: hp(2),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
   },
   memberName: {
     fontSize: hp(1.4),
@@ -1395,6 +1742,16 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(5),
     borderRadius: theme.radius.full,
   },
+  requestAvatarFallback: {
+    width: hp(5),
+    height: hp(5),
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   requestInfo: {
     flex: 1,
   },
@@ -1410,6 +1767,10 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
     opacity: 0.7,
+  },
+  loadingBlock: {
+    paddingVertical: hp(2),
+    alignItems: 'center',
   },
   requestActions: {
     flexDirection: 'row',
@@ -1431,29 +1792,23 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  forumButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.accent,
-    paddingVertical: hp(1.8),
-    marginHorizontal: wp(4),
-    marginTop: hp(2),
-    marginBottom: hp(2),
-    borderRadius: theme.radius.xl,
-    gap: wp(2),
-  },
-  forumButtonText: {
-    fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
-    color: theme.colors.white,
-  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: wp(4),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp(4),
+  },
+  loadingText: {
+    marginTop: hp(2),
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
   },
   errorText: {
     fontSize: hp(2),
@@ -1593,7 +1948,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: theme.typography.sizes.sm,
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
-    opacity: theme.ui.metaOpacity,
+    opacity: theme.typography.opacity.meta,
   },
 })
-

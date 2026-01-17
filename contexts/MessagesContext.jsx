@@ -25,8 +25,13 @@ export const MessagesProvider = ({ children }) => {
   const [typingUsers, setTypingUsers] = useState({}) // { conversationId: { oderId: timestamp } }
   const [onlineUsers, setOnlineUsers] = useState({}) // { oderId: true }
   const [isLoading, setIsLoading] = useState(false)
+  const [realtimeDisabled, setRealtimeDisabled] = useState(false)
   const subscriptionsRef = useRef({})
+  const pollingIntervalsRef = useRef({})
+  const realtimeDisabledRef = useRef(false)
+  const realtimeWarnedRef = useRef(false)
   const typingTimeoutsRef = useRef({})
+  const subscriptionTimeoutsRef = useRef({})
   const presenceChannelRef = useRef(null)
 
   // Check if string is a valid UUID
@@ -41,6 +46,10 @@ export const MessagesProvider = ({ children }) => {
            error?.code === '42P01' ||
            error?.message?.includes('Could not find the table') ||
            error?.message?.includes('relation') && error?.message?.includes('does not exist')
+  }
+
+  const isPolicyRecursionError = (error) => {
+    return error?.code === '42P17' || error?.message?.includes('infinite recursion')
   }
 
   // ============================================================================
@@ -71,6 +80,12 @@ export const MessagesProvider = ({ children }) => {
 
       if (isTableNotFoundError(error)) {
         console.warn('Conversations table not found, using empty state')
+        setConversations([])
+        return
+      }
+
+      if (isPolicyRecursionError(error)) {
+        console.warn('Conversation RLS recursion detected, using empty state')
         setConversations([])
         return
       }
@@ -191,6 +206,10 @@ export const MessagesProvider = ({ children }) => {
       if (isTableNotFoundError(error)) {
         return `local-conv-${user.id}-${otherUserId}`
       }
+
+      if (isPolicyRecursionError(error)) {
+        return `local-conv-${user.id}-${otherUserId}`
+      }
       
       throw error
     }
@@ -246,6 +265,7 @@ export const MessagesProvider = ({ children }) => {
   const loadMessages = useCallback(async (conversationId, limit = 50) => {
     if (!conversationId || !isValidUUID(conversationId)) {
       setMessages(prev => ({ ...prev, [conversationId]: [] }))
+      setIsLoading(false)
       return
     }
 
@@ -260,6 +280,7 @@ export const MessagesProvider = ({ children }) => {
           sender_id,
           content,
           created_at,
+          metadata,
           sender:profiles!messages_sender_id_fkey (
             id,
             full_name,
@@ -284,7 +305,7 @@ export const MessagesProvider = ({ children }) => {
         [conversationId]: sortedMessages,
       }))
 
-      // Subscribe to real-time updates
+      // Subscribe to real-time updates for this conversation
       subscribeToMessages(conversationId)
     } catch (error) {
       console.error('Error loading messages:', error)
@@ -295,13 +316,57 @@ export const MessagesProvider = ({ children }) => {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [subscribeToMessages])
+
+  const fetchMessagesSnapshot = useCallback(async (conversationId, limit = 50) => {
+    if (!conversationId || !isValidUUID(conversationId)) return
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        conversation_id,
+        sender_id,
+        content,
+        created_at,
+        metadata,
+        sender:profiles!messages_sender_id_fkey (
+          id,
+          full_name,
+          username,
+          avatar_url
+        )
+      `)
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.warn('Polling messages failed:', error)
+      return
+    }
+
+    const sortedMessages = (data || []).reverse()
+    setMessages(prev => ({
+      ...prev,
+      [conversationId]: sortedMessages,
+    }))
+  }, [realtimeDisabled, startPollingMessages])
+
+  const startPollingMessages = useCallback((conversationId) => {
+    if (pollingIntervalsRef.current[conversationId]) return
+    fetchMessagesSnapshot(conversationId)
+    pollingIntervalsRef.current[conversationId] = setInterval(() => {
+      fetchMessagesSnapshot(conversationId)
+    }, 4000)
+  }, [fetchMessagesSnapshot])
 
   // Send a message
-  const sendMessage = async (conversationId, content) => {
+  const sendMessage = async (conversationId, content, metadata = null) => {
     if (!user?.id) throw new Error('User must be authenticated')
     if (!conversationId) throw new Error('Conversation ID is required')
-    if (!content?.trim()) throw new Error('Message content is required')
+    // Allow empty content if metadata contains image
+    if (!content?.trim() && !metadata?.imageUrl) throw new Error('Message content or image is required')
 
     try {
       // AI Moderation check (if enabled)
@@ -337,19 +402,27 @@ export const MessagesProvider = ({ children }) => {
       }
 
       // Insert message to Supabase
+      const messageData = {
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: content?.trim() || (metadata?.imageUrl ? '📷 Image' : ''),
+      }
+
+      // Add metadata if provided (for images, etc.)
+      if (metadata) {
+        messageData.metadata = metadata
+      }
+
       const { data, error } = await supabase
         .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: content.trim(),
-        })
+        .insert(messageData)
         .select(`
           id,
           conversation_id,
           sender_id,
           content,
           created_at,
+          metadata,
           sender:profiles!messages_sender_id_fkey (
             id,
             full_name,
@@ -365,6 +438,10 @@ export const MessagesProvider = ({ children }) => {
       }
 
       console.log('✅ Message sent:', data.id)
+
+      // Don't add to local state here - let real-time subscription handle it
+      // This prevents duplicates when message is sent and then received via real-time
+      // The real-time subscription will add it immediately anyway
 
       // Update conversation's updated_at
       await supabase
@@ -385,19 +462,50 @@ export const MessagesProvider = ({ children }) => {
 
   // Subscribe to new messages in a conversation
   const subscribeToMessages = useCallback((conversationId) => {
-    if (!isValidUUID(conversationId)) return
+    if (!isValidUUID(conversationId)) {
+      console.warn('⚠️ Invalid conversationId for subscription:', conversationId)
+      return
+    }
+
+    if (realtimeDisabledRef.current || realtimeDisabled) {
+      startPollingMessages(conversationId)
+      return
+    }
 
     // Unsubscribe if already subscribed
     if (subscriptionsRef.current[conversationId]) {
+      console.log('🧹 Unsubscribing from existing channel for:', conversationId)
       subscriptionsRef.current[conversationId].unsubscribe()
+      delete subscriptionsRef.current[conversationId]
+    }
+    if (pollingIntervalsRef.current[conversationId]) {
+      clearInterval(pollingIntervalsRef.current[conversationId])
+      delete pollingIntervalsRef.current[conversationId]
     }
 
+    console.log('📡 Setting up real-time subscription for conversation:', conversationId)
+
+    let isSubscribed = false
+    const timeoutId = setTimeout(() => {
+      if (isSubscribed || realtimeDisabledRef.current) return
+      console.warn('⏳ Message subscription timed out, falling back to polling:', conversationId)
+      realtimeDisabledRef.current = true
+      setRealtimeDisabled(true)
+      startPollingMessages(conversationId)
+    }, 6000)
+
+    subscriptionTimeoutsRef.current[conversationId] = timeoutId
+
     const channel = supabase
-      .channel(`messages:${conversationId}`)
+      .channel(`messages:${conversationId}`, {
+        config: {
+          broadcast: { self: false },
+        },
+      })
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to INSERT and UPDATE so we can handle unsent messages
           schema: 'public',
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,
@@ -405,35 +513,165 @@ export const MessagesProvider = ({ children }) => {
         async (payload) => {
           const newMessage = payload.new
 
-          // Fetch sender details
-          const { data: sender } = await supabase
-            .from('profiles')
-            .select('id, full_name, username, avatar_url')
-            .eq('id', newMessage.sender_id)
-            .single()
-
-          const messageWithSender = {
-            ...newMessage,
-            sender,
+          // Guard against unexpected payloads
+          if (!newMessage?.id) {
+            console.warn('⚠️ Real-time payload without message id, skipping:', payload)
+            return
           }
 
-          setMessages(prev => {
-            const existing = prev[conversationId] || []
-            // Avoid duplicates
-            if (existing.find(m => m.id === newMessage.id)) {
-              return prev
+          console.log('📬 Real-time message change:', payload.eventType, newMessage.id)
+
+          // Parse metadata if it's a string (JSONB from database)
+          let parsedMetadata = newMessage.metadata
+          if (typeof newMessage.metadata === 'string') {
+            try {
+              parsedMetadata = JSON.parse(newMessage.metadata)
+            } catch (e) {
+              console.warn('Failed to parse message metadata in real-time:', e)
+              parsedMetadata = {}
             }
-            return {
-              ...prev,
-              [conversationId]: [...existing, messageWithSender],
+          }
+
+          if (payload.eventType === 'INSERT') {
+            // Fetch sender details for new messages
+            const { data: sender, error: senderError } = await supabase
+              .from('profiles')
+              .select('id, full_name, username, avatar_url')
+              .eq('id', newMessage.sender_id)
+              .single()
+
+            if (senderError) {
+              console.error('Error fetching sender:', senderError)
             }
-          })
+
+            const messageWithSender = {
+              ...newMessage,
+              metadata: parsedMetadata || {},
+              sender: sender || {
+                id: newMessage.sender_id,
+                full_name: 'Unknown',
+                username: 'unknown',
+                avatar_url: null,
+              },
+            }
+            
+            console.log('📬 Real-time message with metadata:', {
+              id: messageWithSender.id,
+              hasImage: parsedMetadata?.type === 'image',
+              imageUrl: parsedMetadata?.imageUrl,
+              imagePath: parsedMetadata?.imagePath,
+            })
+
+            setMessages(prev => {
+              const existing = prev[conversationId] || []
+              // Avoid duplicates
+              if (existing.find(m => m.id === newMessage.id)) {
+                console.log('⚠️ Duplicate message ignored:', newMessage.id)
+                return prev
+              }
+              console.log('✅ Adding new message to state:', newMessage.id)
+              return {
+                ...prev,
+                [conversationId]: [...existing, messageWithSender],
+              }
+            })
+          } else if (payload.eventType === 'UPDATE') {
+            // Handle updates (e.g., unsent messages)
+            setMessages(prev => {
+              const existing = prev[conversationId] || []
+              if (!existing.length) return prev
+
+              const index = existing.findIndex(m => m.id === newMessage.id)
+              if (index === -1) {
+                // Message not found in current state
+                return prev
+              }
+
+              const updatedMessage = {
+                ...existing[index],
+                ...newMessage,
+                metadata: {
+                  ...(existing[index].metadata || {}),
+                  ...(parsedMetadata || {}),
+                },
+              }
+
+              const updatedArray = [...existing]
+              updatedArray[index] = updatedMessage
+
+              console.log('🔄 Updated message in state (e.g., unsent):', newMessage.id)
+
+              return {
+                ...prev,
+                [conversationId]: updatedArray,
+              }
+            })
+          }
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        console.log('📡 Message subscription status:', status, 'for conversation:', conversationId)
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true
+          if (subscriptionTimeoutsRef.current[conversationId]) {
+            clearTimeout(subscriptionTimeoutsRef.current[conversationId])
+            delete subscriptionTimeoutsRef.current[conversationId]
+          }
+          console.log('✅ Successfully subscribed to messages for conversation:', conversationId)
+        } else if (status === 'CHANNEL_ERROR') {
+          if (subscriptionTimeoutsRef.current[conversationId]) {
+            clearTimeout(subscriptionTimeoutsRef.current[conversationId])
+            delete subscriptionTimeoutsRef.current[conversationId]
+          }
+          if (!realtimeWarnedRef.current) {
+            realtimeWarnedRef.current = true
+            console.error('❌ Channel subscription error for conversation:', conversationId)
+            if (err) {
+              console.error('   Error details:', err)
+            }
+            console.log('💡 This may be due to:')
+            console.log('   1. Real-time not enabled for messages table in Supabase')
+            console.log('      → Run database/enable-realtime-messaging.sql in Supabase SQL Editor')
+            console.log('   2. RLS policies blocking subscription')
+            console.log('      → Run database/check-realtime-status.sql to diagnose')
+            console.log('   3. Conversation not fully created yet')
+            console.log('   Messages will still work via polling, but real-time updates may not work')
+          }
+          realtimeDisabledRef.current = true
+          setRealtimeDisabled(true)
+          startPollingMessages(conversationId)
+        } else if (status === 'TIMED_OUT') {
+          console.warn('⏱️ Channel subscription timed out for conversation:', conversationId)
+          if (subscriptionTimeoutsRef.current[conversationId]) {
+            clearTimeout(subscriptionTimeoutsRef.current[conversationId])
+            delete subscriptionTimeoutsRef.current[conversationId]
+          }
+          realtimeDisabledRef.current = true
+          setRealtimeDisabled(true)
+          startPollingMessages(conversationId)
+        } else if (status === 'CLOSED') {
+          console.log('🔒 Message subscription closed for conversation:', conversationId)
+        }
+      })
 
     subscriptionsRef.current[conversationId] = channel
     console.log('📡 Subscribed to messages for conversation:', conversationId)
+  }, [startPollingMessages])
+
+  const unsubscribeFromMessages = useCallback((conversationId) => {
+    if (!conversationId) return
+    if (subscriptionsRef.current[conversationId]) {
+      subscriptionsRef.current[conversationId].unsubscribe()
+      delete subscriptionsRef.current[conversationId]
+    }
+    if (subscriptionTimeoutsRef.current[conversationId]) {
+      clearTimeout(subscriptionTimeoutsRef.current[conversationId])
+      delete subscriptionTimeoutsRef.current[conversationId]
+    }
+    if (pollingIntervalsRef.current[conversationId]) {
+      clearInterval(pollingIntervalsRef.current[conversationId])
+      delete pollingIntervalsRef.current[conversationId]
+    }
   }, [])
 
   // ============================================================================
@@ -605,6 +843,75 @@ export const MessagesProvider = ({ children }) => {
   }
 
   // ============================================================================
+  // UNSEND MESSAGE (Instagram-style: delete for everyone)
+  // ============================================================================
+
+  const unsendMessage = async (messageId) => {
+    if (!user?.id || !messageId) {
+      throw new Error('User must be authenticated and message ID is required')
+    }
+
+    try {
+      const unsentAt = new Date().toISOString()
+
+      // Mark the message as unsent instead of deleting it so both users see the change
+      const { data, error } = await supabase
+        .from('messages')
+        .update({
+          content: '', // Clear original content
+          metadata: {
+            unsent: true,
+            unsent_by: user.id,
+            unsent_at: unsentAt,
+          },
+        })
+        .eq('id', messageId)
+        .eq('sender_id', user.id) // Ensure only sender can unsend
+        .select('id, conversation_id, sender_id, metadata')
+        .single()
+
+      if (error) {
+        console.error('Error unsending message:', error)
+        throw error
+      }
+
+      console.log('✅ Message marked as unsent:', messageId)
+
+      // Optimistically update local state so the sender sees it immediately
+      setMessages(prev => {
+        const updated = { ...prev }
+        const convId = data.conversation_id
+        const convMessages = updated[convId] || []
+
+        updated[convId] = convMessages.map(msg => 
+          msg.id === data.id
+            ? {
+                ...msg,
+                content: '',
+                metadata: {
+                  ...(msg.metadata || {}),
+                  unsent: true,
+                  unsent_by: user.id,
+                  unsent_at: unsentAt,
+                },
+              }
+            : msg
+        )
+
+        return updated
+      })
+
+      // Refresh conversations so last message preview updates
+      await loadConversations()
+
+      return true
+    } catch (error) {
+      console.error('Error unsending message:', error)
+      throw error
+    }
+  }
+
+  // ============================================================================
   // CLEANUP
   // ============================================================================
 
@@ -614,6 +921,8 @@ export const MessagesProvider = ({ children }) => {
       Object.values(subscriptionsRef.current).forEach((sub) => {
         if (sub?.unsubscribe) sub.unsubscribe()
       })
+
+      Object.values(pollingIntervalsRef.current).forEach(clearInterval)
       
       // Cleanup typing timeouts
       Object.values(typingTimeoutsRef.current).forEach(clearTimeout)
@@ -648,10 +957,12 @@ export const MessagesProvider = ({ children }) => {
         // Messages
         loadMessages,
         sendMessage,
+        unsendMessage,
         markAsRead,
         
         // Real-time
         subscribeToMessages,
+        unsubscribeFromMessages,
         subscribeToTyping,
         sendTypingIndicator,
         
@@ -659,6 +970,7 @@ export const MessagesProvider = ({ children }) => {
         isTyping,
         getTypingUsers,
         isUserOnline,
+        realtimeDisabled,
       }}
     >
       {children}
@@ -673,4 +985,3 @@ export const useMessagesContext = () => {
   }
   return context
 }
-

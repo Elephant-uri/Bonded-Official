@@ -2,12 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { isSuperAdminEmail } from '../utils/admin'
-
-const isRlsRecursionError = (error) =>
-  error?.code === '42P17' ||
-  error?.code === '54001' ||
-  error?.message?.toLowerCase()?.includes('infinite recursion') ||
-  error?.message?.toLowerCase()?.includes('stack depth')
+import { isRlsRecursionError } from '../utils/rlsHelpers'
+import { createSignedUrlForPath } from '../helpers/mediaStorage'
 
 /**
  * Hook to fetch forums for the current user's university
@@ -142,18 +138,72 @@ export function useForums() {
 
       console.log(`✅ Fetched ${data?.length || 0} forums for university ${universityId}`)
 
+      // Restrict org forums to membership only (prevents private org forums from leaking)
+      let userOrgIds = []
+      try {
+        const { data: memberships, error: membershipError } = await supabase
+          .from('org_members')
+          .select('organization_id, role')
+          .eq('user_id', user.id)
+          .in('role', ['member', 'admin', 'owner'])
+
+        if (!membershipError) {
+          userOrgIds = memberships?.map((m) => m.organization_id).filter(Boolean) || []
+        }
+      } catch (membershipError) {
+        // If org membership reads are blocked, hide org forums by default.
+        userOrgIds = []
+      }
+
+      data = (data || []).filter((forum) => {
+        if (forum.type !== 'org') return true
+        if (!forum.org_id) return false
+        return userOrgIds.includes(forum.org_id)
+      })
+
       // Fetch org data separately if org_id exists (since there's no FK relationship)
       const orgIds = [...new Set((data || []).filter(f => f.org_id).map(f => f.org_id))]
       let orgsMap = {}
       
+      const extractStoragePath = (value) => {
+        if (!value || typeof value !== 'string') return null
+        if (!value.startsWith('http')) return value
+        const bucketMarker = 'bonded-media/'
+        const index = value.indexOf(bucketMarker)
+        if (index === -1) return value
+        return value.slice(index + bucketMarker.length).split('?')[0]
+      }
+
       if (orgIds.length > 0) {
         const { data: orgsData } = await supabase
-          .from('orgs')
-          .select('id, name, avatar_url')
+          .from('organizations')
+          .select('id, name, logo_url')
           .in('id', orgIds)
         
         if (orgsData) {
-          orgsMap = orgsData.reduce((acc, org) => {
+          const orgEntries = await Promise.all(
+            orgsData.map(async (org) => {
+              let logoUrl = null
+              if (org.logo_url) {
+                const path = extractStoragePath(org.logo_url)
+                if (path && !path.startsWith('http')) {
+                  try {
+                    logoUrl = await createSignedUrlForPath(path)
+                  } catch (error) {
+                    logoUrl = null
+                  }
+                } else {
+                  logoUrl = path
+                }
+              }
+              return {
+                ...org,
+                logo_url: logoUrl,
+              }
+            })
+          )
+
+          orgsMap = orgEntries.reduce((acc, org) => {
             acc[org.id] = org
             return acc
           }, {})
@@ -266,11 +316,21 @@ export function useForums() {
         for (const forum of orgForums) {
           if (forum.org_id) {
             try {
-              const { count: orgMemberCount, error: orgCountError } = await supabase
+              let orgMemberCount = 0
+              let orgCountError = null
+              ;({ count: orgMemberCount, error: orgCountError } = await supabase
                 .from('org_members')
                 .select('*', { count: 'exact', head: true })
-                .eq('org_id', forum.org_id)
-                .eq('status', 'active')
+                .eq('organization_id', forum.org_id)
+                .in('role', ['member', 'admin']))
+
+              if (orgCountError?.code === '42703') {
+                ;({ count: orgMemberCount, error: orgCountError } = await supabase
+                  .from('org_members')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('org_id', forum.org_id)
+                  .in('role', ['member', 'admin']))
+              }
 
               if (orgCountError) {
                 if (isRlsRecursionError(orgCountError)) {
@@ -307,7 +367,7 @@ export function useForums() {
         description: forum.description,
         universityId: forum.university_id,
         code: forum.class?.class_code || null,
-        image: forum.org_id ? (orgsMap[forum.org_id]?.avatar_url || null) : null,
+        image: forum.org_id ? (orgsMap[forum.org_id]?.logo_url || null) : null,
         memberCount: memberCountsMap[forum.id] || 0,
         postCount: postCountsMap[forum.id] || 0,
         unreadCount: 0, // TODO: Calculate unread posts for user

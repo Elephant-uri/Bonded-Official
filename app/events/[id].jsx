@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Image,
@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -20,8 +21,13 @@ import { hp, wp } from '../../helpers/common'
 import { getStaticMapUrl } from '../../helpers/mapUtils'
 import { useEvent } from '../../hooks/events/useEvent'
 import { useEventActions } from '../../hooks/events/useEventActions'
+import { useFriends } from '../../hooks/useFriends'
+import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { formatDateTime } from '../../utils/dateFormatters'
 import { useAppTheme } from '../theme'
+
+const EMPTY_ATTENDANCE = []
 
 export default function EventDetail() {
   const theme = useAppTheme()
@@ -30,11 +36,13 @@ export default function EventDetail() {
   const { id } = useLocalSearchParams()
   // Normalize eventId - ensure it's a string and handle array case
   const eventId = Array.isArray(id) ? String(id[0]) : id ? String(id) : null
-  const { data: event, isLoading, error } = useEvent(eventId)
+  const { data: event, isLoading, error, refetch } = useEvent(eventId)
   const { user } = useAuthStore()
   const { attendanceState, toggleGoing, requestJoin, isLoading: isActionLoading } = useEventActions(event, user?.id)
+  const { data: friends = [] } = useFriends()
   const [mapUrl, setMapUrl] = useState(null)
   const [mapLoading, setMapLoading] = useState(false)
+  const [isVisibilityUpdating, setIsVisibilityUpdating] = useState(false)
 
   // Debug logging
   useEffect(() => {
@@ -53,12 +61,27 @@ export default function EventDetail() {
 
   // Load map preview when event location is available
   useEffect(() => {
-    if (event?.location_name || event?.location_address) {
+    let isActive = true
+    const loadMap = async () => {
+      if (!event?.location_name && !event?.location_address) return
       setMapLoading(true)
       const location = event.location_address || event.location_name
-      const staticMapUrl = getStaticMapUrl(location, wp(90), hp(20))
-      setMapUrl(staticMapUrl)
-      setMapLoading(false)
+      try {
+        const staticMapUrl = await getStaticMapUrl(location, wp(90), hp(20))
+        if (isActive) {
+          setMapUrl(staticMapUrl)
+        }
+      } finally {
+        if (isActive) {
+          setMapLoading(false)
+        }
+      }
+    }
+
+    loadMap()
+
+    return () => {
+      isActive = false
     }
   }, [event?.location_name, event?.location_address])
 
@@ -77,16 +100,25 @@ export default function EventDetail() {
     }
   }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
+  const attendance = event?.attendance || EMPTY_ATTENDANCE
+  const friendIds = useMemo(() => new Set(friends.map(friend => friend.id)), [friends])
+  const goingAttendees = useMemo(() => (
+    attendance.filter((attendee) =>
+      attendee.status === 'going' || attendee.status === 'approved'
+    )
+  ), [attendance])
+  const attendeesCount = goingAttendees.length || event?.attendees_count || 0
+  const visibleAttendees = useMemo(() => (
+    goingAttendees.filter((attendee) =>
+      attendee.user_id === user?.id ||
+      friendIds.has(attendee.user_id) ||
+      attendee.is_public
+    )
+  ), [friendIds, goingAttendees, user?.id])
+  const anonymousCount = Math.max(0, goingAttendees.length - visibleAttendees.length)
+  const myAttendance = useMemo(() => (
+    goingAttendees.find((attendee) => attendee.user_id === user?.id) || null
+  ), [goingAttendees, user?.id])
 
   if (isLoading) {
     return (
@@ -152,7 +184,24 @@ export default function EventDetail() {
     )
   }
 
-  const attendeesCount = event.attendees_count || 0
+  const togglePublicVisibility = async () => {
+    if (!event?.id || !user?.id || !myAttendance) return
+    if (isVisibilityUpdating) return
+    setIsVisibilityUpdating(true)
+    const { error: updateError } = await supabase
+      .from('event_attendance')
+      .update({ is_public: !myAttendance.is_public })
+      .eq('event_id', event.id)
+      .eq('user_id', user.id)
+
+    if (updateError) {
+      console.error('Error updating RSVP visibility:', updateError)
+      Alert.alert('Error', 'Could not update your RSVP visibility.')
+    } else {
+      await refetch()
+    }
+    setIsVisibilityUpdating(false)
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -190,7 +239,7 @@ export default function EventDetail() {
             {event.start_at && (
               <View style={styles.infoRow}>
                 <Calendar size={hp(2.2)} color={theme.colors.bondedPurple} />
-                <Text style={styles.infoText}>{formatDate(event.start_at)}</Text>
+                <Text style={styles.infoText}>{formatDateTime(event.start_at)}</Text>
               </View>
             )}
 
@@ -236,6 +285,79 @@ export default function EventDetail() {
             <View style={styles.infoRow}>
               <Users size={hp(2.2)} color={theme.colors.bondedPurple} />
               <Text style={styles.infoText}>{attendeesCount} going</Text>
+            </View>
+
+            <View style={styles.attendeesSection}>
+              <View style={styles.attendeesHeader}>
+                <Text style={styles.sectionTitle}>Who's going</Text>
+                <Text style={styles.attendeesMeta}>{attendeesCount} total</Text>
+              </View>
+
+              {event.hide_guest_list ? (
+                <Text style={styles.attendeesHiddenText}>Guest list hidden by organizer.</Text>
+              ) : (
+                <>
+                  {attendanceState?.isGoing && (
+                    <View style={styles.publicToggleRow}>
+                      <View style={styles.publicToggleText}>
+                        <Text style={styles.publicToggleTitle}>Show me publicly</Text>
+                        <Text style={styles.publicToggleSubtitle}>Non-friends can see your name</Text>
+                      </View>
+                      <Switch
+                        value={!!myAttendance?.is_public}
+                        onValueChange={togglePublicVisibility}
+                        disabled={isVisibilityUpdating}
+                        trackColor={{
+                          false: theme.colors.backgroundSecondary,
+                          true: theme.colors.accent,
+                        }}
+                        thumbColor={theme.colors.white}
+                      />
+                    </View>
+                  )}
+
+                  {visibleAttendees.length > 0 ? (
+                    <View style={styles.attendeesList}>
+                      {visibleAttendees.map((attendee) => {
+                        const displayName = attendee.user?.full_name || attendee.user?.username || 'User'
+                        const showName = attendee.user_id === user?.id || friendIds.has(attendee.user_id) || attendee.is_public
+                        return (
+                          <View key={attendee.id} style={styles.attendeeRow}>
+                            {attendee.user?.avatar_url && showName ? (
+                              <Image source={{ uri: attendee.user.avatar_url }} style={styles.attendeeAvatar} />
+                            ) : (
+                              <View style={styles.attendeeAvatarPlaceholder}>
+                                <Text style={styles.attendeeAvatarText}>
+                                  {showName ? displayName.charAt(0).toUpperCase() : '?'}
+                                </Text>
+                              </View>
+                            )}
+                            <View style={styles.attendeeInfo}>
+                              <Text style={styles.attendeeName}>
+                                {showName ? displayName : 'Anonymous'}
+                              </Text>
+                              {friendIds.has(attendee.user_id) && attendee.user_id !== user?.id && (
+                                <Text style={styles.attendeeMeta}>Friend</Text>
+                              )}
+                              {!friendIds.has(attendee.user_id) && attendee.is_public && (
+                                <Text style={styles.attendeeMeta}>Public</Text>
+                              )}
+                            </View>
+                          </View>
+                        )
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={styles.attendeesEmptyText}>No public attendees yet.</Text>
+                  )}
+
+                  {anonymousCount > 0 && (
+                    <Text style={styles.attendeesAnonymousText}>
+                      {anonymousCount} going anonymously
+                    </Text>
+                  )}
+                </>
+              )}
             </View>
 
             {event.description && (
@@ -469,6 +591,106 @@ const createStyles = (theme) =>
     },
     section: {
       marginTop: hp(3),
+    },
+    attendeesSection: {
+      marginTop: hp(2.5),
+      padding: wp(3.5),
+      borderRadius: theme.radius.lg,
+      backgroundColor: theme.colors.backgroundSecondary,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    attendeesHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: hp(1.2),
+    },
+    attendeesMeta: {
+      fontSize: hp(1.5),
+      color: theme.colors.textSecondary,
+    },
+    attendeesHiddenText: {
+      fontSize: hp(1.6),
+      color: theme.colors.textSecondary,
+    },
+    publicToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: hp(1),
+      paddingHorizontal: wp(2),
+      backgroundColor: theme.colors.background,
+      borderRadius: theme.radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      marginBottom: hp(1.5),
+    },
+    publicToggleText: {
+      flex: 1,
+      paddingRight: wp(2),
+    },
+    publicToggleTitle: {
+      fontSize: hp(1.6),
+      fontWeight: '600',
+      color: theme.colors.textPrimary,
+    },
+    publicToggleSubtitle: {
+      fontSize: hp(1.4),
+      color: theme.colors.textSecondary,
+      marginTop: hp(0.4),
+    },
+    attendeesList: {
+      gap: hp(1.2),
+    },
+    attendeeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: wp(2.5),
+    },
+    attendeeAvatar: {
+      width: hp(4.2),
+      height: hp(4.2),
+      borderRadius: hp(2.1),
+      backgroundColor: theme.colors.background,
+    },
+    attendeeAvatarPlaceholder: {
+      width: hp(4.2),
+      height: hp(4.2),
+      borderRadius: hp(2.1),
+      backgroundColor: theme.colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    attendeeAvatarText: {
+      fontSize: hp(1.6),
+      fontWeight: '700',
+      color: theme.colors.textSecondary,
+    },
+    attendeeInfo: {
+      flex: 1,
+    },
+    attendeeName: {
+      fontSize: hp(1.6),
+      fontWeight: '600',
+      color: theme.colors.textPrimary,
+    },
+    attendeeMeta: {
+      fontSize: hp(1.3),
+      color: theme.colors.textSecondary,
+      marginTop: hp(0.2),
+    },
+    attendeesEmptyText: {
+      fontSize: hp(1.5),
+      color: theme.colors.textSecondary,
+      marginBottom: hp(0.8),
+    },
+    attendeesAnonymousText: {
+      fontSize: hp(1.5),
+      color: theme.colors.textSecondary,
+      marginTop: hp(1),
     },
     sectionTitle: {
       fontSize: hp(2),

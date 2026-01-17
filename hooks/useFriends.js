@@ -162,7 +162,7 @@ export function useFriendshipStatus(otherUserId) {
         .select('id')
         .eq('user1_id', smallerId)
         .eq('user2_id', largerId)
-        .single()
+        .maybeSingle()
 
       if (friendship) {
         return { status: 'friends', friendshipId: friendship.id }
@@ -175,7 +175,7 @@ export function useFriendshipStatus(otherUserId) {
         .eq('sender_id', user.id)
         .eq('receiver_id', otherUserId)
         .eq('status', 'pending')
-        .single()
+        .maybeSingle()
 
       if (sentRequest) {
         return { status: 'request_sent', requestId: sentRequest.id }
@@ -188,7 +188,7 @@ export function useFriendshipStatus(otherUserId) {
         .eq('sender_id', otherUserId)
         .eq('receiver_id', user.id)
         .eq('status', 'pending')
-        .single()
+        .maybeSingle()
 
       if (receivedRequest) {
         return { status: 'request_received', requestId: receivedRequest.id }
@@ -215,6 +215,51 @@ export function useSendFriendRequest() {
 
       console.log('📤 Sending friend request to:', receiverId)
 
+      // Block if already friends
+      const smallerId = user.id < receiverId ? user.id : receiverId
+      const largerId = user.id < receiverId ? receiverId : user.id
+      const { data: existingFriendship, error: friendshipError } = await supabase
+        .from('friendships')
+        .select('id')
+        .eq('user1_id', smallerId)
+        .eq('user2_id', largerId)
+        .maybeSingle()
+
+      if (friendshipError) {
+        throw friendshipError
+      }
+
+      if (existingFriendship) {
+        throw new Error('Friend already added')
+      }
+
+      const { data: existingRequest, error: existingRequestError } = await supabase
+        .from('friend_requests')
+        .select('id, status')
+        .eq('sender_id', user.id)
+        .eq('receiver_id', receiverId)
+        .maybeSingle()
+
+      if (existingRequestError) {
+        throw existingRequestError
+      }
+
+      if (existingRequest?.status === 'pending') {
+        throw new Error('Friend request already sent')
+      }
+
+      if (existingRequest?.status && existingRequest.status !== 'pending') {
+        const { error: deleteError } = await supabase
+          .from('friend_requests')
+          .delete()
+          .eq('id', existingRequest.id)
+          .eq('sender_id', user.id)
+
+        if (deleteError) {
+          throw deleteError
+        }
+      }
+
       const { data, error } = await supabase
         .from('friend_requests')
         .insert({
@@ -223,8 +268,8 @@ export function useSendFriendRequest() {
           message: message || null,
           status: 'pending',
         })
-        .select()
-        .single()
+        .select('id')
+        .maybeSingle()
 
       if (error) {
         // Check if request already exists
@@ -234,13 +279,14 @@ export function useSendFriendRequest() {
         throw error
       }
 
-      console.log('✅ Friend request sent:', data.id)
-      return data
+      // If RLS blocked the select, the insert still succeeded
+      console.log('✅ Friend request sent:', data?.id || 'success')
+      return data || { id: 'created', success: true }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['friendshipStatus', user?.id, variables.receiverId] })
       queryClient.invalidateQueries({ queryKey: ['sentFriendRequests'] })
-      Alert.alert('Request Sent', 'Friend request sent successfully!')
+      // No alert needed - button changes to "Pending" which is clear enough
     },
     onError: (error) => {
       console.error('❌ Error sending friend request:', error)
@@ -294,7 +340,7 @@ export function useAcceptFriendRequest() {
       queryClient.invalidateQueries({ queryKey: ['friends'] })
       queryClient.invalidateQueries({ queryKey: ['friendRequests'] })
       queryClient.invalidateQueries({ queryKey: ['friendshipStatus'] })
-      Alert.alert('Friend Added', 'You are now friends!')
+      // No alert needed - button changes to "Friends" which is clear enough
     },
     onError: (error) => {
       console.error('❌ Error accepting friend request:', error)
@@ -390,11 +436,24 @@ export function useRemoveFriend() {
 
       if (error) throw error
 
+      const { error: requestCleanupError } = await supabase
+        .from('friend_requests')
+        .delete()
+        .or(
+          `and(sender_id.eq.${user.id},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${user.id})`
+        )
+
+      if (requestCleanupError) {
+        console.error('❌ Error cleaning friend requests:', requestCleanupError)
+      }
+
       return { success: true }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['friends'] })
       queryClient.invalidateQueries({ queryKey: ['friendshipStatus'] })
+      queryClient.invalidateQueries({ queryKey: ['friendRequests'] })
+      queryClient.invalidateQueries({ queryKey: ['sentFriendRequests'] })
       // No alert - UI already confirmed the action
     },
     onError: (error) => {

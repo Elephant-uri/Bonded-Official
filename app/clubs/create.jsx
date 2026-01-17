@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
@@ -8,6 +9,7 @@ import {
     Image,
     Keyboard,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -21,9 +23,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import Picker from '../../components/Picker'
+import { MapPin } from '../../components/Icons'
 import { useClubsContext } from '../../contexts/ClubsContext'
 import { hp, wp } from '../../helpers/common'
-import { geocodeLocation, getStaticMapUrlWithCoords } from '../../helpers/mapUtils'
+import { formatTime } from '../../utils/dateFormatters'
 import { useAppTheme } from '../theme'
 
 const CATEGORIES = [
@@ -39,7 +42,36 @@ export default function CreateOrg() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
-  const { createClub } = useClubsContext()
+  
+  // Hooks must be called at top level unconditionally
+  const clubsContext = useClubsContext()
+  const createClub = clubsContext?.createClub
+  const orgsAvailable = clubsContext?.orgsAvailable !== false
+  
+  // Debug: Log to see if component is rendering
+  console.log('CreateOrg rendering - clubsContext:', !!clubsContext, 'createClub:', !!createClub)
+  
+  // Check if createClub function is available
+  if (!clubsContext || !createClub) {
+    console.warn('CreateOrg: Missing context or createClub function')
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <AppTopBar
+            schoolName="Create Organization"
+            onPressProfile={() => router.back()}
+            onPressSchool={() => {}}
+            onPressNotifications={() => router.push('/notifications')}
+          />
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: wp(5) }}>
+            <Text style={{ fontSize: hp(2), color: theme.colors.textPrimary, textAlign: 'center' }}>
+              Unable to load organization creation. Please try again.
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -52,10 +84,7 @@ export default function CreateOrg() {
   // Meeting times and location
   const [meetingTimes, setMeetingTimes] = useState([])
   const [meetingLocation, setMeetingLocation] = useState('')
-  const [locationCoords, setLocationCoords] = useState(null)
-  const [showLocationPicker, setShowLocationPicker] = useState(false)
-  const [mapPreviewUrl, setMapPreviewUrl] = useState(null)
-  const [isGeocoding, setIsGeocoding] = useState(false)
+  const locationCoords = null
   const [isMeetingPublic, setIsMeetingPublic] = useState(true)
   
   // Meeting time picker states
@@ -64,6 +93,7 @@ export default function CreateOrg() {
   const [editingMeetingIndex, setEditingMeetingIndex] = useState(null)
   const [tempMeetingDay, setTempMeetingDay] = useState('')
   const [tempMeetingTime, setTempMeetingTime] = useState(new Date())
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   const DAYS_OF_WEEK = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
@@ -95,48 +125,6 @@ export default function CreateOrg() {
       console.log('Image picker error:', error)
       Alert.alert('Error', 'Failed to pick image')
     }
-  }
-
-  const handleLocationSelect = () => {
-    setShowLocationPicker(true)
-  }
-
-  const handleLocationChange = async (text) => {
-    setMeetingLocation(text)
-    
-    // Geocode location when user types (debounced)
-    if (text.length > 3) {
-      setIsGeocoding(true)
-      try {
-        const coords = await geocodeLocation(text)
-        if (coords) {
-          setLocationCoords({ lat: coords.lat, lng: coords.lng })
-          // Generate map preview using coordinates for better accuracy
-          const mapUrl = getStaticMapUrlWithCoords(coords.lat, coords.lng, wp(90), hp(20))
-          setMapPreviewUrl(mapUrl)
-        } else {
-          setLocationCoords(null)
-          setMapPreviewUrl(null)
-        }
-      } catch (error) {
-        console.error('Geocoding error:', error)
-        setLocationCoords(null)
-        setMapPreviewUrl(null)
-      } finally {
-        setIsGeocoding(false)
-      }
-    } else {
-      setLocationCoords(null)
-      setMapPreviewUrl(null)
-    }
-  }
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
-    })
   }
 
   const addMeetingTime = () => {
@@ -178,7 +166,7 @@ export default function CreateOrg() {
     setShowDayPicker(true)
   }
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     // TODO: Upload org avatar/cover to bonded-media and insert public.media rows.
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter an organization name')
@@ -198,17 +186,33 @@ export default function CreateOrg() {
       requiresApproval,
       coverImage: coverImage || null,
       avatar: avatar || null,
+      meetingTimes,
+      meetingLocation,
+      locationCoords,
+      isMeetingPublic,
     }
 
-    const clubId = createClub(clubData)
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    const result = await createClub(clubData)
+    setIsSubmitting(false)
+    const clubId = result?.id
+    if (!clubId) {
+      Alert.alert('Error', result?.error || 'Failed to create organization. Please try again.')
+      return
+    }
+
     Alert.alert('Success', 'Organization created!', [
       {
         text: 'OK',
-        onPress: () => router.push(`/clubs/${clubId}`),
+        onPress: () => router.replace({ pathname: '/clubs/[id]', params: { id: clubId } }),
       },
     ])
   }
 
+  // Debug: Ensure component is rendering
+  console.log('CreateOrg: Rendering component with theme:', !!theme, 'styles:', !!styles)
+  
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
@@ -219,12 +223,26 @@ export default function CreateOrg() {
           onPressNotifications={() => router.push('/notifications')}
         />
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardAvoidingView}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <Text style={styles.title}>Start an Organization</Text>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+            keyboardDismissMode="on-drag"
+            bounces={false}
+          >
+            <View style={styles.header}>
+              <Text style={styles.title}>Start an Organization</Text>
+              <Text style={styles.subtitle}>
+                Give your org a clear identity, then add meeting details for members.
+              </Text>
+            </View>
 
           {/* Basic Info Card */}
           <View style={styles.card}>
@@ -351,7 +369,12 @@ export default function CreateOrg() {
               </View>
               <Switch
                 value={isPublic}
-                onValueChange={setIsPublic}
+                onValueChange={(value) => {
+                  setIsPublic(value)
+                  if (!value) {
+                    setRequiresApproval(true)
+                  }
+                }}
                 trackColor={{
                   false: theme.colors.backgroundSecondary,
                   true: theme.colors.accent + '50',
@@ -434,37 +457,16 @@ export default function CreateOrg() {
             {/* Location */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Meeting Location</Text>
-              <TouchableOpacity
-                style={styles.inputWithIcon}
-                onPress={handleLocationSelect}
-                activeOpacity={0.7}
-              >
+              <View style={styles.inputWithIcon}>
                 <MapPin size={hp(2)} color={theme.colors.textSecondary} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, styles.inputInline]}
                   value={meetingLocation}
-                  placeholder="Select meeting location"
+                  placeholder="Enter meeting location"
                   placeholderTextColor={theme.colors.textSecondary + '60'}
-                  editable={false}
+                  onChangeText={setMeetingLocation}
                 />
-              </TouchableOpacity>
-              {meetingLocation && mapPreviewUrl && (
-                <TouchableOpacity
-                  style={styles.mapPreviewContainer}
-                  onPress={() => setShowLocationPicker(true)}
-                  activeOpacity={0.9}
-                >
-                  <Image 
-                    source={{ uri: mapPreviewUrl }} 
-                    style={styles.mapPreviewImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.mapPreviewOverlay}>
-                    <Ionicons name="location" size={hp(1.8)} color={theme.colors.white} />
-                    <Text style={styles.mapPreviewText} numberOfLines={1}>{meetingLocation}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
+              </View>
             </View>
 
             {/* Meeting Visibility */}
@@ -489,13 +491,25 @@ export default function CreateOrg() {
 
           {/* Create Button */}
           <TouchableOpacity
-            style={styles.createButton}
+            style={[
+              styles.createButton,
+              (!orgsAvailable || isSubmitting) && styles.createButtonDisabled,
+            ]}
             onPress={handleCreate}
             activeOpacity={0.8}
+            disabled={!orgsAvailable || isSubmitting}
           >
-            <Text style={styles.createButtonText}>Create Organization</Text>
+            <Text style={styles.createButtonText}>
+              {isSubmitting ? 'Creating...' : 'Create Organization'}
+            </Text>
           </TouchableOpacity>
-        </ScrollView>
+          {!orgsAvailable && (
+            <Text style={styles.createButtonHelper}>
+              Organization creation is unavailable until the orgs table is deployed.
+            </Text>
+          )}
+          </ScrollView>
+        </KeyboardAvoidingView>
 
         {/* Day Picker Modal */}
         <Modal
@@ -584,6 +598,9 @@ export default function CreateOrg() {
                       value={tempMeetingTime}
                       mode="time"
                       display="spinner"
+                      textColor={theme.colors.textPrimary}
+                      themeVariant={theme.mode}
+                      style={{ backgroundColor: theme.colors.background }}
                       onChange={(event, selectedTime) => {
                         if (selectedTime) {
                           setTempMeetingTime(selectedTime)
@@ -595,6 +612,9 @@ export default function CreateOrg() {
                       value={tempMeetingTime}
                       mode="time"
                       display="default"
+                      textColor={theme.colors.textPrimary}
+                      themeVariant={theme.mode}
+                      style={{ backgroundColor: theme.colors.background }}
                       onChange={(event, selectedTime) => {
                         setShowTimePicker(false)
                         if (selectedTime) {
@@ -622,110 +642,6 @@ export default function CreateOrg() {
           </Modal>
         )}
 
-        {/* Location Picker Modal */}
-        <Modal
-          visible={showLocationPicker}
-          transparent
-          animationType="slide"
-          onRequestClose={() => {
-            Keyboard.dismiss()
-            setShowLocationPicker(false)
-          }}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalOverlay}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-          >
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => {
-                Keyboard.dismiss()
-                setShowLocationPicker(false)
-              }}
-            >
-              <TouchableOpacity
-                style={styles.modalContent}
-                activeOpacity={1}
-                onPress={(e) => e.stopPropagation()}
-              >
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Select Location</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      Keyboard.dismiss()
-                      setShowLocationPicker(false)
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.modalCloseText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView
-                  style={styles.modalBody}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
-                  <TextInput
-                    style={styles.locationInput}
-                    placeholder="Enter location name or address"
-                    placeholderTextColor={theme.colors.textSecondary + '60'}
-                    value={meetingLocation}
-                    onChangeText={handleLocationChange}
-                    autoFocus={true}
-                    returnKeyType="search"
-                  />
-                  {isGeocoding && (
-                    <View style={styles.geocodingIndicator}>
-                      <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
-                      <Text style={styles.geocodingText}>Finding location...</Text>
-                    </View>
-                  )}
-                  {meetingLocation && mapPreviewUrl && !isGeocoding && (
-                    <View style={styles.mapPreviewContainer}>
-                      <Image 
-                        source={{ uri: mapPreviewUrl }} 
-                        style={styles.mapPreviewImage}
-                        resizeMode="cover"
-                      />
-                      {locationCoords && (
-                        <View style={styles.mapPreviewOverlay}>
-                          <Ionicons name="location" size={hp(2)} color={theme.colors.white} />
-                          <Text style={styles.mapPreviewText} numberOfLines={2}>{meetingLocation}</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                  {meetingLocation && !mapPreviewUrl && !isGeocoding && meetingLocation.length > 3 && (
-                    <View style={styles.locationError}>
-                      <Text style={styles.locationErrorText}>
-                        Could not find this location. Please try a different address.
-                      </Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={[
-                      styles.locationConfirmButton,
-                      (!meetingLocation.trim() || isGeocoding) && styles.locationConfirmButtonDisabled,
-                    ]}
-                    onPress={() => {
-                      if (meetingLocation.trim() && !isGeocoding) {
-                        Keyboard.dismiss()
-                        setShowLocationPicker(false)
-                      }
-                    }}
-                    activeOpacity={0.8}
-                    disabled={!meetingLocation.trim() || isGeocoding}
-                  >
-                    <Text style={styles.locationConfirmButtonText}>Confirm</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </Modal>
-
         <BottomNav />
       </View>
     </SafeAreaView>
@@ -740,28 +656,52 @@ const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
-    paddingBottom: hp(10),
-    gap: theme.spacing.lg,
+    paddingBottom: hp(40), // Extra padding for keyboard to prevent content cutoff
+    gap: theme.spacing.md,
+  },
+  header: {
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
   },
   title: {
-    fontSize: theme.typography.sizes.xxl,
+    fontSize: theme.typography.sizes.xl,
     fontFamily: theme.typography.fontFamily.heading,
     fontWeight: theme.typography.weights.extrabold,
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.lg,
     letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: theme.typography.sizes.base,
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+    lineHeight: hp(2.4),
   },
   card: {
     backgroundColor: theme.colors.background,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
-    ...theme.shadows.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
   cardTitle: {
     fontSize: theme.typography.sizes.lg,
@@ -769,19 +709,20 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: theme.typography.weights.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
+    letterSpacing: -0.2,
   },
   inputGroup: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
   },
   label: {
-    fontSize: theme.typography.sizes.base,
+    fontSize: theme.typography.sizes.sm,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
   input: {
-    backgroundColor: theme.colors.backgroundSecondary,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
@@ -791,13 +732,19 @@ const createStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
+  inputInline: {
+    flex: 1,
+    borderWidth: 0,
+    paddingVertical: 0,
+    backgroundColor: 'transparent',
+  },
   textArea: {
     minHeight: hp(12),
     textAlignVertical: 'top',
     paddingTop: theme.spacing.md,
   },
   imagePickerButton: {
-    backgroundColor: theme.colors.backgroundSecondary,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -901,14 +848,25 @@ const createStyles = (theme) => StyleSheet.create({
     paddingVertical: theme.spacing.lg,
     borderRadius: theme.radius.xl,
     alignItems: 'center',
-    marginTop: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.xl,
     ...theme.shadows.md,
+  },
+  createButtonDisabled: {
+    opacity: 0.5,
   },
   createButtonText: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: theme.typography.weights.bold,
     color: theme.colors.white,
+  },
+  createButtonHelper: {
+    marginTop: theme.spacing.sm,
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
   },
   inputWithIcon: {
     flexDirection: 'row',

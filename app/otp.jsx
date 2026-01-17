@@ -9,6 +9,8 @@ import ScreenWrapper from '../components/ScreenWrapper'
 import { hp } from '../helpers/common'
 import { useSendOTP } from '../hooks/useSendOTP'
 import { useVerifyOTP } from '../hooks/useVerifyOTP'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { useAuthStore } from '../stores/authStore'
 import { useAppTheme, useThemeMode } from './theme'
 
 const getFriendlyOtpError = (error) => {
@@ -33,11 +35,35 @@ export default function OTP() {
 
   const [code, setCode] = useState('')
   const [resendCooldown, setResendCooldown] = useState(60) // Start with 60s cooldown
+  const [isNavigating, setIsNavigating] = useState(false)
   const { mutate: sendOTP, isPending: isSending } = useSendOTP()
   const { mutate: verifyOTP, isPending: isVerifying } = useVerifyOTP()
+  const { user } = useAuthStore()
+  // Only fetch profile if user is authenticated to prevent crashes
+  const { data: profile, isLoading: profileLoading, error: profileError } = useCurrentUserProfile()
   const cooldownTimerRef = useRef(null)
+  const navigationTimeoutRef = useRef(null)
+  const hasNavigatedRef = useRef(false) // Prevent multiple navigations
   const { setMode } = useThemeMode()
   const systemScheme = useColorScheme() || 'light'
+  
+  // Add error boundary to catch any unexpected errors
+  useEffect(() => {
+    if (profileError) {
+      console.error('❌ Profile error in OTP screen:', profileError)
+      // Don't crash - just log the error
+    }
+  }, [profileError])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current)
+      }
+      hasNavigatedRef.current = false
+    }
+  }, [])
 
   // Force light mode while OTP screen is displayed, then restore system preference
   // Use useLayoutEffect to ensure theme changes BEFORE render
@@ -68,6 +94,119 @@ export default function OTP() {
     }
   }, [resendCooldown])
 
+  // Navigate after profile loads
+  useEffect(() => {
+    // Prevent multiple navigations
+    if (hasNavigatedRef.current) {
+      console.log('⏭️ Navigation already completed, skipping')
+      return
+    }
+
+    if (!isNavigating) return
+    if (!user) {
+      // User not set yet, wait a bit
+      console.log('⏳ Waiting for user to be set...')
+      return
+    }
+    
+    // Clear any existing timeout
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current)
+    }
+    
+    // Timeout fallback - if profile doesn't load within 5 seconds, navigate to onboarding
+    navigationTimeoutRef.current = setTimeout(() => {
+      if (isNavigating && !hasNavigatedRef.current) {
+        console.warn('⚠️ Profile load timeout, navigating to onboarding')
+        hasNavigatedRef.current = true
+        setIsNavigating(false)
+        try {
+          router.replace('/onboarding')
+        } catch (error) {
+          console.error('❌ Navigation error:', error)
+          hasNavigatedRef.current = false // Reset on error
+        }
+      }
+    }, 5000)
+    
+    // If there's an error, still try to navigate (profile might not exist yet)
+    if (profileError) {
+      console.warn('⚠️ Profile error, navigating to onboarding:', profileError)
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current)
+      }
+      if (!hasNavigatedRef.current) {
+        hasNavigatedRef.current = true
+        setIsNavigating(false)
+        try {
+          router.replace('/onboarding')
+        } catch (error) {
+          console.error('❌ Navigation error:', error)
+          hasNavigatedRef.current = false // Reset on error
+        }
+      }
+      return
+    }
+    
+    if (!profileLoading && profile !== undefined) {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current)
+      }
+      
+      if (hasNavigatedRef.current) {
+        console.log('⏭️ Already navigated, skipping')
+        return
+      }
+
+      hasNavigatedRef.current = true
+      setIsNavigating(false)
+      
+      try {
+        // Handle null profile (user not authenticated or profile doesn't exist)
+        if (!profile || profile === null) {
+          console.warn('⚠️ Profile is null, navigating to onboarding')
+          router.replace('/onboarding')
+          return
+        }
+        
+        // Check if user has basic profile data
+        const hasBasicProfileData = profile?.username && profile?.full_name && 
+          (profile?.avatar_url || profile?.major || profile?.graduation_year)
+        
+        // Navigate based on profile status
+        if (hasBasicProfileData) {
+          // User has basic profile - go to home
+          console.log('✅ User has basic profile, navigating to yearbook')
+          router.replace('/yearbook')
+        } else if (profile?.onboarding_complete) {
+          // Onboarding complete but no basic data (edge case) - go to home
+          console.log('✅ Onboarding complete, navigating to yearbook')
+          router.replace('/yearbook')
+        } else {
+          // New user or incomplete profile - go to onboarding
+          console.log('✅ New user, navigating to onboarding')
+          router.replace('/onboarding')
+        }
+      } catch (error) {
+        console.error('❌ Navigation error after profile load:', error)
+        hasNavigatedRef.current = false // Reset on error to allow retry
+        // Fallback navigation
+        try {
+          router.replace('/onboarding')
+          hasNavigatedRef.current = true
+        } catch (fallbackError) {
+          console.error('❌ Fallback navigation also failed:', fallbackError)
+        }
+      }
+    }
+    
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current)
+      }
+    }
+  }, [isNavigating, profileLoading, profile, profileError, user, router])
+
   const handleVerify = () => {
     if (!email) {
       Alert.alert('Error', 'Email is missing. Please go back and try again.')
@@ -83,17 +222,21 @@ export default function OTP() {
       { email: String(email), token: code },
       {
         onSuccess: () => {
-          Alert.alert('Success', 'You are signed in!', [
-            {
-              text: 'Continue',
-              onPress: () => router.replace('/onboarding'),
-            },
-          ])
+          console.log('✅ OTP verified successfully')
+          // Reset navigation flag
+          hasNavigatedRef.current = false
+          // Small delay to ensure auth store is updated before fetching profile
+          setTimeout(() => {
+            // Set navigating flag and wait for profile to load
+            setIsNavigating(true)
+          }, 500) // Increased delay to ensure auth store is fully updated
         },
         onError: (error) => {
           console.error('Error verifying OTP:', error)
           const message = getFriendlyOtpError(error)
-          Alert.alert('Couldn’t verify code', message)
+          Alert.alert('Couldn\'t verify code', message)
+          setIsNavigating(false)
+          hasNavigatedRef.current = false // Reset on error
         },
       }
     )

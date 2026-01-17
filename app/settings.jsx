@@ -291,5 +291,3 @@ const createStyles = (theme) => StyleSheet.create({
     opacity: theme.ui.metaOpacity,
   },
 })
-
-

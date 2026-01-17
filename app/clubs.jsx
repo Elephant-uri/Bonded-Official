@@ -40,6 +40,25 @@ export default function Clubs() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
+  const getCategoryTheme = (category) => {
+    switch (category) {
+      case 'academic':
+        return { colors: ['#dbeafe', '#93c5fd'], accent: '#2563eb' }
+      case 'sports':
+        return { colors: ['#dcfce7', '#86efac'], accent: '#16a34a' }
+      case 'arts':
+        return { colors: ['#ffe4e6', '#f9a8d4'], accent: '#db2777' }
+      case 'service':
+        return { colors: ['#fef3c7', '#fcd34d'], accent: '#d97706' }
+      case 'business':
+        return { colors: ['#e2e8f0', '#94a3b8'], accent: '#334155' }
+      case 'social':
+        return { colors: ['#ede9fe', '#c4b5fd'], accent: '#7c3aed' }
+      default:
+        return { colors: ['#e0e7ff', '#c7d2fe'], accent: '#4f46e5' }
+    }
+  }
+
   const allClubs = getAllClubs()
 
   const filteredClubs = useMemo(() => {
@@ -66,6 +85,7 @@ export default function Clubs() {
   const renderClubCard = ({ item }) => {
     const interested = isUserInterested(item.id)
     const memberCount = item.members?.length || 0
+    const categoryTheme = getCategoryTheme(item.category)
 
     return (
       <TouchableOpacity
@@ -74,18 +94,55 @@ export default function Clubs() {
         style={styles.clubCardWrapper}
       >
         <AppCard radius="lg" padding={false} style={styles.clubCard}>
-          {item.coverImage && (
-            <View style={styles.clubImageWrapper}>
+          <View style={styles.clubImageWrapper}>
+            {item.coverImage ? (
               <Image source={{ uri: item.coverImage }} style={styles.clubCover} />
+            ) : (
+              <LinearGradient colors={categoryTheme.colors} style={styles.clubCoverPlaceholder}>
+                <View
+                  style={[
+                    styles.clubCoverDot,
+                    { backgroundColor: `${categoryTheme.accent}22`, top: hp(1.5), right: wp(6) },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.clubCoverDot,
+                    styles.clubCoverDotLarge,
+                    { backgroundColor: `${categoryTheme.accent}18`, bottom: hp(1.2), left: wp(5) },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.clubCoverDot,
+                    styles.clubCoverDotSmall,
+                    { backgroundColor: `${categoryTheme.accent}26`, bottom: hp(2.2), right: wp(14) },
+                  ]}
+                />
+                <Text style={[styles.clubCoverInitial, { color: categoryTheme.accent }]}>
+                  {item.name?.charAt(0)?.toUpperCase() || 'C'}
+                </Text>
+              </LinearGradient>
+            )}
               <LinearGradient
                 colors={['transparent', 'rgba(0, 0, 0, 0.7)']}
                 style={styles.clubGradient}
               />
-              <View style={styles.clubNameOverlay}>
-                <Text style={styles.clubName}>{item.name}</Text>
-              </View>
+            <View style={styles.clubNameOverlay}>
+              <Text style={styles.clubName}>{item.name}</Text>
             </View>
-          )}
+            <View style={styles.clubAvatarBadge}>
+              {item.avatar ? (
+                <Image source={{ uri: item.avatar }} style={styles.clubAvatarImage} />
+              ) : (
+                <View style={styles.clubAvatarFallback}>
+                  <Text style={styles.clubAvatarInitial}>
+                    {item.name?.charAt(0)?.toUpperCase() || 'C'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
           <View style={styles.clubContent}>
             <View style={styles.clubMetaRow}>
               <Chip
@@ -104,22 +161,7 @@ export default function Clubs() {
             <Text style={styles.clubDescription} numberOfLines={2}>
               {item.description}
             </Text>
-            {item.leadership && item.leadership.length > 0 && (
-              <View style={styles.leadershipRow}>
-                <Text style={styles.leadershipLabel}>Leadership:</Text>
-                {item.leadership.slice(0, 2).map((leader, index) => (
-                  <Text key={index} style={styles.leadershipName}>
-                    {leader.name}
-                    {index < item.leadership.length - 1 && index < 1 && ', '}
-                  </Text>
-                ))}
-                {item.leadership.length > 2 && (
-                  <Text style={styles.leadershipMore}>
-                    +{item.leadership.length - 2} more
-                  </Text>
-                )}
-              </View>
-            )}
+            {/* Leadership data not available yet */}
             
             {/* Meeting Information */}
             {(item.meetingTimes || item.meetingLocation) && (
@@ -344,6 +386,34 @@ const createStyles = (theme) => StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  clubCoverPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  clubCoverInitial: {
+    fontSize: hp(4.5),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '800',
+  },
+  clubCoverDot: {
+    position: 'absolute',
+    width: hp(6),
+    height: hp(6),
+    borderRadius: hp(3),
+  },
+  clubCoverDotLarge: {
+    width: hp(8.5),
+    height: hp(8.5),
+    borderRadius: hp(4.25),
+  },
+  clubCoverDotSmall: {
+    width: hp(4),
+    height: hp(4),
+    borderRadius: hp(2),
+  },
   clubGradient: {
     position: 'absolute',
     bottom: 0,
@@ -364,8 +434,52 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  clubAvatarBadge: {
+    position: 'absolute',
+    left: wp(4),
+    bottom: -hp(2.2),
+    width: hp(5.2),
+    height: hp(5.2),
+    borderRadius: hp(2.6),
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  clubAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: hp(2.6),
+  },
+  clubAvatarFallback: {
+    width: '100%',
+    height: '100%',
+    borderRadius: hp(2.6),
+    backgroundColor: theme.colors.bondedPurple + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clubAvatarInitial: {
+    fontSize: hp(2),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '800',
+    color: theme.colors.bondedPurple,
+  },
   clubContent: {
     padding: wp(4),
+    paddingTop: hp(3),
   },
   clubMetaRow: {
     flexDirection: 'row',
@@ -448,4 +562,3 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
   },
 })
-

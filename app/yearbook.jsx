@@ -2,38 +2,394 @@ import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Modal, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActionSheetIOS, ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Modal, PanResponder, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import BottomNav from '../components/BottomNav'
-import { ArrowLeft, Calendar, Check, Clock, Filter, MapPin, MessageCircle, School, User, UserMinus, UserPlus, X } from '../components/Icons'
+import { ArrowLeft, Calendar, Check, Clock, Filter, MapPin, MessageCircle, MoreHorizontal, School, User, UserMinus, UserPlus, X } from '../components/Icons'
+import { YearbookSkeleton } from '../components/SkeletonLoader'
 import Picker from '../components/Picker'
+import ShareModal from '../components/ShareModal'
 import { hp, wp } from '../helpers/common'
 import { useFriendshipStatus, useSendFriendRequest, useAcceptFriendRequest, useCancelFriendRequest, useRemoveFriend } from '../hooks/useFriends'
-import { useProfiles } from '../hooks/useProfiles'
+import { useProfiles, useProfilePhotos } from '../hooks/useProfiles'
 import { useCreateConversation } from '../hooks/useMessages'
+import { useNotificationCount } from '../hooks/useNotificationCount'
+import { useUserPosts } from '../hooks/useUserPosts'
 import { useAuthStore } from '../stores/authStore'
 import { useAppTheme } from './theme'
+import { formatTimeAgo } from '../utils/dateFormatters'
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
 
 const YEARS = ['All', '2025', '2024', '2023', '2022']
+const GRADE_OPTIONS = [
+  { value: 'incoming-freshman', label: 'Incoming Freshman' },
+  { value: 'freshman', label: 'Freshman' },
+  { value: 'sophomore', label: 'Sophomore' },
+  { value: 'junior', label: 'Junior' },
+  { value: 'senior', label: 'Senior' },
+  { value: 'graduate', label: 'Graduate' },
+]
+const MAJOR_OPTIONS = [
+  { value: 'undecided', label: 'Undecided' },
+  { value: 'computer-science', label: 'Computer Science' },
+  { value: 'engineering', label: 'Engineering' },
+  { value: 'business', label: 'Business' },
+  { value: 'medicine', label: 'Medicine' },
+  { value: 'psychology', label: 'Psychology' },
+  { value: 'biology', label: 'Biology' },
+  { value: 'economics', label: 'Economics' },
+  { value: 'political-science', label: 'Political Science' },
+  { value: 'history', label: 'History' },
+  { value: 'philosophy', label: 'Philosophy' },
+  { value: 'architecture', label: 'Architecture' },
+  { value: 'mathematics', label: 'Mathematics' },
+  { value: 'physics', label: 'Physics' },
+  { value: 'chemistry', label: 'Chemistry' },
+  { value: 'english', label: 'English' },
+  { value: 'communications', label: 'Communications' },
+  { value: 'journalism', label: 'Journalism' },
+  { value: 'education', label: 'Education' },
+  { value: 'nursing', label: 'Nursing' },
+  { value: 'pre-med', label: 'Pre-Med' },
+  { value: 'pre-law', label: 'Pre-Law' },
+  { value: 'art', label: 'Art' },
+  { value: 'music', label: 'Music' },
+  { value: 'theater', label: 'Theater' },
+  { value: 'film', label: 'Film' },
+  { value: 'design', label: 'Design' },
+  { value: 'fashion', label: 'Fashion' },
+  { value: 'sociology', label: 'Sociology' },
+  { value: 'anthropology', label: 'Anthropology' },
+  { value: 'international-relations', label: 'International Relations' },
+  { value: 'environmental-science', label: 'Environmental Science' },
+  { value: 'neuroscience', label: 'Neuroscience' },
+  { value: 'public-health', label: 'Public Health' },
+  { value: 'other', label: 'Other' },
+]
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'non-binary', label: 'Non-binary' },
+  { value: 'prefer-not-to-say', label: 'Prefer not to say' },
+]
+const GRADE_LABELS = Object.fromEntries(GRADE_OPTIONS.map((option) => [option.value, option.label]))
+const MAJOR_LABELS = Object.fromEntries(MAJOR_OPTIONS.map((option) => [option.value, option.label]))
+const getMajorLabel = (value) => MAJOR_LABELS[value] || value || 'Undeclared'
+const getGradeLabel = (value) => GRADE_LABELS[value] || value
 
-// Profile Modal Component - extracted to use hooks
-const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, currentUserInterests }) => {
-  if (!activeProfile) return null
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window')
+const DISMISS_THRESHOLD = 150
 
-  // Track scroll position for pull-to-dismiss
-  const scrollY = useRef(0)
+// Wrapper component for Profile Modal with swipe-to-dismiss
+const ProfileModal = ({ activeProfile, setActiveProfile, theme, router, currentUserInterests, allProfiles = [] }) => {
+  const translateY = useRef(new Animated.Value(0)).current
+  const translateX = useRef(new Animated.Value(0)).current
+  const [isVisible, setIsVisible] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const scrollYRef = useRef(0)
+  
+  // Find current profile index for navigation
+  const currentIndex = useMemo(() => {
+    if (!activeProfile || !allProfiles.length) return -1
+    return allProfiles.findIndex(p => p.id === activeProfile.id)
+  }, [activeProfile, allProfiles])
+  
+  const navigateToProfile = useCallback((direction) => {
+    if (currentIndex === -1 || allProfiles.length === 0) return
+    
+    const nextIndex = direction === 'next' 
+      ? (currentIndex + 1) % allProfiles.length
+      : currentIndex === 0 
+        ? allProfiles.length - 1 
+        : currentIndex - 1
+    
+    const nextProfile = allProfiles[nextIndex]
+    if (nextProfile) {
+      // Animate out current, then animate in next
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: direction === 'next' ? -SCREEN_WIDTH : SCREEN_WIDTH,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        translateX.setValue(direction === 'next' ? SCREEN_WIDTH : -SCREEN_WIDTH)
+        setActiveProfile(nextProfile)
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 65,
+          friction: 11,
+        }).start()
+      })
+    }
+  }, [currentIndex, allProfiles, setActiveProfile, translateX, translateY])
+
+  React.useEffect(() => {
+    if (activeProfile) {
+      setIsVisible(true)
+      translateY.setValue(SCREEN_HEIGHT)
+      translateX.setValue(0)
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start()
+    }
+  }, [activeProfile])
+
+  const handleClose = useCallback(() => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsVisible(false)
+      setActiveProfile(null)
+      translateX.setValue(0)
+    })
+  }, [setActiveProfile, translateY])
+
+  // Combined pan responder for vertical (dismiss) and horizontal (navigate) swipes
+  const panResponder = useMemo(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: () => false,
+      // Use capture to intercept before ScrollView/FlatList gets the gesture
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        const isAtTop = scrollYRef.current <= 5
+        if (!isAtTop) return false
+        
+        // Check for vertical swipe down (dismiss)
+        const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 2
+        const isSwipingDown = gestureState.dy > 15
+        if (isVertical && isSwipingDown) return true
+        
+        // Check for horizontal swipe (navigate profiles) - only in top whitespace area
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2
+        // Only capture horizontal swipes in the top area (whitespace, not on photos)
+        if (isHorizontal && allProfiles.length > 1 && gestureState.dy < 100) return true
+        
+        return false
+      },
+      onPanResponderGrant: () => {
+        setIsDragging(true)
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
+        
+        if (isVertical && gestureState.dy > 0) {
+          // Vertical swipe down - dismiss
+          translateY.setValue(gestureState.dy)
+        } else if (isHorizontal && allProfiles.length > 1) {
+          // Horizontal swipe - navigate
+          translateX.setValue(gestureState.dx)
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        setIsDragging(false)
+        const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
+        
+        if (isVertical && gestureState.dy > 0) {
+          // Vertical swipe down - dismiss
+          if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
+            handleClose()
+          } else {
+            Animated.spring(translateY, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 65,
+              friction: 11,
+            }).start()
+          }
+        } else if (isHorizontal && allProfiles.length > 1) {
+          // Horizontal swipe - navigate profiles
+          const threshold = SCREEN_WIDTH * 0.3
+          if (Math.abs(gestureState.dx) > threshold || Math.abs(gestureState.vx) > 0.5) {
+            navigateToProfile(gestureState.dx > 0 ? 'prev' : 'next')
+          } else {
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 65,
+              friction: 11,
+            }).start()
+          }
+        } else {
+          // Reset both
+          Animated.parallel([
+            Animated.spring(translateY, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 65,
+              friction: 11,
+            }),
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 65,
+              friction: 11,
+            }),
+          ]).start()
+        }
+      },
+      onPanResponderTerminate: () => {
+        setIsDragging(false)
+        Animated.parallel([
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+          }),
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+          }),
+        ]).start()
+      },
+    }), [handleClose, translateY, translateX, allProfiles, navigateToProfile])
+
+  if (!activeProfile && !isVisible) return null
+
+  // Backdrop fades as modal is dragged down
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, SCREEN_HEIGHT / 2],
+    outputRange: [0.5, 0],
+    extrapolate: 'clamp',
+  })
+
+  // Scale effect as modal is dragged (iOS style)
+  const modalScale = translateY.interpolate({
+    inputRange: [0, SCREEN_HEIGHT],
+    outputRange: [1, 0.9],
+    extrapolate: 'clamp',
+  })
+
+  return (
+    <Modal
+      visible={isVisible}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={handleClose}
+    >
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        {/* Tappable backdrop */}
+        <Animated.View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: '#000',
+            opacity: backdropOpacity,
+          }}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+        </Animated.View>
+
+        {/* Modal content container */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: Platform.OS === 'ios' ? hp(5) : hp(2),
+            left: 0,
+            right: 0,
+            bottom: 0,
+            transform: [
+              { translateY },
+              { translateX },
+              { scale: modalScale },
+            ],
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Gesture capture area - only at top for swipe down and horizontal navigation */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: hp(15), // Top area for gestures
+              zIndex: 1,
+            }}
+            {...panResponder.panHandlers}
+            pointerEvents="box-none"
+          />
+          <ProfileModalContent
+            activeProfile={activeProfile}
+            setActiveProfile={setActiveProfile}
+            theme={theme}
+            router={router}
+            currentUserInterests={currentUserInterests}
+            onClose={handleClose}
+            scrollYRef={scrollYRef}
+            isDragging={isDragging}
+            allProfiles={allProfiles}
+          />
+        </Animated.View>
+      </View>
+    </Modal>
+  )
+}
+
+// Profile Modal Content - extracted to use hooks
+const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, currentUserInterests, onClose, scrollYRef, isDragging, allProfiles }) => {
+  // All hooks must be called before any early returns
+  const { user } = useAuthStore()
+  const handleScroll = useCallback((event) => {
+    const offsetY = event.nativeEvent.contentOffset.y
+    if (scrollYRef) {
+      scrollYRef.current = offsetY
+    }
+  }, [scrollYRef])
+  const [shareContent, setShareContent] = useState(null)
+
+  // Lazy-load gallery photos when profile modal opens
+  const { data: galleryPhotos = [] } = useProfilePhotos(activeProfile?.id)
 
   // Friend status hooks
-  const { data: friendshipStatus, isLoading: statusLoading } = useFriendshipStatus(activeProfile.id)
+  const { data: friendshipStatus, isLoading: statusLoading } = useFriendshipStatus(activeProfile?.id)
   const sendRequest = useSendFriendRequest()
   const acceptRequest = useAcceptFriendRequest()
   const cancelRequest = useCancelFriendRequest()
   const removeFriend = useRemoveFriend()
   const createConversation = useCreateConversation()
+  const { data: recentPosts = [], isLoading: recentPostsLoading } = useUserPosts(activeProfile?.id, 3)
+
+  // Combine avatar with lazy-loaded gallery photos
+  const profilePhotos = useMemo(() => {
+    if (!activeProfile) return []
+    const basePhotos = activeProfile.photoUrl ? [activeProfile.photoUrl] : []
+    const allPhotos = [...basePhotos]
+    galleryPhotos.forEach(url => {
+      if (url && !allPhotos.includes(url)) {
+        allPhotos.push(url)
+      }
+    })
+    return allPhotos.length > 0 ? allPhotos : (activeProfile.photoUrl ? [activeProfile.photoUrl] : [])
+  }, [activeProfile, galleryPhotos])
+
+  // Early return after all hooks
+  if (!activeProfile) return null
 
   const handleFriendAction = () => {
     switch (friendshipStatus?.status) {
@@ -74,22 +430,100 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
   }
 
   const handleMessage = async () => {
+    if (!user?.id || !activeProfile) return
+    
+    // Capture profile data before closing modal
+    const profileId = activeProfile.id
+    const profileName = activeProfile.name
+    
     try {
-      const conversationId = await createConversation.mutateAsync({ 
-        otherUserId: activeProfile.id 
-      })
+      // Close the modal first - ensure it's fully closed before navigation
       setActiveProfile(null)
-      router.push({
+      
+      // Wait for modal to start closing animation
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      const conversationId = await createConversation.mutateAsync({ 
+        otherUserId: profileId 
+      })
+      
+      // Additional delay to ensure modal is fully unmounted
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Navigate to chat using replace to prevent back navigation to modal
+      router.replace({
         pathname: '/chat',
         params: { 
           conversationId,
-          userId: activeProfile.id, 
-          userName: activeProfile.name 
+          userId: profileId, 
+          userName: profileName 
         }
       })
     } catch (error) {
       console.error('Error creating conversation:', error)
+      Alert.alert('Error', 'Failed to start conversation. Please try again.')
+      // Reset activeProfile on error to allow retry
+      setActiveProfile(null)
     }
+  }
+
+  const handleShare = () => {
+    if (!activeProfile) return
+    setShareContent({
+      type: 'profile',
+      data: {
+        id: activeProfile.id,
+        name: activeProfile.name,
+        majorLabel: getMajorLabel(activeProfile.major),
+        year: activeProfile.year,
+        avatar: activeProfile.photoUrl,
+        grade: activeProfile.grade,
+        quote: activeProfile.quote,
+      },
+    })
+  }
+
+  const confirmBlock = () => {
+    if (!activeProfile) return
+    Alert.alert(
+      'Block user?',
+      `You won't see ${activeProfile.name} again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Blocked', 'Block is coming soon.')
+          },
+        },
+      ]
+    )
+  }
+
+  const openProfileActions = () => {
+    if (!activeProfile) return
+    const options = ['Share', 'Block', 'Cancel']
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: 2,
+          destructiveButtonIndex: 1,
+          userInterfaceStyle: 'light',
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) handleShare()
+          if (buttonIndex === 1) confirmBlock()
+        }
+      )
+      return
+    }
+    Alert.alert('Profile options', undefined, [
+      { text: 'Share', onPress: handleShare },
+      { text: 'Block', style: 'destructive', onPress: confirmBlock },
+      { text: 'Cancel', style: 'cancel' },
+    ])
   }
 
   const getFriendButtonConfig = () => {
@@ -112,72 +546,108 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
   const isActionLoading = sendRequest.isPending || cancelRequest.isPending || 
                           acceptRequest.isPending || removeFriend.isPending
 
-  // Pull-to-dismiss handlers
-  const handleScroll = useCallback((event) => {
-    scrollY.current = event.nativeEvent.contentOffset.y
-  }, [])
-
-  const handleScrollBeginDrag = useCallback(() => {
-    setIsDragging(true)
-  }, [])
-
-  const handleScrollEndDrag = useCallback((event) => {
-    setIsDragging(false)
-    const offsetY = event.nativeEvent.contentOffset.y
-    // If user is at top and pulls down past threshold, dismiss
-    if (offsetY < -80) {
+  const styles = createProfileModalStyles(theme)
+  const handleOpenPost = (post) => {
+    if (onClose) {
+      onClose()
+    } else {
       setActiveProfile(null)
     }
-  }, [setActiveProfile])
-
-  const styles = createProfileModalStyles(theme)
+    router.push({
+      pathname: '/forum',
+      params: { forumId: post.forum_id, postId: post.id },
+    })
+  }
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Drag indicator at very top */}
-      <View style={styles.dragIndicatorContainer}>
+      {/* Drag indicator pill - visual cue for swipe */}
+      <View style={styles.dragIndicatorContainer} pointerEvents="none">
         <View style={styles.dragIndicator} />
       </View>
       
-      {/* Hero Image - extends past notch */}
-      <View style={styles.heroSection}>
-        <Image 
-          source={{ uri: activeProfile.photoUrl }} 
-          style={styles.heroImage} 
-        />
-        <LinearGradient
-          colors={['rgba(0,0,0,0.3)', 'transparent', 'transparent', 'rgba(0,0,0,0.5)']}
-          style={styles.heroGradient}
-        />
-        
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          activeOpacity={0.7}
-          onPress={() => setActiveProfile(null)}
-        >
-          <View style={styles.backButtonCircle}>
-            <ArrowLeft size={hp(2)} color="#fff" strokeWidth={2} />
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Scrollable Content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-        alwaysBounceVertical={true}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        onScrollEndDrag={handleScrollEndDrag}
-        scrollEventThrottle={16}
+      {/* Back Button - fixed position */}
+      <TouchableOpacity
+        style={styles.backButton}
+        activeOpacity={0.7}
+        onPress={onClose}
       >
-        {/* Name */}
-        <Text style={styles.name}>{activeProfile.name}</Text>
+        <View style={styles.backButtonCircle}>
+          <ArrowLeft size={hp(2)} color="#fff" strokeWidth={2} />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.moreButton}
+        activeOpacity={0.7}
+        onPress={openProfileActions}
+      >
+        <View style={styles.moreButtonCircle}>
+          <MoreHorizontal size={hp(2.2)} color="#fff" strokeWidth={2} />
+        </View>
+      </TouchableOpacity>
+
+      {/* ScrollView for modal content - scrollEnabled disabled while dragging */}
+      <ScrollView
+        style={styles.fullScrollView}
+        contentContainerStyle={styles.fullScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={!isDragging}
+        scrollEnabled={!isDragging}
+        scrollEventThrottle={16}
+        onScroll={handleScroll}
+        nestedScrollEnabled={true}
+      >
+        {/* Hero Image Carousel - swipeable photos */}
+        <View style={styles.heroSection} pointerEvents="box-none">
+          {profilePhotos.length > 1 ? (
+            <FlatList
+              data={profilePhotos}
+              keyExtractor={(item, index) => `photo-${index}`}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              bounces={true}
+              scrollEventThrottle={16}
+              nestedScrollEnabled={true}
+              disableIntervalMomentum={false}
+              decelerationRate="fast"
+              snapToInterval={SCREEN_WIDTH}
+              snapToAlignment="start"
+              getItemLayout={(_, index) => ({
+                length: SCREEN_WIDTH,
+                offset: SCREEN_WIDTH * index,
+                index,
+              })}
+              renderItem={({ item }) => (
+                <Image 
+                  source={{ uri: item }} 
+                  style={{ 
+                    width: SCREEN_WIDTH, 
+                    height: hp(50),
+                    resizeMode: 'cover',
+                  }} 
+                />
+              )}
+            />
+          ) : (
+          <Image 
+            source={{ uri: activeProfile.photoUrl }} 
+            style={styles.heroImage} 
+          />
+          )}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
+            style={styles.heroGradient}
+            pointerEvents="none"
+          />
+        </View>
+        
+        {/* Content Section */}
+        <View style={styles.contentSection}>
+          {/* Name */}
+          <Text style={styles.name}>{activeProfile.name}</Text>
         
         {/* Handle */}
         <Text style={styles.handle}>
@@ -243,7 +713,7 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
         <View style={styles.metaRow}>
           <View style={styles.metaPill}>
             <School size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.metaPillText}>{activeProfile.major}</Text>
+            <Text style={styles.metaPillText}>{getMajorLabel(activeProfile.major)}</Text>
           </View>
           <View style={styles.metaPill}>
             <Calendar size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
@@ -252,7 +722,7 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
           {activeProfile.grade && (
             <View style={styles.metaPill}>
               <User size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
-              <Text style={styles.metaPillText}>{activeProfile.grade}</Text>
+              <Text style={styles.metaPillText}>{getGradeLabel(activeProfile.grade)}</Text>
             </View>
           )}
         </View>
@@ -297,7 +767,68 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
             )}
           </View>
         )}
+
+        <View style={styles.postsSection}>
+          <View style={styles.postsSectionHeader}>
+            <Ionicons name="chatbubbles-outline" size={hp(2)} color={theme.colors.textSecondary} />
+            <Text style={styles.postsTitle}>Recent forum posts</Text>
+          </View>
+          {recentPostsLoading ? (
+            <View style={styles.postsLoadingContainer}>
+              <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
+              <Text style={styles.postsEmptyText}>Loading posts...</Text>
+            </View>
+          ) : recentPosts.length === 0 ? (
+            <View style={styles.postsEmptyContainer}>
+              <Ionicons name="document-text-outline" size={hp(3)} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
+              <Text style={styles.postsEmptyText}>No recent posts yet</Text>
+            </View>
+          ) : (
+            <View style={styles.postsListContainer}>
+              {recentPosts.map((post, index) => (
+                <TouchableOpacity
+                  key={post.id}
+                  style={[
+                    styles.postCard,
+                    index === recentPosts.length - 1 && styles.postCardLast
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenPost(post)}
+                >
+                  <View style={styles.postCardContent}>
+                    <View style={styles.postCardTextContainer}>
+                      <Text style={styles.postCardTitle} numberOfLines={2}>
+                        {post.title || post.body || 'Untitled post'}
+                      </Text>
+                      <View style={styles.postCardMetaRow}>
+                        <Text style={styles.postCardAuthor}>
+                          {post.is_anonymous ? 'Anonymous' : (post.author?.username || post.author?.full_name || 'User')}
+                        </Text>
+                        <Text style={styles.postCardSeparator}>•</Text>
+                        <View style={styles.postCardForumTag}>
+                          <Text style={styles.postCardForumText}>
+                            {post.forum?.name || 'Forum'}
+                          </Text>
+                        </View>
+                        <Text style={styles.postCardTime}>
+                          {formatTimeAgo(post.created_at)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.textSecondary} style={{ opacity: 0.5 }} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+        </View>
       </ScrollView>
+      <ShareModal
+        visible={!!shareContent}
+        content={shareContent}
+        onClose={() => setShareContent(null)}
+      />
     </View>
   )
 }
@@ -307,10 +838,13 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
   },
   dragIndicatorContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? hp(6) : hp(3),
+    top: hp(1),
     left: 0,
     right: 0,
     zIndex: 100,
@@ -318,10 +852,44 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     paddingVertical: hp(0.5),
   },
   dragIndicator: {
-    width: wp(10),
-    height: hp(0.5),
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-    borderRadius: hp(0.25),
+    width: wp(12),
+    height: hp(0.6),
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: hp(0.3),
+  },
+  backButton: {
+    position: 'absolute',
+    top: hp(3),
+    left: wp(4),
+    zIndex: 150,
+  },
+  backButtonCircle: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreButton: {
+    position: 'absolute',
+    top: hp(3),
+    right: wp(4),
+    zIndex: 150,
+  },
+  moreButtonCircle: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullScrollView: {
+    flex: 1,
+  },
+  fullScrollContent: {
+    flexGrow: 1,
   },
   heroSection: {
     width: '100%',
@@ -340,27 +908,15 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  backButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? hp(6) : hp(4),
-    left: wp(4),
-    zIndex: 10,
-  },
-  backButtonCircle: {
-    width: hp(4.5),
-    height: hp(4.5),
-    borderRadius: hp(2.25),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
+  contentSection: {
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    marginTop: -hp(3),
     paddingHorizontal: wp(5),
     paddingTop: hp(3),
     paddingBottom: hp(10),
+    minHeight: hp(50),
   },
   name: {
     fontSize: hp(3.2),
@@ -521,12 +1077,117 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     marginTop: hp(1),
     fontStyle: 'italic',
   },
+  // Posts section styles
+  postsSection: {
+    marginTop: hp(1),
+    paddingTop: hp(2),
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  postsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    marginBottom: hp(1.5),
+  },
+  postsTitle: {
+    fontSize: hp(1.8),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  postsLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2),
+    paddingVertical: hp(3),
+  },
+  postsEmptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(3),
+    gap: hp(1),
+  },
+  postsEmptyText: {
+    fontSize: hp(1.5),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  postsListContainer: {
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: 'hidden',
+  },
+  postCard: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  postCardLast: {
+    borderBottomWidth: 0,
+  },
+  postCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  postCardTextContainer: {
+    flex: 1,
+    marginRight: wp(2),
+  },
+  postCardTitle: {
+    fontSize: hp(1.6),
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '500',
+    marginBottom: hp(0.8),
+    lineHeight: hp(2.2),
+  },
+  postCardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
+  },
+  postCardAuthor: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '500',
+  },
+  postCardSeparator: {
+    fontSize: hp(1.2),
+    color: theme.colors.textSecondary,
+    opacity: 0.5,
+  },
+  postCardForumTag: {
+    backgroundColor: theme.colors.bondedPurple + '15',
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.3),
+    borderRadius: theme.radius.sm,
+  },
+  postCardForumText: {
+    fontSize: hp(1.2),
+    color: theme.colors.bondedPurple,
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+  },
+  postCardTime: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
 })
 
 export default function Yearbook() {
   const router = useRouter()
   const theme = useAppTheme()
   const { user } = useAuthStore()
+  const { data: notificationCount = 0 } = useNotificationCount()
+  const notificationLabel = notificationCount > 99 ? '99+' : `${notificationCount}`
   const [selectedYear, setSelectedYear] = useState('All') // Show all profiles by default
   const [sortOption, setSortOption] = useState('recent')
   const [gradeFilter, setGradeFilter] = useState(null)
@@ -557,41 +1218,10 @@ export default function Yearbook() {
 
   const yearOptions = YEARS.map((year) => ({ value: year, label: year }))
 
-  const gradeOptions = [
-    { value: 'Freshman', label: 'Freshman' },
-    { value: 'Sophomore', label: 'Sophomore' },
-    { value: 'Junior', label: 'Junior' },
-    { value: 'Senior', label: 'Senior' },
-  ]
-
   const ageOptions = [
     { value: '18-19', label: '18–19' },
     { value: '20-21', label: '20–21' },
     { value: '22+', label: '22+' },
-  ]
-
-  const majorOptions = [
-    { value: 'Computer Science', label: 'Computer Science' },
-    { value: 'Business Administration', label: 'Business Administration' },
-    { value: 'Psychology', label: 'Psychology' },
-    { value: 'Biology', label: 'Biology' },
-    { value: 'Engineering', label: 'Engineering' },
-    { value: 'Marketing', label: 'Marketing' },
-    { value: 'Communications', label: 'Communications' },
-    { value: 'Economics', label: 'Economics' },
-    { value: 'English', label: 'English' },
-    { value: 'Political Science', label: 'Political Science' },
-    { value: 'Art & Design', label: 'Art & Design' },
-    { value: 'Nursing', label: 'Nursing' },
-    { value: 'Education', label: 'Education' },
-    { value: 'Finance', label: 'Finance' },
-    { value: 'Data Science', label: 'Data Science' },
-  ]
-
-  const genderOptions = [
-    { value: 'male', label: 'Male' },
-    { value: 'female', label: 'Female' },
-    { value: 'non-binary', label: 'Non-binary' },
   ]
 
   const sortOptions = [
@@ -686,7 +1316,7 @@ export default function Yearbook() {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {item.major?.split(' ')[0] || 'Undeclared'}
+                {getMajorLabel(item.major).split(' ')[0]}
               </Text>
             </View>
           </View>
@@ -793,14 +1423,33 @@ export default function Yearbook() {
               onPress={() => router.push('/notifications')}
             >
               <Ionicons name="notifications-outline" size={hp(2.4)} color={theme.colors.textPrimary} />
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{notificationLabel}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
-          {/* University and Year Header */}
+          {/* University Header */}
           <View style={styles.headerContent}>
-            <Text style={styles.universityYearTitle}>
-              University of Rhode Island {selectedYear}
-            </Text>
+            {/* Title Row with Filter */}
+            <View style={styles.titleRow}>
+              <Text style={styles.universityYearTitle}>
+                University of Rhode Island
+              </Text>
+              <TouchableOpacity
+                style={styles.filterIconButton}
+                activeOpacity={0.7}
+                onPress={() => setIsFilterModalVisible(true)}
+              >
+                <Filter
+                  size={hp(2.2)}
+                  color={theme.colors.textSecondary}
+                  strokeWidth={2}
+                />
+              </TouchableOpacity>
+            </View>
             
             {/* Search Bar */}
             <View style={styles.searchContainer}>
@@ -812,7 +1461,7 @@ export default function Yearbook() {
               />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search by name..."
+                placeholder="Search"
                 placeholderTextColor={theme.colors.textSecondary + '80'}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -829,21 +1478,6 @@ export default function Yearbook() {
                   />
                 </TouchableOpacity>
               )}
-            </View>
-            
-            {/* Filter button only */}
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                style={styles.filterIconButton}
-                activeOpacity={0.7}
-                onPress={() => setIsFilterModalVisible(true)}
-              >
-                <Filter
-                  size={hp(2.2)}
-                  color={theme.colors.textSecondary}
-                  strokeWidth={2}
-                />
-              </TouchableOpacity>
             </View>
           </View>
         </Animated.View>
@@ -863,9 +1497,7 @@ export default function Yearbook() {
           </View>
         )}
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading profiles...</Text>
-          </View>
+          <YearbookSkeleton numCards={12} numColumns={3} />
         ) : (
           <AnimatedFlatList
             data={filteredProfiles}
@@ -899,21 +1531,14 @@ export default function Yearbook() {
         )}
 
         {/* Profile Modal */}
-        <Modal
-          visible={!!activeProfile}
-          transparent={false}
-          animationType="slide"
-          presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
-          onRequestClose={() => setActiveProfile(null)}
-        >
-          <ProfileModalContent 
+        <ProfileModal
             activeProfile={activeProfile}
             setActiveProfile={setActiveProfile}
             theme={theme}
             router={router}
             currentUserInterests={currentUserInterests}
+          allProfiles={filteredProfiles}
           />
-        </Modal>
 
         {/* Filters Modal */}
         <Modal
@@ -973,7 +1598,7 @@ export default function Yearbook() {
                   label="Class Year"
                   placeholder="All classes"
                   value={gradeFilter}
-                  options={gradeOptions}
+                  options={GRADE_OPTIONS}
                   onValueChange={setGradeFilter}
                   containerStyle={styles.modalPicker}
                 />
@@ -982,7 +1607,7 @@ export default function Yearbook() {
                   label="Major"
                   placeholder="All majors"
                   value={majorFilter}
-                  options={majorOptions}
+                  options={MAJOR_OPTIONS}
                   onValueChange={setMajorFilter}
                   containerStyle={styles.modalPicker}
                 />
@@ -1000,7 +1625,7 @@ export default function Yearbook() {
                   label="Gender"
                   placeholder="Any gender"
                   value={genderFilter}
-                  options={genderOptions}
+                  options={GENDER_OPTIONS}
                   onValueChange={setGenderFilter}
                   containerStyle={styles.modalPicker}
                 />
@@ -1079,14 +1704,43 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: -0.3,
   },
+  notificationBadge: {
+    position: 'absolute',
+    top: hp(0.3),
+    right: wp(0.6),
+    minWidth: hp(1.8),
+    height: hp(1.8),
+    borderRadius: hp(0.9),
+    paddingHorizontal: wp(0.6),
+    backgroundColor: theme.colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+  notificationBadgeText: {
+    fontSize: hp(1.1),
+    color: theme.colors.white,
+    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.body,
+    includeFontPadding: false,
+  },
   headerContent: {
-    paddingVertical: hp(1),
+    paddingVertical: hp(0.5),
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1),
   },
   headerIconButton: {
     padding: hp(0.5),
   },
   filterIconButton: {
-    padding: hp(0.5),
+    padding: hp(0.8),
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.radius.md,
   },
   universityYearTitle: {
     fontSize: theme.typography.sizes.lg,
@@ -1094,8 +1748,8 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: -0.2,
+    flex: 1,
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -1134,17 +1788,9 @@ const createStyles = (theme) => StyleSheet.create({
     padding: theme.spacing.xs,
     marginLeft: theme.spacing.xs,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.xs,
-  },
   listContent: {
     paddingHorizontal: theme.spacing.sm,
-    paddingTop: hp(28),
+    paddingTop: hp(24),
     paddingBottom: hp(10),
   },
   cardRow: {
@@ -1620,6 +2266,3 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
   },
 })
-
-
-

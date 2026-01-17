@@ -24,6 +24,7 @@ import { getEventColor as getEventColorFromTheme } from '../helpers/themeHelpers
 import { useEventsForUser } from '../hooks/events/useEventsForUser'
 import { useAuthStore } from '../stores/authStore'
 import { useAppTheme } from './theme'
+import { formatDate, formatDateShort, formatTime, formatTimeForDisplay } from '../utils/dateFormatters'
 
 const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -250,21 +251,6 @@ export default function Calendar() {
     setSelectedDate(newDate)
   }
 
-  const formatTime = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
-
-  const formatDateShort = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
-  }
 
   const renderMonthView = () => {
     const firstDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
@@ -1118,21 +1104,6 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
   // TODO: Fetch connections from Supabase
   const connections: any[] = []
 
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-  }
 
   const handleCreate = async () => {
     // Check onboarding completion

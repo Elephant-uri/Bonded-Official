@@ -7,7 +7,7 @@ import { createSignedUrlForPath, uploadImageToBondedMedia } from './mediaStorage
  * @param {string} userId - User ID for folder structure
  * @returns {Promise<Array>} Array of uploaded photo URLs
  */
-export const uploadPhotosToSupabase = async (photos, userId) => {
+export const uploadPhotosToSupabase = async (photos, userId, universityId = null) => {
   if (!photos || photos.length === 0) {
     console.log('📸 No photos to upload')
     return []
@@ -18,20 +18,21 @@ export const uploadPhotosToSupabase = async (photos, userId) => {
     throw new Error('User ID is required for photo upload')
   }
 
-  console.log(`📸 Starting upload of ${photos.length} photo(s) for user ${userId}`)
+  console.log(`📸 Starting upload of ${photos.length} photo(s) for user ${userId} (University: ${universityId || 'None'})`)
+
   const uploadedPhotos = []
   const errors = []
 
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i]
-    
+
     // Skip if already uploaded
     if (photo.uploadedUrl) {
       console.log(`✅ Photo ${i + 1} already uploaded, skipping: ${photo.uploadedUrl}`)
       uploadedPhotos.push(photo)
       continue
     }
-    
+
     if (!photo.localUri) {
       console.warn(`⚠️ Photo ${i + 1} has no localUri, skipping`)
       errors.push({ index: i, error: 'No localUri provided' })
@@ -50,6 +51,7 @@ export const uploadPhotosToSupabase = async (photos, userId) => {
         ownerType: 'user',
         ownerId: userId,
         userId,
+        universityId, // Pass the pre-resolved universityId
         upsert: mediaType === 'profile_avatar',
       })
 
@@ -66,10 +68,10 @@ export const uploadPhotosToSupabase = async (photos, userId) => {
       console.log(`🔗 Signed URL for photo ${i + 1}: ${signedUrl}`)
     } catch (error) {
       console.error(`❌ Error processing photo ${i + 1}:`, error)
-      errors.push({ 
-        index: i, 
+      errors.push({
+        index: i,
         error: error.message || 'Unknown error',
-        stack: error.stack 
+        stack: error.stack
       })
       // Continue with other photos
     }
@@ -78,7 +80,7 @@ export const uploadPhotosToSupabase = async (photos, userId) => {
   // Log summary
   const successCount = uploadedPhotos.filter(p => p.uploadedUrl).length
   console.log(`📊 Upload summary: ${successCount}/${photos.length} photos uploaded successfully`)
-  
+
   if (errors.length > 0) {
     console.warn(`⚠️ ${errors.length} photo(s) failed to upload:`, errors)
   }

@@ -16,29 +16,10 @@ export function useOnboardingGate() {
   /**
    * Check if user can access a feature
    * Returns { canAccess: boolean, reason?: string }
+   * All features are now accessible regardless of onboarding status
    */
   const canAccessFeature = (featureName) => {
-    if (isOnboardingComplete) {
-      return { canAccess: true }
-    }
-    
-    // Define which features require complete onboarding
-    const requiresCompleteOnboarding = [
-      'create_post',
-      'create_event',
-      'send_message',
-      'view_yearbook',
-      'browse_profiles',
-    ]
-    
-    if (requiresCompleteOnboarding.includes(featureName)) {
-      return {
-        canAccess: false,
-        reason: 'Please complete onboarding to use this feature',
-      }
-    }
-    
-    // Some features are available with partial onboarding
+    // All features are accessible - no gating based on onboarding
     return { canAccess: true }
   }
   
@@ -64,16 +45,11 @@ export function useOnboardingGate() {
   }
   
   /**
-   * Gate a feature - shows nudge if not complete, returns if access is allowed
+   * Gate a feature - always allows access (no gating)
    */
   const gateFeature = (featureName, showNudge = true) => {
-    const { canAccess, reason } = canAccessFeature(featureName)
-    
-    if (!canAccess && showNudge) {
-      showOnboardingNudge(featureName)
-    }
-    
-    return canAccess
+    // Always allow access - no gating
+    return true
   }
   
   return {

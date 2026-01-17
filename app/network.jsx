@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { Animated, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
@@ -9,76 +9,49 @@ import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
 import { ArrowLeft, Calendar, MessageCircle, School } from '../components/Icons'
 import { hp, wp } from '../helpers/common'
-import { generateProfiles } from '../services/profileGenerator'
-import { fetchMultiplePhotos, getPhotoUrl } from '../services/unsplashService'
+import { useClassMatching, useUniversityProfiles } from '../hooks/useClassMatching'
 import { useAppTheme } from './theme'
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
-
-// Mock connections - in production, this would come from a relationships/friends API
-const getConnections = (allProfiles) => {
-  // For demo purposes, return first 50 profiles as "connections"
-  // In production, filter by actual friend/connection relationships
-  return allProfiles.slice(0, 50)
-}
 
 export default function Network() {
   const router = useRouter()
   const theme = useAppTheme()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeProfile, setActiveProfile] = useState(null)
-  const [profiles, setProfiles] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
   const scrollY = useRef(new Animated.Value(0)).current
   const lastScrollY = useRef(0)
   const headerTranslateY = useRef(new Animated.Value(0)).current
   const isAnimating = useRef(false)
 
-  // Generate profiles on mount - cached per session
-  useEffect(() => {
-    const generateData = async () => {
-      setIsLoading(true)
-      try {
-        // Fetch photos from Unsplash (will use cache if available)
-        const photoUrls = await fetchMultiplePhotos(200)
-        
-        // Generate profiles with Unsplash photos
-        const generatedProfiles = generateProfiles(200, (width, height, seed) => {
-          // Extract index from seed (e.g., "profile-5" -> 5)
-          let index = 0
-          if (seed && seed.startsWith('profile-')) {
-            index = parseInt(seed.replace('profile-', '')) || 0
-          }
-          // Use the fetched Unsplash photos, fallback to Picsum if needed
-          return photoUrls[index] || getPhotoUrl(width, height, seed)
-        })
-        
-        setProfiles(generatedProfiles)
-      } catch (error) {
-        console.error('❌ Error generating profiles:', error)
-        // Fallback to Picsum Photos
-        const generatedProfiles = generateProfiles(200, getPhotoUrl)
-        setProfiles(generatedProfiles)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    generateData()
-  }, [])
+  // Fetch classmates (users who share classes)
+  const { data: classmates = [], isLoading: isLoadingClassmates } = useClassMatching()
 
+  // Fallback to university profiles if no classmates
+  const { data: universityProfiles = [], isLoading: isLoadingUni } = useUniversityProfiles()
+
+  // Combine data - prioritize classmates, then university profiles
   const connections = useMemo(() => {
-    return getConnections(profiles)
-  }, [profiles])
+    if (classmates.length > 0) {
+      return classmates
+    }
+    return universityProfiles
+  }, [classmates, universityProfiles])
+
+  const isLoading = isLoadingClassmates || isLoadingUni
 
   const filteredConnections = useMemo(() => {
     if (!searchQuery.trim()) return connections
-    
+
     const query = searchQuery.toLowerCase()
     return connections.filter((profile) => {
+      const name = profile.full_name || ''
+      const major = profile.major || ''
+      const quote = profile.yearbook_quote || ''
       return (
-        profile.name.toLowerCase().includes(query) ||
-        profile.major.toLowerCase().includes(query) ||
-        (profile.quote && profile.quote.toLowerCase().includes(query))
+        name.toLowerCase().includes(query) ||
+        major.toLowerCase().includes(query) ||
+        quote.toLowerCase().includes(query)
       )
     })
   }, [connections, searchQuery])
@@ -89,6 +62,12 @@ export default function Network() {
   const cardWidth = (wp(100) - (padding * 2) - (gap * (numColumns - 1))) / numColumns
 
   const renderProfileCard = ({ item, index }) => {
+    const displayName = item.full_name || item.username || 'Unknown'
+    const photoUrl = item.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`
+    const quote = item.yearbook_quote || ''
+    const major = item.major || ''
+    const sharedClassCount = item.sharedClassCount || 0
+
     return (
       <TouchableOpacity
         style={[styles.cardWrapper, { width: cardWidth }]}
@@ -99,7 +78,7 @@ export default function Network() {
       >
         <AppCard radius="md" padding={false} style={styles.card}>
           <View style={styles.cardImageWrapper}>
-            <Image source={{ uri: item.photoUrl }} style={styles.cardImage} />
+            <Image source={{ uri: photoUrl }} style={styles.cardImage} />
             <LinearGradient
               colors={['transparent', 'rgba(0, 0, 0, 0.7)']}
               style={styles.cardGradient}
@@ -107,25 +86,33 @@ export default function Network() {
             {/* Name Over Image */}
             <View style={styles.cardOverlayContent}>
               <Text numberOfLines={1} style={styles.cardName}>
-                {item.name}
+                {displayName}
               </Text>
+              {sharedClassCount > 0 && (
+                <View style={styles.sharedClassBadge}>
+                  <Ionicons name="school-outline" size={hp(1.2)} color="#fff" />
+                  <Text style={styles.sharedClassText}>{sharedClassCount}</Text>
+                </View>
+              )}
             </View>
           </View>
           {/* Tagline and Major Badge */}
           <View style={styles.cardInfo}>
             <Text numberOfLines={2} style={styles.cardQuote}>
-              {item.quote}
+              {quote || `${major} student`}
             </Text>
             {/* Major Badge - Below Quote */}
-            <View style={styles.cardBadge}>
-              <Text 
-                style={styles.cardBadgeText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {item.major.split(' ')[0]}
-              </Text>
-            </View>
+            {major ? (
+              <View style={styles.cardBadge}>
+                <Text
+                  style={styles.cardBadgeText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {major.split(' ')[0]}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </AppCard>
       </TouchableOpacity>
@@ -329,36 +316,60 @@ export default function Network() {
                   {/* Profile Image */}
                   <View style={styles.profileModalImageContainer}>
                     <Image
-                      source={{ uri: activeProfile.photoUrl }}
+                      source={{ uri: activeProfile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activeProfile.full_name || 'User')}&background=random` }}
                       style={styles.profileModalImage}
                     />
                   </View>
 
                   {/* Profile Info */}
                   <View style={styles.profileModalInfo}>
-                    <Text style={styles.profileModalName}>{activeProfile.name}</Text>
-                    <Text style={styles.profileModalMajor}>{activeProfile.major}</Text>
-                    {activeProfile.quote && (
-                      <Text style={styles.profileModalQuote}>"{activeProfile.quote}"</Text>
+                    <Text style={styles.profileModalName}>{activeProfile.full_name || activeProfile.username}</Text>
+                    <Text style={styles.profileModalMajor}>{activeProfile.major || 'Student'}</Text>
+                    {activeProfile.yearbook_quote && (
+                      <Text style={styles.profileModalQuote}>"{activeProfile.yearbook_quote}"</Text>
                     )}
-                    
+
+                    {/* Shared Classes */}
+                    {activeProfile.sharedClasses?.length > 0 && (
+                      <View style={styles.sharedClassesSection}>
+                        <Text style={styles.sharedClassesTitle}>
+                          {activeProfile.sharedClasses.length} Shared {activeProfile.sharedClasses.length === 1 ? 'Class' : 'Classes'}
+                        </Text>
+                        <View style={styles.sharedClassesList}>
+                          {activeProfile.sharedClasses.slice(0, 5).map((cls, idx) => (
+                            <View key={idx} style={styles.sharedClassChip}>
+                              <Text style={styles.sharedClassChipText}>
+                                {cls.class_code || cls.class_name}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
                     {/* Details */}
                     <View style={styles.profileModalDetails}>
                       <View style={styles.profileModalDetailItem}>
                         <School size={hp(2)} color={theme.colors.textSecondary} />
                         <Text style={styles.profileModalDetailText}>
-                          {activeProfile.grade} • {activeProfile.year}
+                          {activeProfile.grade || 'Student'}{activeProfile.graduation_year ? ` • ${activeProfile.graduation_year}` : ''}
                         </Text>
                       </View>
-                      {activeProfile.age && (
-                        <View style={styles.profileModalDetailItem}>
-                          <Calendar size={hp(2)} color={theme.colors.textSecondary} />
-                          <Text style={styles.profileModalDetailText}>
-                            Age {activeProfile.age}
-                          </Text>
-                        </View>
-                      )}
                     </View>
+
+                    {/* Interests */}
+                    {activeProfile.interests?.length > 0 && (
+                      <View style={styles.interestsSection}>
+                        <Text style={styles.interestsTitle}>Interests</Text>
+                        <View style={styles.interestsList}>
+                          {activeProfile.interests.slice(0, 6).map((interest, idx) => (
+                            <View key={idx} style={styles.interestChip}>
+                              <Text style={styles.interestChipText}>{interest}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </ScrollView>
               </>
@@ -605,7 +616,79 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
   },
+  sharedClassBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.radius.sm,
+    gap: 2,
+    marginTop: theme.spacing.xs,
+  },
+  sharedClassText: {
+    fontSize: theme.typography.sizes.xs,
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: theme.typography.weights.semibold,
+    color: '#fff',
+  },
+  sharedClassesSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  sharedClassesTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.sm,
+  },
+  sharedClassesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+  },
+  sharedClassChip: {
+    backgroundColor: theme.colors.accent + '20',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.sm,
+  },
+  sharedClassChipText: {
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.accent,
+  },
+  interestsSection: {
+    marginTop: theme.spacing.lg,
+  },
+  interestsTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.sm,
+  },
+  interestsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+  },
+  interestChip: {
+    backgroundColor: theme.colors.backgroundSecondary,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  interestChipText: {
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+  },
 })
+
+
 
 
 

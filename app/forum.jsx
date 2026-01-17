@@ -1,72 +1,805 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import {
-    Alert,
-    Animated,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import BottomNav from '../components/BottomNav'
-import Chip from '../components/Chip'
 import AnonymousMessageButton from '../components/Forum/AnonymousMessageButton'
+import ForumPostDetail from '../components/Forum/ForumPostDetail'
 import PollRenderer from '../components/Forum/PollRenderer'
 import PostTags from '../components/Forum/PostTags'
 import RepostModal from '../components/Forum/RepostModal'
 import ForumSelectorModal from '../components/ForumSelectorModal'
 import ForumSwitcher from '../components/ForumSwitcher'
 import {
-    Add,
-    ArrowDownCircle,
-    ArrowUpCircle,
-    Check,
-    ChevronDown,
-    EyeOff,
-    Heart,
-    HeartFill,
-    ImageIcon,
-    MessageCircle,
-    MoreHorizontal,
-    Person,
-    Repeat,
-    Share2,
-    Video,
-    X
+  Add,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Check,
+  ChevronDown,
+  ImageIcon,
+  MessageCircle,
+  MoreHorizontal,
+  Person,
+  Repeat,
+  Share2,
+  Video,
+  X
 } from '../components/Icons'
 import ShareModal from '../components/ShareModal'
-import Stories from '../components/Stories/Stories'
+import { ForumFeedSkeleton } from '../components/SkeletonLoader'
 import StoryFlow from '../components/Stories/StoryFlow'
 import StoryViewer from '../components/Stories/StoryViewer'
-import SegmentedControl from '../components/ui/SegmentedControl'
+import YearbookProfileModalContent from '../components/YearbookProfileModalContent'
 import { useStoriesContext } from '../contexts/StoriesContext'
 import { hp, wp } from '../helpers/common'
-import { useQueryClient, useMutation } from '@tanstack/react-query'
-import { useCreatePost } from '../hooks/useCreatePost'
+import { resolveMediaUrls, uploadImageToBondedMedia } from '../helpers/mediaStorage'
 import { useComments } from '../hooks/useComments'
+import { useCreatePost } from '../hooks/useCreatePost'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useForums } from '../hooks/useForums'
-import { usePosts } from '../hooks/usePosts'
+import { usePost, usePosts } from '../hooks/usePosts'
+import { useProfile } from '../hooks/useProfiles'
 import { useUniversities } from '../hooks/useUniversities'
+import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { isSuperAdminEmail } from '../utils/admin'
 import { useAppTheme } from './theme'
-import { supabase } from '../lib/supabase'
-import { uploadImageToBondedMedia } from '../helpers/mediaStorage'
+
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window')
+const DISMISS_THRESHOLD = 150
+
+// Profile Modal with swipe-to-dismiss
+const ProfileModalWrapper = ({ activeProfile, activeProfileId, setActiveProfileId, theme, router, currentUserInterests, isLoading = false }) => {
+  const translateY = useRef(new Animated.Value(0)).current
+  const [isVisible, setIsVisible] = useState(false)
+
+  React.useEffect(() => {
+    if (activeProfileId) {
+      setIsVisible(true)
+      translateY.setValue(SCREEN_HEIGHT)
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start()
+    }
+  }, [activeProfileId])
+
+  const handleClose = useCallback(() => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsVisible(false)
+      setActiveProfileId(null)
+    })
+  }, [setActiveProfileId, translateY])
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only claim if clearly vertical AND downward
+        const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5
+        const isDownward = gestureState.dy > 10
+        return isVertical && isDownward
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy)
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
+          handleClose()
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+          }).start()
+        }
+      },
+    })
+  ).current
+
+  if (!activeProfileId && !isVisible) return null
+
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, SCREEN_HEIGHT],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  })
+
+  return (
+    <Modal
+      visible={isVisible}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={handleClose}
+      presentationStyle="overFullScreen"
+    >
+      <View style={{ flex: 1 }}>
+        {/* Semi-transparent backdrop */}
+        <Animated.View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            opacity: backdropOpacity,
+          }}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+        </Animated.View>
+
+        {/* Modal content container */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: Platform.OS === 'ios' ? hp(5) : hp(2),
+            left: 0,
+            right: 0,
+            bottom: 0,
+            transform: [{ translateY }],
+          }}
+        >
+          {isLoading || !activeProfile ? (
+            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+              <View style={{ 
+                paddingTop: hp(8), 
+                paddingHorizontal: wp(4),
+                alignItems: 'center',
+                gap: hp(2)
+              }}>
+                <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
+                <Text style={{ color: theme.colors.textSecondary, fontSize: hp(1.6) }}>Loading profile...</Text>
+              </View>
+            </View>
+          ) : (
+            <YearbookProfileModalContent
+              activeProfile={activeProfile}
+              setActiveProfile={handleClose}
+              theme={theme}
+              router={router}
+              currentUserInterests={currentUserInterests}
+              onClose={handleClose}
+              panResponder={panResponder}
+            />
+          )}
+        </Animated.View>
+      </View>
+    </Modal>
+  )
+}
+
+// Instagram-style Comments Bottom Sheet
+const CommentsSheet = ({ post, onClose, theme, comments, commentSort, setCommentSort, handleCommentVote, userVotes, handleAddComment }) => {
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current
+  const [isVisible, setIsVisible] = useState(false)
+  const [newComment, setNewComment] = useState('')
+  const [isAnon, setIsAnon] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const insets = useSafeAreaInsets()
+  const onCloseRef = useRef(onClose)
+
+  // Keep onClose ref updated
+  React.useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  React.useEffect(() => {
+    if (post) {
+      setIsVisible(true)
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start()
+    }
+  }, [post])
+
+  const handleClose = useCallback(() => {
+    Keyboard.dismiss()
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsVisible(false)
+      if (onCloseRef.current) onCloseRef.current()
+    })
+  }, [translateY])
+
+  const panResponder = useMemo(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
+        const isDownward = gestureState.dy > 5
+        return isVertical && isDownward
+      },
+      onPanResponderGrant: () => {
+        // Prepare for gesture
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy)
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
+          Keyboard.dismiss()
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setIsVisible(false)
+            if (onCloseRef.current) onCloseRef.current()
+          })
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+          }).start()
+        }
+      },
+    })
+    , [translateY])
+
+  const submitComment = async () => {
+    if (!newComment.trim() || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      const success = await handleAddComment(post.id, newComment.trim(), isAnon)
+      if (success) {
+        setNewComment('')
+      }
+    } catch (e) {
+      Logger.error(e, 'Failed to submit comment');
+    }
+    setIsSubmitting(false)
+  }
+
+  if (!post && !isVisible) return null
+
+  const postComments = comments[post?.id] || []
+  let sortedComments = [...postComments]
+  if (commentSort === 'new') {
+    sortedComments.sort((a, b) => b.timeAgo?.localeCompare(a.timeAgo) || 0)
+  } else {
+    sortedComments.sort((a, b) => {
+      const scoreA = (a.upvotes || 0) - (a.downvotes || 0)
+      const scoreB = (b.upvotes || 0) - (b.downvotes || 0)
+      return scoreB - scoreA
+    })
+  }
+
+  const sheetStyles = createCommentsSheetStyles(theme)
+
+  const backdropOpacity = translateY.interpolate({
+    inputRange: [0, SCREEN_HEIGHT],
+    outputRange: [0.3, 0],
+    extrapolate: 'clamp',
+  })
+
+  const postPreviewOpacity = translateY.interpolate({
+    inputRange: [0, SCREEN_HEIGHT / 2, SCREEN_HEIGHT],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  })
+
+  return (
+    <Modal
+      visible={isVisible}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={handleClose}
+    >
+      <View style={sheetStyles.container}>
+        {/* Post preview in background */}
+        {post && (
+          <Animated.View
+            style={[
+              sheetStyles.postPreview,
+              { opacity: postPreviewOpacity }
+            ]}
+          >
+            <View style={sheetStyles.postPreviewContent}>
+              <View style={sheetStyles.postPreviewHeader}>
+                <View style={sheetStyles.postPreviewAvatar}>
+                  <Text style={sheetStyles.postPreviewAvatarText}>
+                    {post.isAnon ? '?' : post.author?.charAt(0)?.toUpperCase() || '?'}
+                  </Text>
+                </View>
+                <View style={sheetStyles.postPreviewAuthorInfo}>
+                  <Text style={sheetStyles.postPreviewAuthorName}>
+                    {post.isAnon ? 'Anonymous' : post.author}
+                  </Text>
+                  <Text style={sheetStyles.postPreviewMeta}>
+                    {post.forum} • {post.timeAgo}
+                  </Text>
+                </View>
+              </View>
+              {post.title && (
+                <Text style={sheetStyles.postPreviewTitle} numberOfLines={2}>
+                  {post.title}
+                </Text>
+              )}
+              <Text style={sheetStyles.postPreviewBody} numberOfLines={3}>
+                {post.body}
+              </Text>
+              {post.media && post.media.length > 0 && (
+                <Image
+                  source={{ uri: post.media[0].uri }}
+                  style={sheetStyles.postPreviewImage}
+                  resizeMode="cover"
+                />
+              )}
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Tap to dismiss backdrop */}
+        <Animated.View
+          style={[
+            sheetStyles.backdrop,
+            { opacity: backdropOpacity }
+          ]}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+        </Animated.View>
+
+        {/* Comments sheet */}
+        <Animated.View
+          style={[
+            sheetStyles.sheet,
+            { transform: [{ translateY }] }
+          ]}
+        >
+          {/* Drag handle */}
+          <View style={sheetStyles.dragHandleArea} {...panResponder.panHandlers}>
+            <View style={sheetStyles.dragHandle} />
+          </View>
+
+          {/* Header */}
+          <View style={sheetStyles.header}>
+            <Text style={sheetStyles.headerTitle}>Comments</Text>
+            <TouchableOpacity onPress={handleClose} style={sheetStyles.sendButton}>
+              <Ionicons name="paper-plane-outline" size={hp(2.4)} color={theme.colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Comments list */}
+          <FlatList
+            data={sortedComments}
+            keyExtractor={(item) => item.id}
+            style={sheetStyles.commentsList}
+            contentContainerStyle={sheetStyles.commentsListContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <View style={sheetStyles.emptyState}>
+                <Text style={sheetStyles.emptyText}>No comments yet</Text>
+                <Text style={sheetStyles.emptySubtext}>Be the first to comment!</Text>
+              </View>
+            }
+            renderItem={({ item: comment }) => (
+              <View style={sheetStyles.commentItem}>
+                <View style={sheetStyles.commentAvatar}>
+                  <Text style={sheetStyles.commentAvatarText}>
+                    {comment.isAnon ? '?' : comment.author?.charAt(0).toUpperCase() || '?'}
+                  </Text>
+                </View>
+                <View style={sheetStyles.commentContent}>
+                  <View style={sheetStyles.commentHeader}>
+                    <Text style={sheetStyles.commentAuthor}>
+                      {comment.isAnon ? 'Anonymous' : comment.author}
+                    </Text>
+                    <Text style={sheetStyles.commentTime}>{comment.timeAgo}</Text>
+                  </View>
+                  <Text style={sheetStyles.commentText}>{comment.body}</Text>
+                  <View style={sheetStyles.commentActions}>
+                    <TouchableOpacity
+                      style={sheetStyles.likeButton}
+                      onPress={() => handleCommentVote(comment.id, null, 'up')}
+                    >
+                      {userVotes[comment.id] === 'up' ? (
+                        <Ionicons name="heart" size={hp(1.8)} color={theme.colors.error} />
+                      ) : (
+                        <Ionicons name="heart-outline" size={hp(1.8)} color={theme.colors.textSecondary} />
+                      )}
+                      {(comment.upvotes - (comment.downvotes || 0)) > 0 && (
+                        <Text style={[
+                          sheetStyles.likeCount,
+                          userVotes[comment.id] === 'up' && { color: theme.colors.error }
+                        ]}>
+                          {comment.upvotes - (comment.downvotes || 0)}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={sheetStyles.replyButton}>
+                      <Text style={sheetStyles.replyText}>Reply</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+          />
+
+          {/* Emoji bar */}
+          <View style={sheetStyles.emojiBar}>
+            {['😭', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'].map((emoji, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={sheetStyles.emojiButton}
+                onPress={() => setNewComment(prev => prev + emoji)}
+              >
+                <Text style={sheetStyles.emoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Comment input */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+          >
+            <View style={[sheetStyles.inputContainer, { paddingBottom: insets.bottom || hp(2) }]}>
+              <View style={sheetStyles.inputAvatar}>
+                <Ionicons name="person" size={hp(2)} color={theme.colors.textSecondary} />
+              </View>
+              <TextInput
+                style={sheetStyles.input}
+                placeholder={`Add a comment${post?.author ? ` for ${post.isAnon ? 'Anonymous' : post.author}` : ''}...`}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={newComment}
+                onChangeText={setNewComment}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                style={sheetStyles.gifButton}
+                onPress={() => setIsAnon(!isAnon)}
+              >
+                <Text style={[sheetStyles.gifText, isAnon && { color: theme.colors.bondedPurple }]}>
+                  {isAnon ? 'ANON' : 'GIF'}
+                </Text>
+              </TouchableOpacity>
+              {newComment.trim().length > 0 && (
+                <TouchableOpacity
+                  style={sheetStyles.postButton}
+                  onPress={submitComment}
+                  disabled={isSubmitting}
+                >
+                  <Text style={sheetStyles.postButtonText}>
+                    {isSubmitting ? '...' : 'Post'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
+    </Modal>
+  )
+}
+
+const createCommentsSheetStyles = (theme) => StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '70%',
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: hp(2),
+    borderTopRightRadius: hp(2),
+  },
+  dragHandleArea: {
+    alignItems: 'center',
+    paddingVertical: hp(1.5),
+  },
+  dragHandle: {
+    width: wp(10),
+    height: hp(0.5),
+    backgroundColor: theme.colors.border,
+    borderRadius: hp(0.25),
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(5),
+    paddingBottom: hp(1.5),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  headerTitle: {
+    fontSize: hp(2),
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  sendButton: {
+    position: 'absolute',
+    right: wp(5),
+  },
+  commentsList: {
+    flex: 1,
+  },
+  commentsListContent: {
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: hp(6),
+  },
+  emptyText: {
+    fontSize: hp(1.8),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  emptySubtext: {
+    fontSize: hp(1.5),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+    marginTop: hp(0.5),
+  },
+  commentItem: {
+    flexDirection: 'row',
+    paddingVertical: hp(1.2),
+  },
+  commentAvatar: {
+    width: hp(4),
+    height: hp(4),
+    borderRadius: hp(2),
+    backgroundColor: theme.colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(3),
+  },
+  commentAvatarText: {
+    fontSize: hp(1.6),
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(0.3),
+  },
+  commentAuthor: {
+    fontSize: hp(1.5),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+    marginRight: wp(2),
+  },
+  commentTime: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  commentText: {
+    fontSize: hp(1.5),
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+    lineHeight: hp(2.1),
+  },
+  commentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: hp(0.8),
+    gap: wp(4),
+  },
+  likeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1),
+  },
+  likeCount: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  replyButton: {},
+  replyText: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+  },
+  emojiBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(4),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
+  },
+  emojiButton: {
+    padding: wp(1),
+  },
+  emoji: {
+    fontSize: hp(2.6),
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  inputAvatar: {
+    width: hp(4),
+    height: hp(4),
+    borderRadius: hp(2),
+    backgroundColor: theme.colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(3),
+  },
+  input: {
+    flex: 1,
+    fontSize: hp(1.6),
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+    maxHeight: hp(10),
+    paddingVertical: hp(1),
+  },
+  gifButton: {
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.5),
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: hp(0.5),
+    marginLeft: wp(2),
+  },
+  gifText: {
+    fontSize: hp(1.4),
+    fontWeight: '700',
+    color: theme.colors.textSecondary,
+  },
+  postButton: {
+    marginLeft: wp(2),
+  },
+  postButtonText: {
+    fontSize: hp(1.6),
+    fontWeight: '600',
+    color: theme.colors.bondedPurple,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  postPreview: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(5),
+  },
+  postPreviewContent: {
+    backgroundColor: theme.colors.background,
+    borderRadius: hp(2),
+    padding: wp(4),
+    maxWidth: wp(90),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  postPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(1.5),
+  },
+  postPreviewAvatar: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    backgroundColor: theme.colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(2.5),
+  },
+  postPreviewAvatarText: {
+    fontSize: hp(1.8),
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  postPreviewAuthorInfo: {
+    flex: 1,
+  },
+  postPreviewAuthorName: {
+    fontSize: hp(1.6),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  postPreviewMeta: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+    marginTop: hp(0.2),
+  },
+  postPreviewTitle: {
+    fontSize: hp(1.8),
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+    marginBottom: hp(1),
+  },
+  postPreviewBody: {
+    fontSize: hp(1.5),
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
+    lineHeight: hp(2.2),
+    marginBottom: hp(1.5),
+  },
+  postPreviewImage: {
+    width: '100%',
+    height: hp(20),
+    borderRadius: hp(1),
+    marginTop: hp(1),
+  },
+})
 
 // All mock data removed - using real Supabase data
 // Comments: Loaded from Supabase forum_comments table (TODO: create useComments hook)
@@ -79,11 +812,15 @@ export default function Forum() {
   const styles = createStyles(theme)
   const router = useRouter()
   const params = useLocalSearchParams()
+  const requestedForumId = Array.isArray(params.forumId) ? params.forumId[0] : params.forumId
+  const requestedPostId = Array.isArray(params.postId) ? params.postId[0] : params.postId
   const insets = useSafeAreaInsets()
   const queryClient = useQueryClient()
   // Posts are now fetched from usePosts hook
   const [activePost, setActivePost] = useState(null)
+  const [commentsPost, setCommentsPost] = useState(null) // For Instagram-style comments sheet
   const [activeAuthorPost, setActiveAuthorPost] = useState(null)
+  const [activeProfileId, setActiveProfileId] = useState(null)
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false)
   const [postOptionsPost, setPostOptionsPost] = useState(null) // Post for which options menu is shown
   const [draftTitle, setDraftTitle] = useState('')
@@ -109,7 +846,7 @@ export default function Forum() {
   const [polls, setPolls] = useState({}) // { postId: poll }
   const [pollVotes, setPollVotes] = useState({}) // { pollId: { userId: optionIndex } }
   const [pollResults, setPollResults] = useState({}) // { pollId: { totalVotes, voteCounts } }
-  
+
   // Story state
   const [isStoryFlowVisible, setIsStoryFlowVisible] = useState(false)
   const [isStoryViewerVisible, setIsStoryViewerVisible] = useState(false)
@@ -118,13 +855,16 @@ export default function Forum() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareContent, setShareContent] = useState(null)
   const [isCampusSelectorVisible, setIsCampusSelectorVisible] = useState(false)
+  const openedPostRef = useRef(null) // Track which post was opened via deep link to avoid re-opening
   const [selectedUniversityId, setSelectedUniversityId] = useState(null)
-  
+
   const { getForumStories } = useStoriesContext()
   const { user } = useAuthStore()
   const isSuperAdmin = isSuperAdminEmail(user?.email)
   const { data: userProfile } = useCurrentUserProfile() // For onboarding check
-  
+  const { data: activeProfileRaw, isLoading: profileLoading } = useProfile(activeProfileId)
+  const currentUserInterests = useMemo(() => new Set(userProfile?.interests || []), [userProfile])
+
   // Fetch forums
   const { data: forums = [], isLoading: forumsLoading } = useForums()
   const { data: universities = [], isLoading: universitiesLoading } = useUniversities()
@@ -138,7 +878,7 @@ export default function Forum() {
     if (!isSuperAdmin || !selectedUniversityId) return forums
     return forums.filter((forum) => forum.universityId === selectedUniversityId)
   }, [forums, isSuperAdmin, selectedUniversityId])
-  
+
   // Set default forum when forums load (only once when forums first become available)
   React.useEffect(() => {
     if (visibleForums.length > 0 && !currentForum) {
@@ -150,38 +890,59 @@ export default function Forum() {
       }
     }
   }, [visibleForums]) // Removed currentForum from deps to avoid infinite loops
-  
-  // Also ensure forum is set if it becomes null (safety check)
+
   React.useEffect(() => {
-    if (visibleForums.length > 0 && currentForum === null) {
+    if (!requestedForumId || visibleForums.length === 0) return
+    const match = visibleForums.find((forum) => forum.id === requestedForumId)
+    if (match && match.id !== currentForum?.id) {
+      setCurrentForum(match)
+    }
+  }, [requestedForumId, visibleForums, currentForum])
+
+  React.useEffect(() => {
+    if (!requestedPostRaw?.forum_id || requestedForumId || visibleForums.length === 0) return
+    const match = visibleForums.find((forum) => forum.id === requestedPostRaw.forum_id)
+    if (match && match.id !== currentForum?.id) {
+      setCurrentForum(match)
+    }
+  }, [requestedPostRaw, requestedForumId, visibleForums, currentForum])
+
+  // Also ensure forum is set if it becomes null (safety check)
+  // Use ref to avoid infinite loop
+  const currentForumRef = React.useRef(currentForum)
+  currentForumRef.current = currentForum
+
+  React.useEffect(() => {
+    if (visibleForums.length > 0 && currentForumRef.current === null) {
       const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
       if (mainForum) {
         console.log('Re-setting forum (was null):', mainForum.name, mainForum.id)
         setCurrentForum(mainForum)
       }
     }
-  }, [visibleForums, currentForum])
+  }, [visibleForums])
 
   React.useEffect(() => {
     if (!isSuperAdmin || universities.length === 0 || selectedUniversityId) return
-    const fallbackUniversityId = currentForum?.universityId || universities[0]?.id || null
+    const fallbackUniversityId = currentForumRef.current?.universityId || universities[0]?.id || null
     if (fallbackUniversityId) {
       setSelectedUniversityId(fallbackUniversityId)
     }
-  }, [isSuperAdmin, universities, selectedUniversityId, currentForum])
+  }, [isSuperAdmin, universities, selectedUniversityId])
 
   React.useEffect(() => {
     if (!isSuperAdmin) return
     if (!selectedUniversityId) return
     const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0] || null
-    if (mainForum && mainForum.id !== currentForum?.id) {
+    const currentId = currentForumRef.current?.id
+    if (mainForum && mainForum.id !== currentId) {
       setCurrentForum(mainForum)
     }
-    if (!mainForum && currentForum) {
+    if (!mainForum && currentForumRef.current) {
       setCurrentForum(null)
     }
-  }, [isSuperAdmin, selectedUniversityId, visibleForums, currentForum])
-  
+  }, [isSuperAdmin, selectedUniversityId, visibleForums])
+
   // Fetch posts for current forum with pagination
   const {
     data: postsData,
@@ -192,6 +953,8 @@ export default function Forum() {
     hasNextPage,
     fetchNextPage,
   } = usePosts(currentForum?.id, { tag: null }) // Tag filtering disabled for V1
+
+  const { data: requestedPostRaw } = usePost(requestedPostId)
 
   const {
     data: activePostComments = [],
@@ -204,37 +967,213 @@ export default function Forum() {
     return postsData.pages.flatMap((page) => page.posts || [])
   }, [postsData])
 
+  const fetchPostUserVotes = useCallback(async (postIds) => {
+    if (!user?.id) return
+    if (!postIds?.length) {
+      setPostUserVotes({})
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('post_reactions')
+      .select('post_id, reaction_type')
+      .in('post_id', postIds)
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Error fetching post votes:', error)
+      return
+    }
+
+    const nextVotes = {}
+    data?.forEach((row) => {
+      nextVotes[row.post_id] = row.reaction_type
+    })
+    setPostUserVotes(nextVotes)
+  }, [user?.id])
+
+  React.useEffect(() => {
+    const postIds = [...new Set([
+      ...posts.map((post) => post.id).filter(Boolean),
+      activePost?.id,
+    ].filter(Boolean))]
+    fetchPostUserVotes(postIds)
+  }, [posts, activePost?.id, fetchPostUserVotes])
+
   const loadMorePosts = () => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage()
     }
   }
 
+  React.useEffect(() => {
+    if (!requestedPostId) return
+    if (openedPostRef.current === requestedPostId) return
+    const match = posts.find((post) => post.id === requestedPostId)
+    if (match) {
+      setActivePost(match)
+      openedPostRef.current = requestedPostId
+      return
+    }
+    if (!requestedPostRaw) return
+    let cancelled = false
+    const hydratePost = async () => {
+      const resolvedMedia = await resolveMediaUrls(requestedPostRaw.media_urls || [])
+      const authorLabel = requestedPostRaw.is_anonymous
+        ? 'Anon'
+        : (
+          requestedPostRaw.author?.username?.trim()
+            ? requestedPostRaw.author.username
+            : (requestedPostRaw.author?.email ? requestedPostRaw.author.email.split('@')[0] : 'Anonymous')
+        )
+      const mapped = {
+        id: requestedPostRaw.id,
+        author: authorLabel,
+        isAnon: requestedPostRaw.is_anonymous || false,
+        title: requestedPostRaw.title,
+        body: requestedPostRaw.body,
+        forum: requestedPostRaw.forum?.name || 'Unknown',
+        forumId: requestedPostRaw.forum_id,
+        upvotes: requestedPostRaw.upvotes_count || 0,
+        downvotes: requestedPostRaw.downvotes_count || 0,
+        score: (requestedPostRaw.upvotes_count || 0) - (requestedPostRaw.downvotes_count || 0),
+        commentsCount: requestedPostRaw.comments_count || 0,
+        repostsCount: requestedPostRaw.reposts_count || 0,
+        timeAgo: getTimeAgo(requestedPostRaw.created_at),
+        tags: Array.isArray(requestedPostRaw.tags) ? requestedPostRaw.tags : [],
+        media: resolvedMedia.map((url) => ({ uri: url, type: 'image' })),
+        createdAt: requestedPostRaw.created_at,
+        userId: requestedPostRaw.user_id,
+        authorAvatar: requestedPostRaw.author?.avatar_url || null,
+        poll: requestedPostRaw.poll || null,
+      }
+      if (!cancelled) {
+        setActivePost(mapped)
+        openedPostRef.current = requestedPostId
+      }
+    }
+    hydratePost()
+    return () => {
+      cancelled = true
+    }
+  }, [requestedPostId, posts, requestedPostRaw])
+
   // Create post mutation
   const createPostMutation = useCreatePost()
-  
+
   const currentForumId = currentForum?.id || null
-  
+
+  const activeProfile = useMemo(() => {
+    if (!activeProfileRaw) return null
+    return {
+      id: activeProfileRaw.id,
+      name: activeProfileRaw.full_name || activeProfileRaw.username || 'Anonymous',
+      email: activeProfileRaw.email,
+      age: activeProfileRaw.age,
+      grade: activeProfileRaw.grade,
+      gender: activeProfileRaw.gender,
+      major: activeProfileRaw.major || 'Undeclared',
+      year: activeProfileRaw.graduation_year?.toString() || '2025',
+      bio: activeProfileRaw.bio,
+      avatar: activeProfileRaw.avatar_url,
+      photoUrl: activeProfileRaw.avatar_url,
+      interests: Array.isArray(activeProfileRaw.interests) ? activeProfileRaw.interests : [],
+      personalityTags: Array.isArray(activeProfileRaw.personality_tags) ? activeProfileRaw.personality_tags : [],
+      university: activeProfileRaw.university?.name || 'University',
+      location: activeProfileRaw.university?.name || null,
+      quote: activeProfileRaw.bio || 'No bio yet',
+      photos: activeProfileRaw.avatar_url ? [activeProfileRaw.avatar_url] : [],
+    }
+  }, [activeProfileRaw])
+
   // Delete post mutation
   const deletePostMutation = useMutation({
     mutationFn: async (postId) => {
-      const { error } = await supabase
+      if (!user?.id) {
+        throw new Error('You must be logged in to delete posts')
+      }
+
+      console.log('🗑️ Attempting to delete post:', postId, 'by user:', user.id)
+
+      // Try soft delete first (set deleted_at timestamp)
+      const { data: softDeleteData, error: softDeleteError } = await supabase
         .from('posts')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', postId)
-        .eq('user_id', user?.id) // Ensure user owns the post
+        .eq('user_id', user.id) // Ensure user owns the post
+        .select('id, deleted_at')
 
-      if (error) throw error
+      if (softDeleteError) {
+        console.error('❌ Soft delete error:', softDeleteError)
+        console.error('Error details:', {
+          code: softDeleteError.code,
+          message: softDeleteError.message,
+          details: softDeleteError.details,
+          hint: softDeleteError.hint,
+        })
+      }
+
+      // Check if update succeeded (data exists and no error)
+      if (softDeleteData && softDeleteData.length > 0 && !softDeleteError) {
+        console.log('✅ Post soft deleted successfully:', postId, softDeleteData[0])
+        return { id: postId, deleted: true }
+      }
+
+      // If no data returned and no error, RLS likely blocked it
+      if (!softDeleteData && !softDeleteError) {
+        console.warn('⚠️ Soft delete returned no data (RLS may have blocked it)')
+      }
+
+      // If soft delete failed, try hard delete as fallback
+      console.log('⚠️ Soft delete failed, attempting hard delete...')
+      const { data: hardDeleteData, error: hardDeleteError } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle()
+
+      if (hardDeleteError) {
+        console.error('❌ Hard delete error:', hardDeleteError)
+        console.error('Error details:', {
+          code: hardDeleteError.code,
+          message: hardDeleteError.message,
+          details: hardDeleteError.details,
+          hint: hardDeleteError.hint,
+        })
+
+        // Provide more helpful error message
+        let errorMessage = 'Failed to delete post. '
+        if (hardDeleteError.code === '42501') {
+          errorMessage += 'You do not have permission to delete this post.'
+        } else if (hardDeleteError.code === 'PGRST301') {
+          errorMessage += 'Post not found or you are not the owner.'
+        } else {
+          errorMessage += hardDeleteError.message || 'Please try again.'
+        }
+        throw new Error(errorMessage)
+      }
+
+      if (hardDeleteData || !hardDeleteError) {
+        console.log('✅ Post hard deleted successfully:', postId)
+        return { id: postId, deleted: true }
+      }
+
+      // If we get here, both methods failed
+      throw new Error('Failed to delete post. Please check your permissions.')
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('✅ Delete mutation succeeded:', data)
       // Invalidate posts queries to refresh the feed
       queryClient.invalidateQueries({ queryKey: ['posts', currentForumId] })
       queryClient.invalidateQueries({ queryKey: ['posts'] })
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] })
       setPostOptionsPost(null)
       Alert.alert('Success', 'Post deleted successfully')
     },
     onError: (error) => {
-      console.error('Error deleting post:', error)
+      console.error('❌ Delete mutation error:', error)
       Alert.alert('Error', error.message || 'Failed to delete post. Please try again.')
     }
   })
@@ -253,19 +1192,19 @@ export default function Forum() {
       ]
     )
   }
-  
+
   // Mock current user - replace with real auth
   const currentUser = {
     id: user?.id || 'user-123',
     name: user?.email?.split('@')[0] || 'User',
     avatar: null,
   }
-  
+
   // Posts are already filtered by forum and tag in the query
   // Just apply sorting if needed
   const allPosts = useMemo(() => {
     if (posts.length === 0) return []
-    
+
     // Posts are already sorted by created_at DESC from query
     // Tag filtering is done in the query
     return posts.map((post) => ({
@@ -273,7 +1212,7 @@ export default function Forum() {
       type: 'post',
     }))
   }, [posts])
-  
+
   // Update school if params change
   React.useEffect(() => {
     if (params.schoolName) {
@@ -287,27 +1226,105 @@ export default function Forum() {
   const [replyingTo, setReplyingTo] = useState(null)
   const [replyText, setReplyText] = useState('')
   const [replyIsAnon, setReplyIsAnon] = useState(true)
-  const [userVotes, setUserVotes] = useState({}) // Track user votes: { 'comment-id': 'up' | 'down' | null }
+  const [postUserVotes, setPostUserVotes] = useState({}) // { postId: 'upvote' | 'downvote' | null }
+  const [userVotes, setUserVotes] = useState({}) // { commentId: 'up' | 'down' | null }
+  const [focusCommentInput, setFocusCommentInput] = useState(false)
   const scrollY = useRef(new Animated.Value(0)).current
   const lastScrollY = useRef(0)
   const headerTranslateY = useRef(new Animated.Value(0)).current
   const isAnimating = useRef(false)
+  const pendingCommentIds = useRef({}) // Track pending optimistic comments by post ID
+  const commentInputRef = useRef(null)
 
+  // Fix infinite loop by checking if data actually changed
   React.useEffect(() => {
     if (!activePost?.id) return
-    setComments((prev) => ({
-      ...prev,
-      [activePost.id]: activePostComments,
-    }))
+    const currentComments = comments[activePost.id] || []
+    if (JSON.stringify(currentComments) !== JSON.stringify(activePostComments)) {
+      setComments((prev) => ({
+        ...prev,
+        [activePost.id]: activePostComments,
+      }))
+    }
   }, [activePost?.id, activePostComments])
 
+  const collectCommentIds = useCallback((postComments) => {
+    const ids = []
+      ; (postComments || []).forEach((comment) => {
+        if (comment?.id) ids.push(comment.id)
+        if (comment?.replies?.length) {
+          comment.replies.forEach((reply) => {
+            if (reply?.id) ids.push(reply.id)
+          })
+        }
+      })
+    return ids
+  }, [])
+
   React.useEffect(() => {
-    if (!activePost) return
-    const updated = posts.find((post) => post.id === activePost.id)
-    if (updated) {
-      setActivePost((prev) => (prev ? { ...prev, ...updated } : prev))
+    if (!activePost?.id || !user?.id) {
+      setUserVotes({})
+      return
     }
-  }, [posts, activePost])
+    const postComments = comments[activePost.id] || []
+    const commentIds = collectCommentIds(postComments)
+    if (!commentIds.length) {
+      setUserVotes({})
+      return
+    }
+
+    const fetchCommentVotes = async () => {
+      const { data, error } = await supabase
+        .from('forum_comment_reactions')
+        .select('comment_id, reaction_type')
+        .in('comment_id', commentIds)
+        .eq('user_id', user.id)
+
+      if (error) {
+        if (isTableNotFoundError(error)) {
+          console.warn('forum_comment_reactions table missing - run migration to enable comment votes.')
+          return
+        }
+        console.error('Error fetching comment votes:', error)
+        return
+      }
+
+      const nextVotes = {}
+      data?.forEach((row) => {
+        nextVotes[row.comment_id] = row.reaction_type === 'upvote' ? 'up' : 'down'
+      })
+      setUserVotes(nextVotes)
+    }
+
+    fetchCommentVotes()
+  }, [activePost?.id, comments, collectCommentIds, user?.id])
+
+  // Sync activePost with posts data - only depend on activePost.id to avoid infinite loop
+  const activePostId = activePost?.id
+  React.useEffect(() => {
+    if (!activePostId) return
+    const updated = posts.find((post) => post.id === activePostId)
+    if (updated) {
+      setActivePost((prev) => {
+        if (!prev) return prev
+        // Only update if commentsCount actually changed to prevent unnecessary re-renders
+        if (prev.commentsCount === updated.commentsCount &&
+          prev.score === updated.score) {
+          return prev
+        }
+        return { ...prev, ...updated }
+      })
+    }
+  }, [posts, activePostId])
+
+  React.useEffect(() => {
+    if (!activePost || !focusCommentInput) return
+    const timeoutId = setTimeout(() => {
+      commentInputRef.current?.focus()
+    }, 200)
+    setFocusCommentInput(false)
+    return () => clearTimeout(timeoutId)
+  }, [activePost, focusCommentInput])
 
   const syncPostCommentCount = async (postId) => {
     if (!postId) return
@@ -371,6 +1388,53 @@ export default function Forum() {
     }
   }
 
+  const syncCommentVoteCounts = async (commentId) => {
+    if (!commentId) return
+
+    const { count: upvotes, error: upvoteError } = await supabase
+      .from('forum_comment_reactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('comment_id', commentId)
+      .eq('reaction_type', 'upvote')
+
+    if (upvoteError) {
+      if (isTableNotFoundError(upvoteError)) return
+      console.error('Error counting comment upvotes:', upvoteError)
+      return
+    }
+
+    const { count: downvotes, error: downvoteError } = await supabase
+      .from('forum_comment_reactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('comment_id', commentId)
+      .eq('reaction_type', 'downvote')
+
+    if (downvoteError) {
+      if (isTableNotFoundError(downvoteError)) return
+      console.error('Error counting comment downvotes:', downvoteError)
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('forum_comments')
+      .update({
+        upvotes_count: upvotes || 0,
+        downvotes_count: downvotes || 0,
+      })
+      .eq('id', commentId)
+
+    if (updateError) {
+      console.error('Error syncing comment vote counts:', updateError)
+    }
+  }
+
+  const isTableNotFoundError = (error) => {
+    return error?.code === 'PGRST205' ||
+      error?.code === '42P01' ||
+      error?.message?.includes('Could not find the table') ||
+      (error?.message?.includes('relation') && error?.message?.includes('does not exist'))
+  }
+
   const updatePostCache = (postId, updater) => {
     queryClient.setQueriesData({ queryKey: ['posts'] }, (old) => {
       if (!old?.pages) return old
@@ -382,6 +1446,41 @@ export default function Forum() {
       }))
       return { ...old, pages }
     })
+  }
+
+  const createNotification = async ({
+    userId,
+    actorId,
+    type,
+    entityType,
+    entityId,
+    data = {},
+  }) => {
+    if (!userId || !actorId || userId === actorId) return
+    try {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        actor_id: actorId,
+        type,
+        entity_type: entityType,
+        entity_id: entityId,
+        data,
+      })
+    } catch (error) {
+      console.warn('Notification insert failed:', error)
+    }
+  }
+
+  const getCommentOwnerId = (commentId, parentId = null) => {
+    if (!activePost?.id) return null
+    const postComments = comments[activePost.id] || []
+    if (!parentId) {
+      const match = postComments.find((comment) => comment.id === commentId)
+      return match?.userId || null
+    }
+    const parent = postComments.find((comment) => comment.id === parentId)
+    const reply = parent?.replies?.find((item) => item.id === commentId)
+    return reply?.userId || null
   }
 
   const handlePostReaction = async (postId, reactionType) => {
@@ -403,10 +1502,12 @@ export default function Forum() {
       return
     }
 
-    const currentPost = posts.find((post) => post.id === postId)
+    const currentPost = posts.find((post) => post.id === postId) || (activePost?.id === postId ? activePost : null)
     const currentUpvotes = currentPost?.upvotes || 0
     const currentDownvotes = currentPost?.downvotes || 0
     const isSameVote = existing?.reaction_type === reactionType
+    const nextVoteState = isSameVote ? null : reactionType
+    const shouldNotifyUpvote = reactionType === 'upvote' && (!existing || existing.reaction_type !== 'upvote')
 
     let nextUpvotes = currentUpvotes
     let nextDownvotes = currentDownvotes
@@ -437,10 +1538,20 @@ export default function Forum() {
       ...post,
       upvotes: nextUpvotes,
       downvotes: nextDownvotes,
+      score: nextUpvotes - nextDownvotes,
     }))
+    setPostUserVotes((prev) => {
+      const next = { ...prev }
+      if (nextVoteState) {
+        next[postId] = nextVoteState
+      } else {
+        delete next[postId]
+      }
+      return next
+    })
     setActivePost((prev) => (
       prev && prev.id === postId
-        ? { ...prev, upvotes: nextUpvotes, downvotes: nextDownvotes }
+        ? { ...prev, upvotes: nextUpvotes, downvotes: nextDownvotes, score: nextUpvotes - nextDownvotes }
         : prev
     ))
 
@@ -476,10 +1587,26 @@ export default function Forum() {
         })
 
       if (insertError) {
-        console.error('Error inserting reaction:', insertError)
-        Alert.alert('Error', 'Failed to update vote. Please try again.')
-        return
+        if (insertError.code === '23505') {
+          setPostUserVotes((prev) => ({ ...prev, [postId]: reactionType }))
+        } else {
+          console.error('Error inserting reaction:', insertError)
+          Alert.alert('Error', 'Failed to update vote. Please try again.')
+          return
+        }
       }
+    }
+
+    if (shouldNotifyUpvote) {
+      const postOwnerId = currentPost?.userId
+      await createNotification({
+        userId: postOwnerId,
+        actorId: user.id,
+        type: 'post_like',
+        entityType: 'post',
+        entityId: postId,
+        data: { post_id: postId },
+      })
     }
 
     await syncPostVoteCounts(postId)
@@ -512,7 +1639,7 @@ export default function Forum() {
       return
     }
 
-    const voteKey = parentId ? `${parentId}-${commentId}` : commentId
+    const voteKey = commentId
     const currentVote = userVotes[voteKey]
     const newVote = currentVote === direction ? null : direction
     const currentCounts = getCommentCounts(commentId, parentId)
@@ -541,7 +1668,15 @@ export default function Forum() {
       }
     }
 
-    setUserVotes((prev) => ({ ...prev, [voteKey]: newVote }))
+    setUserVotes((prev) => {
+      const next = { ...prev }
+      if (newVote) {
+        next[voteKey] = newVote
+      } else {
+        delete next[voteKey]
+      }
+      return next
+    })
     setComments((prev) => ({
       ...prev,
       [activePost.id]: (prev[activePost.id] || []).map((comment) => {
@@ -562,19 +1697,84 @@ export default function Forum() {
       }),
     }))
 
-    const { error } = await supabase
-      .from('forum_comments')
-      .update({ upvotes_count: nextUpvotes, downvotes_count: nextDownvotes })
-      .eq('id', commentId)
+    const reactionType = direction === 'up' ? 'upvote' : 'downvote'
+    const { data: existing, error } = await supabase
+      .from('forum_comment_reactions')
+      .select('id, reaction_type')
+      .eq('comment_id', commentId)
+      .eq('user_id', user.id)
+      .maybeSingle()
 
     if (error) {
-      console.error('Error updating comment like:', error)
-      Alert.alert('Error', 'Failed to update like. Please try again.')
+      if (isTableNotFoundError(error)) {
+        Alert.alert('Update required', 'Comment votes require a database update.')
+        return
+      }
+      console.error('Error loading comment vote:', error)
+      Alert.alert('Error', 'Failed to update vote. Please try again.')
       await refetchComments()
       return
     }
 
+    const isSameVote = existing?.reaction_type === reactionType
+
+    if (isSameVote) {
+      const { error: deleteError } = await supabase
+        .from('forum_comment_reactions')
+        .delete()
+        .eq('id', existing.id)
+
+      if (deleteError) {
+        console.error('Error removing comment vote:', deleteError)
+        Alert.alert('Error', 'Failed to update vote. Please try again.')
+        await refetchComments()
+        return
+      }
+    } else if (existing) {
+      const { error: updateError } = await supabase
+        .from('forum_comment_reactions')
+        .update({ reaction_type: reactionType })
+        .eq('id', existing.id)
+
+      if (updateError) {
+        console.error('Error updating comment vote:', updateError)
+        Alert.alert('Error', 'Failed to update vote. Please try again.')
+        await refetchComments()
+        return
+      }
+    } else if (newVote) {
+      const { error: insertError } = await supabase
+        .from('forum_comment_reactions')
+        .insert({
+          comment_id: commentId,
+          user_id: user.id,
+          reaction_type: reactionType,
+        })
+
+      if (insertError) {
+        if (insertError.code !== '23505') {
+          console.error('Error inserting comment vote:', insertError)
+          Alert.alert('Error', 'Failed to update vote. Please try again.')
+          await refetchComments()
+          return
+        }
+      }
+    }
+
+    await syncCommentVoteCounts(commentId)
     await refetchComments()
+
+    if (direction === 'up' && newVote === 'up') {
+      const commentOwnerId = getCommentOwnerId(commentId, parentId)
+      await createNotification({
+        userId: commentOwnerId,
+        actorId: user.id,
+        type: 'comment_like',
+        entityType: 'comment',
+        entityId: commentId,
+        data: { post_id: activePost.id, comment_id: commentId },
+      })
+    }
   }
 
   const submitComment = async ({ postId, parentId = null, body, isAnonymous, tempId = null }) => {
@@ -616,6 +1816,7 @@ export default function Forum() {
       const authorLabel = isAnonymous ? 'Anonymous' : currentUser.name
       const savedComment = {
         id: data.id,
+        userId: data.user_id,
         author: authorLabel,
         isAnon: isAnonymous,
         body: data.body,
@@ -652,6 +1853,39 @@ export default function Forum() {
     await syncPostCommentCount(postId)
     await refetchComments()
     await refetchPosts()
+
+    const postOwnerId = activePost?.userId
+    if (!parentId) {
+      await createNotification({
+        userId: postOwnerId,
+        actorId: user.id,
+        type: 'post_comment',
+        entityType: 'post',
+        entityId: postId,
+        data: { post_id: postId, comment_id: data?.id },
+      })
+    } else {
+      const parentOwnerId = getCommentOwnerId(parentId, null)
+      await createNotification({
+        userId: parentOwnerId,
+        actorId: user.id,
+        type: 'comment_reply',
+        entityType: 'comment',
+        entityId: parentId,
+        data: { post_id: postId, comment_id: data?.id, parent_id: parentId },
+      })
+      if (postOwnerId && postOwnerId !== parentOwnerId) {
+        await createNotification({
+          userId: postOwnerId,
+          actorId: user.id,
+          type: 'post_comment',
+          entityType: 'post',
+          entityId: postId,
+          data: { post_id: postId, comment_id: data?.id, parent_id: parentId },
+        })
+      }
+    }
+
     return true
   }
 
@@ -665,8 +1899,8 @@ export default function Forum() {
         return
       }
 
-      const mediaType = kind === 'image' 
-        ? ImagePicker.MediaTypeOptions.Images 
+      const mediaType = kind === 'image'
+        ? ImagePicker.MediaTypeOptions.Images
         : ImagePicker.MediaTypeOptions.Videos
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -800,6 +2034,10 @@ export default function Forum() {
     }
 
     // Regular post
+    const voteState = postUserVotes[item.id]
+    const isUpvoted = voteState === 'upvote'
+    const isDownvoted = voteState === 'downvote'
+
     return (
       <View style={styles.postCard}>
         <TouchableOpacity
@@ -808,212 +2046,232 @@ export default function Forum() {
         >
           {/* Header */}
           <View style={styles.postHeader}>
-      <TouchableOpacity
-        style={styles.postAuthorRow}
-        activeOpacity={0.8}
-        onPress={() => setActiveAuthorPost(item)}
-      >
-              <LinearGradient
-                colors={item.isAnon 
-                  ? ['#A855F7', '#9333EA'] 
-                  : [theme.colors.textSecondary, theme.colors.textSecondary + 'DD']
+            <TouchableOpacity
+              style={styles.postAuthorRow}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (item.isAnon) {
+                  setActiveAuthorPost(item)
+                  return
                 }
-                style={styles.postAvatar}
-              >
-          <Text style={styles.postAvatarText}>
-            {item.isAnon ? '?' : item.author.charAt(0).toUpperCase()}
-          </Text>
-              </LinearGradient>
-        <View style={styles.postAuthorInfo}>
-          <Text style={styles.postAuthorName}>
-            {item.isAnon ? 'Anonymous' : item.author}
-          </Text>
-          <Text style={styles.postMetaText}>
-            {item.forum} • {item.timeAgo}
-          </Text>
-        </View>
-      </TouchableOpacity>
-        <TouchableOpacity 
-          activeOpacity={0.7}
-          onPress={(e) => {
-            e.stopPropagation()
-            setPostOptionsPost(item)
-          }}
-        >
-          <MoreHorizontal
-                size={hp(2.2)}
-                color={theme.colors.textSecondary}
-            strokeWidth={2}
-          />
-        </TouchableOpacity>
-      </View>
-
-        {/* Content */}
-        <View style={styles.postBody}>
-            {item.title && (
-          <Text style={styles.postTitle}>{item.title}</Text>
-            )}
-          <Text numberOfLines={3} style={styles.postBodyText}>
-            {item.body}
-          </Text>
-
-          {/* Tags */}
-          {item.tags && item.tags.length > 0 && (
-              <View style={styles.postTagsContainer}>
-            <PostTags tags={item.tags} maxDisplay={2} />
-              </View>
-          )}
-
-          {/* Poll */}
-          {polls[item.id] && (
-              <View style={styles.postPollContainer}>
-            <PollRenderer
-              poll={polls[item.id]}
-              userVote={pollVotes[polls[item.id].poll_id]?.[currentUser.id]}
-              onVote={(optionIndex) => {
-                const pollId = polls[item.id].poll_id
-                setPollVotes((prev) => ({
-                  ...prev,
-                  [pollId]: {
-                    ...(prev[pollId] || {}),
-                    [currentUser.id]: optionIndex,
-                  },
-                }))
-                // Update results
-                setPollResults((prev) => {
-                  const current = prev[pollId] || { totalVotes: 0, voteCounts: [] }
-                  const newCounts = [...(current.voteCounts || [])]
-                  newCounts[optionIndex] = (newCounts[optionIndex] || 0) + 1
-                  return {
-                    ...prev,
-                    [pollId]: {
-                      totalVotes: current.totalVotes + 1,
-                      voteCounts: newCounts,
-                    },
-                  }
-                })
+                setActiveProfileId(item.userId)
               }}
-              totalVotes={pollResults[polls[item.id].poll_id]?.totalVotes || 0}
-              voteCounts={pollResults[polls[item.id].poll_id]?.voteCounts || []}
-            />
-              </View>
-          )}
-
-          {item.media && item.media.length > 0 && (
-            <View style={styles.postMediaPreview}>
-              {item.media[0].type === 'image' ? (
+            >
+              {item.isAnon ? (
+                <LinearGradient
+                  colors={['#A855F7', '#9333EA']}
+                  style={styles.postAvatar}
+                >
+                  <Text style={styles.postAvatarText}>?</Text>
+                </LinearGradient>
+              ) : item.authorAvatar ? (
                 <Image
-                  source={{ uri: item.media[0].uri }}
-                  style={styles.postMediaImage}
+                  source={{ uri: item.authorAvatar }}
+                  style={styles.postAvatarImage}
                 />
               ) : (
-                <View style={styles.postMediaVideo}>
-                  <Video
-                      size={hp(3.5)}
-                    color={theme.colors.white}
-                    strokeWidth={2}
-                    fill={theme.colors.white}
-                  />
-                  <Text style={styles.postMediaVideoText}>Video</Text>
-                </View>
+                <LinearGradient
+                  colors={['#6B7280', '#4B5563']}
+                  style={styles.postAvatar}
+                >
+                  <Text style={styles.postAvatarText}>
+                    {item.author?.charAt(0)?.toUpperCase() || '?'}
+                  </Text>
+                </LinearGradient>
               )}
-            </View>
-          )}
-        </View>
+              <View style={styles.postAuthorInfo}>
+                <Text style={styles.postAuthorName}>
+                  {item.isAnon ? 'Anonymous' : item.author}
+                </Text>
+                <Text style={styles.postMetaText}>
+                  {item.forum} • {item.timeAgo}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={(e) => {
+                e.stopPropagation()
+                setPostOptionsPost(item)
+              }}
+            >
+              <MoreHorizontal
+                size={hp(2.2)}
+                color={theme.colors.textSecondary}
+                strokeWidth={2}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Content */}
+          <View style={styles.postBody}>
+            {item.title && (
+              <Text style={styles.postTitle}>{item.title}</Text>
+            )}
+            <Text numberOfLines={3} style={styles.postBodyText}>
+              {item.body}
+            </Text>
+
+            {/* Tags */}
+            {item.tags && item.tags.length > 0 && (
+              <View style={styles.postTagsContainer}>
+                <PostTags tags={item.tags} maxDisplay={2} />
+              </View>
+            )}
+
+            {/* Poll */}
+            {polls[item.id] && (
+              <View style={styles.postPollContainer}>
+                <PollRenderer
+                  poll={polls[item.id]}
+                  userVote={pollVotes[polls[item.id].poll_id]?.[currentUser.id]}
+                  onVote={(optionIndex) => {
+                    const pollId = polls[item.id].poll_id
+                    setPollVotes((prev) => ({
+                      ...prev,
+                      [pollId]: {
+                        ...(prev[pollId] || {}),
+                        [currentUser.id]: optionIndex,
+                      },
+                    }))
+                    // Update results
+                    setPollResults((prev) => {
+                      const current = prev[pollId] || { totalVotes: 0, voteCounts: [] }
+                      const newCounts = [...(current.voteCounts || [])]
+                      newCounts[optionIndex] = (newCounts[optionIndex] || 0) + 1
+                      return {
+                        ...prev,
+                        [pollId]: {
+                          totalVotes: current.totalVotes + 1,
+                          voteCounts: newCounts,
+                        },
+                      }
+                    })
+                  }}
+                  totalVotes={pollResults[polls[item.id].poll_id]?.totalVotes || 0}
+                  voteCounts={pollResults[polls[item.id].poll_id]?.voteCounts || []}
+                />
+              </View>
+            )}
+
+            {item.media && item.media.length > 0 && (
+              <View style={styles.postMediaPreview}>
+                {item.media[0].type === 'image' ? (
+                  <Image
+                    source={{ uri: item.media[0].uri }}
+                    style={styles.postMediaImage}
+                  />
+                ) : (
+                  <View style={styles.postMediaVideo}>
+                    <Video
+                      size={hp(3.5)}
+                      color={theme.colors.white}
+                      strokeWidth={2}
+                      fill={theme.colors.white}
+                    />
+                    <Text style={styles.postMediaVideoText}>Video</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
 
         {/* Actions - Compact Row */}
         <View style={styles.postActionsRow}>
-        <View style={styles.postVotesRow}>
-          <TouchableOpacity
-            style={styles.voteButton}
-            activeOpacity={0.7}
-            onPress={async () => {
-              await handlePostReaction(item.id, 'upvote')
-            }}
-          >
-            <ArrowUpCircle
+          <View style={styles.postVotesRow}>
+            <TouchableOpacity
+              style={styles.voteButton}
+              activeOpacity={0.7}
+              onPress={async () => {
+                await handlePostReaction(item.id, 'upvote')
+              }}
+            >
+              <ArrowUpCircle
                 size={hp(2.4)}
-                color={item.upvotes > 0 ? theme.statusColors.success : theme.colors.textSecondary}
-              strokeWidth={2}
-              fill={item.upvotes > 0 ? '#2ecc71' : 'none'}
-            />
-          </TouchableOpacity>
-          <Text
-            style={[
-              styles.postVoteCount,
-              item.upvotes > 0 && styles.postVotePositive,
-              item.upvotes < 0 && styles.postVoteNegative,
-            ]}
-          >
-            {item.upvotes}
-          </Text>
-          <TouchableOpacity
-            style={styles.voteButton}
-            activeOpacity={0.7}
-            onPress={async () => {
-              await handlePostReaction(item.id, 'downvote')
-            }}
-          >
-            <ArrowDownCircle
+                color={isUpvoted ? theme.statusColors.success : theme.colors.textSecondary}
+                strokeWidth={2}
+                fill={isUpvoted ? '#2ecc71' : 'none'}
+              />
+            </TouchableOpacity>
+            <Text
+              style={[
+                styles.postVoteCount,
+                isUpvoted && styles.postVotePositive,
+                isDownvoted && styles.postVoteNegative,
+              ]}
+            >
+              {item.score}
+            </Text>
+            <TouchableOpacity
+              style={styles.voteButton}
+              activeOpacity={0.7}
+              onPress={async () => {
+                await handlePostReaction(item.id, 'downvote')
+              }}
+            >
+              <ArrowDownCircle
                 size={hp(2.4)}
-                color={item.upvotes < 0 ? theme.statusColors.error : theme.colors.textSecondary}
-              strokeWidth={2}
-              fill={item.upvotes < 0 ? '#e74c3c' : 'none'}
-            />
-          </TouchableOpacity>
-        </View>
+                color={isDownvoted ? theme.statusColors.error : theme.colors.textSecondary}
+                strokeWidth={2}
+                fill={isDownvoted ? '#e74c3c' : 'none'}
+              />
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
+          <TouchableOpacity
             style={styles.postActionButton}
-          activeOpacity={0.7}
-          onPress={() => setActivePost(item)}
-        >
-          <MessageCircle
+            activeOpacity={0.7}
+            onPress={() => {
+              setActivePost(item)
+              setFocusCommentInput(true)
+            }}
+          >
+            <MessageCircle
               size={hp(2)}
               color={theme.colors.textSecondary}
-            strokeWidth={2}
-          />
+              strokeWidth={2}
+            />
             {item.commentsCount > 0 && (
               <Text style={styles.postActionText}>{item.commentsCount}</Text>
             )}
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <TouchableOpacity
+          <TouchableOpacity
             style={styles.postActionButton}
-          activeOpacity={0.7}
-          onPress={() => {
-            setRepostPost(item)
-            setShowRepostModal(true)
-          }}
-        >
-          <Repeat
+            activeOpacity={0.7}
+            onPress={() => {
+              setRepostPost(item)
+              setShowRepostModal(true)
+            }}
+          >
+            <Repeat
               size={hp(2)}
               color={theme.colors.textSecondary}
-            strokeWidth={2}
-          />
-          {item.repostsCount > 0 && (
+              strokeWidth={2}
+            />
+            {item.repostsCount > 0 && (
               <Text style={styles.postActionText}>{item.repostsCount}</Text>
-          )}
-        </TouchableOpacity>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity
+          <TouchableOpacity
             style={styles.postActionButton}
-          activeOpacity={0.7}
-          onPress={() => {
-            setShareContent({
-              type: 'post',
-              data: item,
-            })
-            setShowShareModal(true)
-          }}
-        >
-          <Share2
+            activeOpacity={0.7}
+            onPress={() => {
+              setShareContent({
+                type: 'post',
+                data: item,
+              })
+              setShowShareModal(true)
+            }}
+          >
+            <Share2
               size={hp(2)}
               color={theme.colors.textSecondary}
-            strokeWidth={2}
-          />
-        </TouchableOpacity>
+              strokeWidth={2}
+            />
+          </TouchableOpacity>
         </View>
       </View>
     )
@@ -1068,12 +2326,10 @@ export default function Forum() {
           colors={['rgba(168, 85, 247, 0.08)', 'transparent']}
           style={styles.storiesGradient}
         >
-          <Stories
-            forumId={currentForumId}
-            onCreateStory={handleCreateStory}
-            onViewStory={handleViewStory}
-            currentUserId={currentUser.id}
-          />
+          <View style={styles.storiesPlaceholder}>
+            <Text style={styles.storiesPlaceholderTitle}>Stories</Text>
+            <Text style={styles.storiesPlaceholderSubtitle}>Coming soon</Text>
+          </View>
         </LinearGradient>
       </View>
     </View>
@@ -1090,9 +2346,7 @@ export default function Forum() {
             </Text>
           </View>
         ) : (forumsLoading || postsLoading) ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading posts...</Text>
-          </View>
+          <ForumFeedSkeleton numPosts={6} />
         ) : postsError ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>Failed to load posts. Please try again.</Text>
@@ -1141,482 +2395,76 @@ export default function Forum() {
         )}
 
 
-        {/* Post / Comments Modal Shell */}
+        {/* Forum Post Detail Screen */}
         <Modal
           visible={!!activePost}
-          transparent
+          transparent={false}
           animationType="slide"
-          onRequestClose={() => setActivePost(null)}
+          onRequestClose={() => {
+            setActivePost(null)
+            setActiveProfileId(null) // Clear profile when closing post detail
+          }}
+          presentationStyle="fullScreen"
         >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setActivePost(null)}
-          >
-            <Pressable
-              style={styles.postModalContent}
-              onPress={(e) => e.stopPropagation()}
-            >
-              {activePost && (
-                <>
-                  <View style={styles.postModalHeader}>
-                    <Text style={styles.postModalTitle} numberOfLines={2}>
-                      {activePost.title || activePost.body?.slice(0, 50)}
-                      {!activePost.title && activePost.body?.length > 50 && '...'}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => setActivePost(null)}
-                      style={styles.modalCloseButton}
-                    >
-                      <X
-                        size={hp(2.6)}
-                        color={theme.colors.textPrimary}
-                        strokeWidth={2.5}
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  <Text style={styles.postModalMeta}>
-                    {activePost.isAnon ? 'Anonymous' : activePost.author} • {activePost.forum} • {activePost.timeAgo}
-                  </Text>
-
-                  <KeyboardAvoidingView
-                    style={styles.keyboardAvoidingView}
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-                  >
-                    <ScrollView
-                      style={styles.postModalBody}
-                      contentContainerStyle={styles.postModalBodyContent}
-                      showsVerticalScrollIndicator={true}
-                      keyboardShouldPersistTaps="handled"
-                      scrollEnabled={true}
-                      bounces={true}
-                      keyboardDismissMode="interactive"
-                    >
-                      <Text style={styles.postModalBodyText}>
-                        {activePost.body}
-                      </Text>
-
-                      <View style={styles.commentsSection}>
-                        <View style={styles.commentsHeader}>
-                          <Text style={styles.commentsTitle}>
-                            Comments {activePost.commentsCount > 0 && (
-                              <Text style={styles.commentsCount}>({activePost.commentsCount})</Text>
-                            )}
-                          </Text>
-                          <SegmentedControl
-                            options={[
-                              { label: 'Best', value: 'best' },
-                              { label: 'New', value: 'new' },
-                            ]}
-                            value={commentSort}
-                            onChange={setCommentSort}
-                            style={styles.sortSegmented}
-                          />
-                        </View>
-                      </View>
-
-                      {/* Comments list */}
-                      {comments[activePost.id] && comments[activePost.id].length > 0 ? (
-                        <View style={styles.commentsList}>
-                          {(() => {
-                            let sortedComments = [...comments[activePost.id]]
-                            if (commentSort === 'new') {
-                              sortedComments.sort((a, b) => {
-                                // Sort by timeAgo (newest first) - simplified
-                                return b.timeAgo.localeCompare(a.timeAgo)
-                              })
-                            } else if (commentSort === 'old') {
-                              sortedComments.sort((a, b) => {
-                                return a.timeAgo.localeCompare(b.timeAgo)
-                              })
-                            } else {
-                              // Best: sort by upvotes - downvotes
-                              sortedComments.sort((a, b) => {
-                                const scoreA = (a.upvotes || 0) - (a.downvotes || 0)
-                                const scoreB = (b.upvotes || 0) - (b.downvotes || 0)
-                                return scoreB - scoreA
-                              })
-                            }
-                            return sortedComments
-                          })().map((comment) => (
-                            <View key={comment.id} style={styles.commentCard}>
-                                <View style={styles.commentAvatar}>
-                                  <Text style={styles.commentAvatarText}>
-                                    {comment.isAnon ? '?' : comment.author.charAt(0).toUpperCase()}
-                                  </Text>
-                                </View>
-                              <View style={{ flex: 1 }}>
-                                <View style={styles.commentHeader}>
-                                  <Text style={styles.commentAuthorName}>
-                                    {comment.isAnon ? 'Anonymous' : comment.author}
-                                  </Text>
-                                  <Text style={styles.commentMetaText}>
-                                    {comment.timeAgo}
-                                  </Text>
-                            </View>
-                            <Text style={styles.commentBody}>{comment.body}</Text>
-                            <View style={styles.commentActions}>
-                                <TouchableOpacity
-                                    style={styles.commentLikeButton}
-                                  activeOpacity={0.7}
-                                  onPress={async () => {
-                                    await handleCommentVote(comment.id, null, 'up')
-                                  }}
-                                >
-                                    {userVotes[comment.id] === 'up' ? (
-                                      <HeartFill size={hp(1.8)} color={theme.colors.info} strokeWidth={2} />
-                                    ) : (
-                                      <Heart size={hp(1.8)} color={theme.colors.textSecondary} strokeWidth={2} />
-                                    )}
-                                    {(comment.upvotes - (comment.downvotes || 0)) !== 0 && (
-                                      <Text style={[
-                                        styles.commentLikeText,
-                                        userVotes[comment.id] === 'up' && styles.commentLikeTextActive
-                                      ]}>
-                                        {comment.upvotes - (comment.downvotes || 0)}
-                                </Text>
-                                    )}
-                                    <Text style={[
-                                      styles.commentLikeLabel,
-                                      userVotes[comment.id] === 'up' && styles.commentLikeLabelActive
-                                    ]}>
-                                      Up
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={styles.commentLikeButton}
-                                  activeOpacity={0.7}
-                                  onPress={async () => {
-                                    await handleCommentVote(comment.id, null, 'down')
-                                  }}
-                                >
-                                  <ArrowDownCircle
-                                    size={hp(1.8)}
-                                    color={userVotes[comment.id] === 'down' ? theme.statusColors.error : theme.colors.textSecondary}
-                                    strokeWidth={2}
-                                  />
-                                  <Text style={[
-                                    styles.commentLikeLabel,
-                                    userVotes[comment.id] === 'down' && styles.commentLikeLabelActive
-                                  ]}>
-                                    Down
-                                  </Text>
-                                </TouchableOpacity>
-                              <TouchableOpacity
-                                    style={styles.commentReplyButton}
-                                activeOpacity={0.7}
-                                onPress={() => setReplyingTo(comment.id)}
-                              >
-                                    <Text style={styles.commentReplyText}>Reply</Text>
-                              </TouchableOpacity>
-                            </View>
-
-                            {/* Replies */}
-                            {comment.replies && comment.replies.length > 0 && (
-                              <View style={styles.repliesContainer}>
-                                {comment.replies.map((reply) => (
-                                  <View key={reply.id} style={styles.replyCard}>
-                                        <View style={styles.replyAvatar}>
-                                          <Text style={styles.replyAvatarText}>
-                                            {reply.isAnon ? '?' : reply.author.charAt(0).toUpperCase()}
-                                          </Text>
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                          <View style={styles.replyHeader}>
-                                          <Text style={styles.replyAuthorName}>
-                                            {reply.isAnon ? 'Anonymous' : reply.author}
-                                          </Text>
-                                          <Text style={styles.replyMetaText}>
-                                            {reply.timeAgo}
-                                          </Text>
-                                    </View>
-                                    <Text style={styles.replyBody}>{reply.body}</Text>
-                                    <View style={styles.replyActions}>
-                                        <TouchableOpacity
-                                              style={styles.commentLikeButton}
-                                          activeOpacity={0.7}
-                                          onPress={async () => {
-                                            await handleCommentVote(reply.id, comment.id, 'up')
-                                          }}
-                                        >
-                                              {userVotes[`${comment.id}-${reply.id}`] === 'up' ? (
-                                                <HeartFill size={hp(1.6)} color={theme.colors.info} strokeWidth={2} />
-                                              ) : (
-                                                <Heart size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
-                                              )}
-                                              {(reply.upvotes - (reply.downvotes || 0)) !== 0 && (
-                                                <Text style={[
-                                                  styles.commentLikeText,
-                                                  { fontSize: hp(1.3) },
-                                                  userVotes[`${comment.id}-${reply.id}`] === 'up' && styles.commentLikeTextActive
-                                                ]}>
-                                                  {reply.upvotes - (reply.downvotes || 0)}
-                                        </Text>
-                                              )}
-                                              <Text style={[
-                                                styles.commentLikeLabel,
-                                                { fontSize: hp(1.3) },
-                                                userVotes[`${comment.id}-${reply.id}`] === 'up' && styles.commentLikeLabelActive
-                                              ]}>
-                                                Up
-                                              </Text>
-                                            </TouchableOpacity>
-                                        <TouchableOpacity
-                                              style={styles.commentLikeButton}
-                                          activeOpacity={0.7}
-                                          onPress={async () => {
-                                            await handleCommentVote(reply.id, comment.id, 'down')
-                                          }}
-                                        >
-                                          <ArrowDownCircle
-                                            size={hp(1.6)}
-                                            color={userVotes[`${comment.id}-${reply.id}`] === 'down' ? theme.statusColors.error : theme.colors.textSecondary}
-                                            strokeWidth={2}
-                                          />
-                                          <Text style={[
-                                            styles.commentLikeLabel,
-                                            { fontSize: hp(1.3) },
-                                            userVotes[`${comment.id}-${reply.id}`] === 'down' && styles.commentLikeLabelActive
-                                          ]}>
-                                            Down
-                                          </Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                              style={styles.commentReplyButton}
-                                          activeOpacity={0.7}
-                                          onPress={() => {
-                                                // TODO: Implement reply to reply
-                                              }}
-                                            >
-                                              <Text style={[styles.commentReplyText, { fontSize: hp(1.3) }]}>Reply</Text>
-                                        </TouchableOpacity>
-                                      </View>
-                                    </View>
-                                  </View>
-                                ))}
-                              </View>
-                            )}
-
-                            {/* Reply input */}
-                            {replyingTo === comment.id && (
-                              <View style={styles.replyInputContainer}>
-                                <TextInput
-                                  style={styles.replyInput}
-                                  placeholder="Write a reply..."
-                                      placeholderTextColor={theme.colors.textSecondary}
-                                  value={replyText}
-                                  onChangeText={setReplyText}
-                                  multiline
-                                />
-                                <View style={styles.replyInputActions}>
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.anonPillSmall,
-                                      replyIsAnon && styles.anonPillActiveSmall,
-                                    ]}
-                                    activeOpacity={0.8}
-                                    onPress={() => setReplyIsAnon((prev) => !prev)}
-                                  >
-                                    {replyIsAnon ? (
-                                      <EyeOff
-                                        size={hp(1.6)}
-                                        color={theme.colors.white}
-                                        strokeWidth={2}
-                                        style={{ marginRight: wp(1) }}
-                                      />
-                                    ) : (
-                                      <Person
-                                        size={hp(1.6)}
-                                        color={theme.colors.textSecondary}
-                                        strokeWidth={2}
-                                        style={{ marginRight: wp(1) }}
-                                      />
-                                    )}
-                                    <Text
-                                      style={[
-                                        styles.anonPillTextSmall,
-                                        replyIsAnon && { color: theme.colors.white },
-                                      ]}
-                                    >
-                                      {replyIsAnon ? 'Anon' : 'Name'}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <View style={styles.replyInputButtons}>
-                                    <TouchableOpacity
-                                      style={styles.replyCancelButton}
-                                      activeOpacity={0.8}
-                                      onPress={() => {
-                                        setReplyingTo(null)
-                                        setReplyText('')
-                                        setReplyIsAnon(true)
-                                      }}
-                                    >
-                                      <Text style={styles.replyCancelText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={[
-                                        styles.replySubmitButton,
-                                        !replyText.trim() && styles.replySubmitButtonDisabled,
-                                      ]}
-                                      activeOpacity={0.8}
-                                      onPress={async () => {
-                                        if (!replyText.trim()) return
-                                        const body = replyText.trim()
-                                        const newReply = {
-                                          id: `reply-${comment.id}-${Date.now()}`,
-                                          author: replyIsAnon ? 'Anon' : 'You',
-                                          isAnon: replyIsAnon,
-                                          body,
-                                          upvotes: 0,
-                                          downvotes: 0,
-                                          timeAgo: 'now',
-                                        }
-                                        setComments((prev) => ({
-                                          ...prev,
-                                          [activePost.id]: prev[activePost.id].map((c) =>
-                                            c.id === comment.id
-                                              ? { ...c, replies: [...(c.replies || []), newReply] }
-                                              : c
-                                          ),
-                                        }))
-                                        setReplyingTo(null)
-                                        setReplyText('')
-                                        setReplyIsAnon(true)
-                                        const success = await submitComment({
-                                          postId: activePost.id,
-                                          parentId: comment.id,
-                                          body,
-                                          isAnonymous: replyIsAnon,
-                                        })
-                                        if (success) {
-                                          setActivePost((prev) => (
-                                            prev ? { ...prev, commentsCount: (prev.commentsCount || 0) + 1 } : prev
-                                          ))
-                                        }
-                                      }}
-                                    >
-                                      <Text style={styles.replySubmitText}>Reply</Text>
-                                    </TouchableOpacity>
-                                  </View>
-                                </View>
-                              </View>
-                            )}
-                              </View>
-                          </View>
-                            ))}
-                          </View>
-                        ) : (
-                          <View style={styles.emptyCommentsBox}>
-                            <Text style={styles.emptyCommentsText}>
-                              No comments yet. Be the first to comment!
-                            </Text>
-                          </View>
-                        )}
-                    </ScrollView>
-
-                    {/* New comment input - Fixed at bottom */}
-                    <View style={styles.newCommentContainer}>
-                    <TextInput
-                      style={styles.newCommentInput}
-                      placeholder="Add a comment..."
-                      placeholderTextColor={theme.colors.softBlack}
-                      value={newCommentText}
-                      onChangeText={setNewCommentText}
-                      multiline
-                    />
-                    <View style={styles.newCommentActions}>
-                      <TouchableOpacity
-                        style={[
-                          styles.anonPillSmall,
-                          newCommentIsAnon && styles.anonPillActiveSmall,
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => setNewCommentIsAnon((prev) => !prev)}
-                      >
-                        {newCommentIsAnon ? (
-                          <EyeOff
-                            size={hp(1.6)}
-                            color={theme.colors.white}
-                            strokeWidth={2}
-                            style={{ marginRight: wp(1) }}
-                          />
-                        ) : (
-                          <Person
-                            size={hp(1.6)}
-                            color={theme.colors.bondedPurple}
-                            strokeWidth={2}
-                            style={{ marginRight: wp(1) }}
-                          />
-                        )}
-                        <Text
-                          style={[
-                            styles.anonPillTextSmall,
-                            newCommentIsAnon && { color: theme.colors.white },
-                          ]}
-                        >
-                          {newCommentIsAnon ? 'Anon' : 'Name'}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.commentSubmitButton,
-                          !newCommentText.trim() && styles.commentSubmitButtonDisabled,
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={async () => {
-                          if (!newCommentText.trim()) return
-                          const body = newCommentText.trim()
-                          const tempId = `temp-comment-${activePost.id}-${Date.now()}`
-                          const newComment = {
-                            id: tempId,
-                            author: newCommentIsAnon ? 'Anon' : 'You',
-                            isAnon: newCommentIsAnon,
-                            body,
-                            upvotes: 0,
-                            downvotes: 0,
-                            timeAgo: 'now',
-                            replies: [],
-                          }
-                          setComments((prev) => ({
-                            ...prev,
-                            [activePost.id]: [...(prev[activePost.id] || []), newComment],
-                          }))
-                          pendingCommentIds.current[activePost.id] = [
-                            ...(pendingCommentIds.current[activePost.id] || []),
-                            newComment,
-                          ]
-                          setNewCommentText('')
-                          setNewCommentIsAnon(true)
-                          Keyboard.dismiss()
-                          const success = await submitComment({
-                            postId: activePost.id,
-                            body,
-                            isAnonymous: newCommentIsAnon,
-                            tempId,
-                          })
-                          if (!success) {
-                            pendingCommentIds.current[activePost.id] = (
-                              pendingCommentIds.current[activePost.id] || []
-                            ).filter((item) => item.id !== tempId)
-                          }
-                          if (success) {
-                            setActivePost((prev) => (
-                              prev ? { ...prev, commentsCount: (prev.commentsCount || 0) + 1 } : prev
-                            ))
-                          }
-                        }}
-                      >
-                        <Text style={styles.commentSubmitText}>Post</Text>
-                      </TouchableOpacity>
-                    </View>
-                    </View>
-                  </KeyboardAvoidingView>
-                </>
-              )}
-            </Pressable>
-          </Pressable>
+          <ForumPostDetail
+            post={activePost}
+            comments={comments[activePost?.id] || []}
+            userVotes={userVotes}
+            postUserVote={postUserVotes[activePost?.id]}
+            commentSort={commentSort}
+            onClose={() => {
+              setActivePost(null)
+              setActiveProfileId(null) // Clear profile when closing post detail
+            }}
+            onPostVote={handlePostReaction}
+            onCommentVote={handleCommentVote}
+            onAddComment={async (postId, body, isAnon, parentId) => {
+              const success = await submitComment({
+                postId,
+                body,
+                isAnonymous: isAnon,
+                parentId: parentId ?? null  // Use nullish coalescing to preserve 0/false values
+              })
+              return success
+            }}
+            onChangeSort={setCommentSort}
+            onShare={() => {
+              setShareContent({ type: 'post', data: activePost })
+              setShowShareModal(true)
+            }}
+            onRepost={() => {
+              setRepostPost(activePost)
+              setShowRepostModal(true)
+            }}
+            onPressProfile={(userId, isAnon) => {
+              if (isAnon) {
+                // Handle anonymous profile view if needed
+                return
+              }
+              setActiveProfileId(userId)
+            }}
+            theme={theme}
+            activeProfile={activeProfile}
+            activeProfileId={activeProfileId}
+            setActiveProfileId={setActiveProfileId}
+            router={router}
+            currentUserInterests={currentUserInterests}
+            profileLoading={profileLoading}
+          />
         </Modal>
+
+        {/* Yearbook Profile Modal with swipe-to-dismiss - only show when ForumPostDetail is not open */}
+        {!activePost && (
+          <ProfileModalWrapper
+            activeProfile={activeProfile}
+            activeProfileId={activeProfileId}
+            setActiveProfileId={setActiveProfileId}
+            theme={theme}
+            router={router}
+            currentUserInterests={currentUserInterests}
+            isLoading={profileLoading}
+          />
+        )}
 
         {/* Author Profile Modal */}
         <Modal
@@ -1676,7 +2524,7 @@ export default function Forum() {
                           style={{ marginRight: wp(1) }}
                         />
                         <Text style={styles.profileMetaPillText}>
-                          {(activeAuthorPost.upvotes || 0) - (activeAuthorPost.downvotes || 0)} karma
+                          {activeAuthorPost.score ?? ((activeAuthorPost.upvotes || 0) - (activeAuthorPost.downvotes || 0))} karma
                         </Text>
                       </View>
                     </View>
@@ -1689,29 +2537,16 @@ export default function Forum() {
                     </View>
 
                     <View style={styles.profileActions}>
-                      <AnonymousMessageButton
-                        userId={activeAuthorPost.authorId || 'user-123'}
-                        userName={activeAuthorPost.isAnon ? 'Anonymous' : activeAuthorPost.author}
-                        onSendMessage={async (messageData) => {
-                          // TODO: Implement actual anonymous message sending
-                          console.log('Sending anonymous message:', messageData)
-                        }}
-                      />
-                      <TouchableOpacity
-                        style={[
-                          styles.profileButton,
-                          styles.profilePrimaryButton,
-                        ]}
-                        activeOpacity={0.8}
-                      >
-                        <Person
-                          size={hp(2)}
-                          color={theme.colors.white}
-                          strokeWidth={2}
-                          style={{ marginRight: wp(1.5) }}
+                      {activeAuthorPost.isAnon && (
+                        <AnonymousMessageButton
+                          userId={activeAuthorPost.userId || 'user-123'}
+                          userName="Anonymous"
+                          onSendMessage={async (messageData) => {
+                            // TODO: Implement actual anonymous message sending
+                            console.log('Sending anonymous message:', messageData)
+                          }}
                         />
-                        <Text style={styles.profilePrimaryText}>Connect</Text>
-                      </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 </>
@@ -1739,7 +2574,7 @@ export default function Forum() {
                 <>
                   {/* Drag Handle */}
                   <View style={styles.postOptionsHandle} />
-                  
+
                   {/* Options List */}
                   <View style={styles.postOptionsList}>
                     {postOptionsPost.userId === currentUser.id && (
@@ -1772,7 +2607,7 @@ export default function Forum() {
                       </TouchableOpacity>
                     )}
                   </View>
-                  
+
                   {/* Cancel Button */}
                   <TouchableOpacity
                     style={styles.postOptionsCancel}
@@ -1793,524 +2628,524 @@ export default function Forum() {
           transparent={true}
           animationType="slide"
           onRequestClose={() => setIsCreateModalVisible(false)}
-          presentationStyle="pageSheet"
+          presentationStyle="overFullScreen"
         >
           <View style={styles.fizzModalWrapper}>
             <SafeAreaView style={styles.fizzModalSafeArea} edges={['top', 'bottom', 'left', 'right']}>
-            <KeyboardAvoidingView
-              style={styles.fizzModalContainer}
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              <KeyboardAvoidingView
+                style={styles.fizzModalContainer}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={0}
-            >
-              {/* Header */}
-              <View style={[styles.fizzModalHeader, { paddingTop: Math.max(insets.top, hp(2)) }]}>
-                <TouchableOpacity
-                  onPress={() => setIsCreateModalVisible(false)}
-                  activeOpacity={0.8}
-                  style={styles.fizzHeaderButton}
-                >
-                  <X size={hp(2.5)} color={theme.colors.textPrimary} strokeWidth={2.5} />
-                </TouchableOpacity>
+              >
+                {/* Header */}
+                <View style={[styles.fizzModalHeader, { paddingTop: Math.max(insets.top, hp(2)) }]}>
+                  <TouchableOpacity
+                    onPress={() => setIsCreateModalVisible(false)}
+                    activeOpacity={0.8}
+                    style={styles.fizzHeaderButton}
+                  >
+                    <X size={hp(2.5)} color={theme.colors.textPrimary} strokeWidth={2.5} />
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => {
-                    Keyboard.dismiss()
-                    setShowPostAsModal(true)
-                  }}
-                  activeOpacity={0.8}
-                  style={styles.fizzHeaderCenter}
-                >
-                  {/* Show current forum name */}
-                  {currentForum && (
-                    <Text style={[styles.fizzModalTitle, { fontSize: hp(1.4), color: theme.colors.textSecondary, marginBottom: hp(0.3) }]} numberOfLines={1}>
-                      {currentForum.name}
-                    </Text>
-                  )}
-                  <View style={styles.fizzAnonymousRow}>
-                    <View style={styles.fizzAnonymousIcon}>
-                      <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss()
+                      setShowPostAsModal(true)
+                    }}
+                    activeOpacity={0.8}
+                    style={styles.fizzHeaderCenter}
+                  >
+                    {/* Show current forum name */}
+                    {currentForum && (
+                      <Text style={[styles.fizzModalTitle, { fontSize: hp(1.4), color: theme.colors.textSecondary, marginBottom: hp(0.3) }]} numberOfLines={1}>
+                        {currentForum.name}
+                      </Text>
+                    )}
+                    <View style={styles.fizzAnonymousRow}>
+                      <View style={styles.fizzAnonymousIcon}>
+                        <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                      </View>
+                      <Text style={styles.fizzAnonymousText}>
+                        {draftIsAnon ? 'Anonymous' : 'Your Name'}
+                      </Text>
+                      <ChevronDown size={hp(1.8)} color={theme.colors.textPrimary} strokeWidth={2.5} />
                     </View>
-                    <Text style={styles.fizzAnonymousText}>
-                      {draftIsAnon ? 'Anonymous' : 'Your Name'}
-                    </Text>
-                    <ChevronDown size={hp(1.8)} color={theme.colors.textPrimary} strokeWidth={2.5} />
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  disabled={!draftBody.trim() || createPostMutation.isPending}
-                  onPress={async () => {
-                    console.log('Post button pressed')
-                    console.log('draftBody:', draftBody)
-                    console.log('currentForum:', currentForum)
-                    console.log('currentForumId:', currentForum?.id)
-                    console.log('forums available:', visibleForums.length)
-                    
-                    if (!draftBody.trim()) {
-                      Alert.alert('Required', 'Please enter a post body')
-                      setIsCreateModalVisible(false)
-                      return
-                    }
+                  <TouchableOpacity
+                    disabled={!draftBody.trim() || createPostMutation.isPending}
+                    onPress={async () => {
+                      console.log('Post button pressed')
+                      console.log('draftBody:', draftBody)
+                      console.log('currentForum:', currentForum)
+                      console.log('currentForumId:', currentForum?.id)
+                      console.log('forums available:', visibleForums.length)
 
-                    // Use the currently viewed forum - this should always be set
-                    let forumToUse = currentForum
-                    let forumIdToUse = currentForum?.id
-                    
-                    // If somehow currentForum is still null, try to get it from forums
-                    if (!forumToUse && visibleForums.length > 0) {
-                      // Auto-select default forum if none selected
-                      forumToUse = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
-                      if (forumToUse) {
-                        console.log('Auto-selecting forum:', forumToUse.name, forumToUse.id)
-                        setCurrentForum(forumToUse)
-                        forumIdToUse = forumToUse.id
-                      }
-                    }
-                    
-                    if (!forumIdToUse) {
-                      console.error('No forum selected and no forums available')
-                      Alert.alert('Error', 'Please select a forum first')
-                      return
-                    }
-                    
-                    console.log('Using forum for post:', forumToUse.name, forumIdToUse)
-
-                    try {
-                      console.log('Creating post with data:', {
-                        forumId: forumIdToUse,
-                        body: draftBody.trim(),
-                        isAnonymous: draftIsAnon,
-                      })
-                      
-                      // Extract media URLs from draftMedia
-                      const mediaUrls = []
-                      
-                      // Prepare tags array
-                      const tags = draftTags.length > 0 
-                        ? draftTags 
-                        : (selectedTag ? [selectedTag] : [])
-
-                      // Create the post
-                      const result = await createPostMutation.mutateAsync({
-                        forumId: forumIdToUse,
-                        title: draftTitle.trim() || null,
-                        body: draftBody.trim(),
-                        tags,
-                        mediaUrls,
-                        isAnonymous: draftIsAnon,
-                        poll: draftPoll || null,
-                      })
-
-                      console.log('Post created successfully:', result)
-                      
-                      // Extract post and any poll error from result
-                      const createdPost = result?.post || result
-                      const pollError = result?.pollError
-
-                      // Show warning if poll creation failed
-                      if (pollError) {
-                        Alert.alert(
-                          'Poll Creation Issue',
-                          'Your post was created but the poll failed to attach. You can try creating a new post with the poll.',
-                          [{ text: 'OK' }]
-                        )
+                      if (!draftBody.trim()) {
+                        Alert.alert('Required', 'Please enter a post body')
+                        setIsCreateModalVisible(false)
+                        return
                       }
 
-                      if (createdPost?.id && draftMedia.length > 0) {
-                        try {
-                          console.log('📸 Uploading media for post:', createdPost.id)
-                          const mediaPaths = await uploadPostMedia(createdPost.id)
-                          console.log('📸 Media paths:', mediaPaths)
+                      // Use the currently viewed forum - this should always be set
+                      let forumToUse = currentForum
+                      let forumIdToUse = currentForum?.id
 
-                          if (mediaPaths.length > 0) {
-                            const { error: updateError } = await supabase
-                              .from('posts')
-                              .update({ media_urls: mediaPaths })
-                              .eq('id', createdPost.id)
-
-                            if (updateError) {
-                              console.error('Failed to update post with media:', updateError)
-                            } else {
-                              console.log('✅ Post updated with media successfully')
-                              // Invalidate queries to show updated post with images
-                              // Invalidate all posts queries for the current forum
-                              queryClient.invalidateQueries({ queryKey: ['posts', currentForumId] })
-                              // Also invalidate any posts queries without filters
-                              queryClient.invalidateQueries({ queryKey: ['posts'] })
-                            }
-                          }
-                        } catch (mediaError) {
-                          console.error('Post media upload failed:', mediaError)
-                          Alert.alert(
-                            'Media Upload Failed',
-                            'Your post was created but the images failed to upload. You can try editing the post to add them again.'
-                          )
+                      // If somehow currentForum is still null, try to get it from forums
+                      if (!forumToUse && visibleForums.length > 0) {
+                        // Auto-select default forum if none selected
+                        forumToUse = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
+                        if (forumToUse) {
+                          console.log('Auto-selecting forum:', forumToUse.name, forumToUse.id)
+                          setCurrentForum(forumToUse)
+                          forumIdToUse = forumToUse.id
                         }
                       }
 
-                      // Reset form
-                      setDraftTitle('')
-                      setDraftBody('')
-                      setDraftIsAnon(true)
-                      setDraftMedia([])
-                      setDraftTags([])
-                      setSelectedTag(null)
-                      setDraftPoll(null)
-                      setIsCreateModalVisible(false)
-                    } catch (error) {
-                      console.error('Error creating post:', error)
-                      console.error('Error details:', JSON.stringify(error, null, 2))
-                      console.error('Error code:', error.code)
-                      console.error('Error message:', error.message)
-                      console.error('Error details:', error.details)
-                      
-                      let errorMessage = 'Failed to create post. Please try again.'
-                      if (error.message) {
-                        errorMessage = error.message
-                      } else if (error.details) {
-                        errorMessage = error.details
-                      } else if (error.code) {
-                        errorMessage = `Error ${error.code}: ${error.message || 'Failed to create post'}`
+                      if (!forumIdToUse) {
+                        console.error('No forum selected and no forums available')
+                        Alert.alert('Error', 'Please select a forum first')
+                        return
                       }
-                      
-                      Alert.alert('Error Creating Post', errorMessage)
-                    }
-                  }}
-                  style={[
-                    styles.fizzPostButton,
-                    (!draftBody.trim() || createPostMutation.isPending) && styles.fizzPostButtonDisabled,
-                  ]}
-                >
-                  <Text style={styles.fizzPostButtonText}>
-                    {createPostMutation.isPending ? 'Posting...' : 'Post'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
 
-              {/* Content Area */}
-              <View style={styles.fizzContentArea}>
-                {/* Optional Title Input */}
-                <TextInput
-                  value={draftTitle}
-                  onChangeText={setDraftTitle}
-                  placeholder="Add a title (optional)"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  style={styles.fizzTitleInput}
-                  maxLength={100}
-                />
-                
-                {/* Body Input */}
-                <TextInput
-                  value={draftBody}
-                  onChangeText={setDraftBody}
-                  placeholder="Share what's really on your mind..."
-                  placeholderTextColor={theme.colors.textSecondary}
-                  style={styles.fizzTextInput}
-                  multiline
-                  textAlignVertical="top"
-                />
-                
-                {/* Draft Media Preview - Industry Standard Design */}
-                {draftMedia.length > 0 && (
-                  <View style={styles.draftMediaPreview}>
-                    {draftMedia.length === 1 ? (
-                      // Single image - full width, Instagram-style
-                      <View style={styles.draftMediaSingle}>
-                        <Image
-                          source={{ uri: draftMedia[0].uri }}
-                          style={styles.draftMediaSingleImage}
-                        />
-                        <TouchableOpacity
-                          style={styles.draftMediaRemoveSingle}
-                          onPress={() => setDraftMedia([])}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.draftMediaRemoveSingleButton}>
-                            <X size={hp(2.2)} color={theme.colors.white} strokeWidth={2.5} />
-                          </View>
-                        </TouchableOpacity>
-                      </View>
-                    ) : draftMedia.length === 2 ? (
-                      // Two images - side by side with gap
-                      <View style={styles.draftMediaTwoGrid}>
-                        {draftMedia.map((media, index) => (
-                          <View key={index} style={styles.draftMediaTwoItem}>
-                            <Image
-                              source={{ uri: media.uri }}
-                              style={styles.draftMediaTwoImage}
-                            />
-                            <TouchableOpacity
-                              style={styles.draftMediaRemoveTwo}
-                              onPress={() => {
-                                setDraftMedia((prev) => prev.filter((_, i) => i !== index))
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.draftMediaRemoveTwoButton}>
-                                <X size={hp(1.9)} color={theme.colors.white} strokeWidth={2.5} />
-                              </View>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                    ) : (
-                      // Three or more - clean grid layout
-                      <View style={styles.draftMediaGrid}>
-                        {draftMedia.slice(0, 4).map((media, index) => (
-                          <View key={index} style={styles.draftMediaGridItem}>
-                            <Image
-                              source={{ uri: media.uri }}
-                              style={styles.draftMediaGridImage}
-                            />
-                            {index === 3 && draftMedia.length > 4 && (
-                              <View style={styles.draftMediaMoreOverlay}>
-                                <Text style={styles.draftMediaMoreText}>+{draftMedia.length - 4}</Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={styles.draftMediaRemoveGrid}
-                              onPress={() => {
-                                setDraftMedia((prev) => prev.filter((_, i) => i !== index))
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.draftMediaRemoveGridButton}>
-                                <X size={hp(1.7)} color={theme.colors.white} strokeWidth={2.5} />
-                              </View>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
+                      console.log('Using forum for post:', forumToUse.name, forumIdToUse)
 
-              {/* Selected Tag Display - Moved above action bar */}
-              {selectedTag && (() => {
-                const tagColors = {
-                  'QUESTION': '#5B8DEF',
-                  'CONFESSION': '#FF7A8A',
-                  'CRUSH': '#FF8CC8',
-                  'DM ME': '#4DD0E1',
-                  'EVENT': '#FFB84D',
-                  'PSA': '#FF6B6B',
-                  'SHOUTOUT': '#4ECDC4',
-                  'DUB': '#FFD93D',
-                  'RIP': '#95A5A6',
-                  'MEME': '#A78BFA',
-                  'LOST & FOUND': '#E67E22',
-                }
-                const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
-                return (
-                  <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
-                    <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
+                      try {
+                        console.log('Creating post with data:', {
+                          forumId: forumIdToUse,
+                          body: draftBody.trim(),
+                          isAnonymous: draftIsAnon,
+                        })
+
+                        // Extract media URLs from draftMedia
+                        const mediaUrls = []
+
+                        // Prepare tags array
+                        const tags = draftTags.length > 0
+                          ? draftTags
+                          : (selectedTag ? [selectedTag] : [])
+
+                        // Create the post
+                        const result = await createPostMutation.mutateAsync({
+                          forumId: forumIdToUse,
+                          title: draftTitle.trim() || null,
+                          body: draftBody.trim(),
+                          tags,
+                          mediaUrls,
+                          isAnonymous: draftIsAnon,
+                          poll: draftPoll || null,
+                        })
+
+                        console.log('Post created successfully:', result)
+
+                        // Extract post and any poll error from result
+                        const createdPost = result?.post || result
+                        const pollError = result?.pollError
+
+                        // Show warning if poll creation failed
+                        if (pollError) {
+                          Alert.alert(
+                            'Poll Creation Issue',
+                            'Your post was created but the poll failed to attach. You can try creating a new post with the poll.',
+                            [{ text: 'OK' }]
+                          )
+                        }
+
+                        if (createdPost?.id && draftMedia.length > 0) {
+                          try {
+                            console.log('📸 Uploading media for post:', createdPost.id)
+                            const mediaPaths = await uploadPostMedia(createdPost.id)
+                            console.log('📸 Media paths:', mediaPaths)
+
+                            if (mediaPaths.length > 0) {
+                              const { error: updateError } = await supabase
+                                .from('posts')
+                                .update({ media_urls: mediaPaths })
+                                .eq('id', createdPost.id)
+
+                              if (updateError) {
+                                console.error('Failed to update post with media:', updateError)
+                              } else {
+                                console.log('✅ Post updated with media successfully')
+                                // Invalidate queries to show updated post with images
+                                // Invalidate all posts queries for the current forum
+                                queryClient.invalidateQueries({ queryKey: ['posts', currentForumId] })
+                                // Also invalidate any posts queries without filters
+                                queryClient.invalidateQueries({ queryKey: ['posts'] })
+                              }
+                            }
+                          } catch (mediaError) {
+                            console.error('Post media upload failed:', mediaError)
+                            Alert.alert(
+                              'Media Upload Failed',
+                              'Your post was created but the images failed to upload. You can try editing the post to add them again.'
+                            )
+                          }
+                        }
+
+                        // Reset form
+                        setDraftTitle('')
+                        setDraftBody('')
+                        setDraftIsAnon(true)
+                        setDraftMedia([])
+                        setDraftTags([])
+                        setSelectedTag(null)
+                        setDraftPoll(null)
+                        setIsCreateModalVisible(false)
+                      } catch (error) {
+                        console.error('Error creating post:', error)
+                        console.error('Error details:', JSON.stringify(error, null, 2))
+                        console.error('Error code:', error.code)
+                        console.error('Error message:', error.message)
+                        console.error('Error details:', error.details)
+
+                        let errorMessage = 'Failed to create post. Please try again.'
+                        if (error.message) {
+                          errorMessage = error.message
+                        } else if (error.details) {
+                          errorMessage = error.details
+                        } else if (error.code) {
+                          errorMessage = `Error ${error.code}: ${error.message || 'Failed to create post'}`
+                        }
+
+                        Alert.alert('Error Creating Post', errorMessage)
+                      }
+                    }}
+                    style={[
+                      styles.fizzPostButton,
+                      (!draftBody.trim() || createPostMutation.isPending) && styles.fizzPostButtonDisabled,
+                    ]}
+                  >
+                    <Text style={styles.fizzPostButtonText}>
+                      {createPostMutation.isPending ? 'Posting...' : 'Post'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Content Area */}
+                <View style={styles.fizzContentArea}>
+                  {/* Optional Title Input */}
+                  <TextInput
+                    value={draftTitle}
+                    onChangeText={setDraftTitle}
+                    placeholder="Add a title (optional)"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    style={styles.fizzTitleInput}
+                    maxLength={100}
+                  />
+
+                  {/* Body Input */}
+                  <TextInput
+                    value={draftBody}
+                    onChangeText={setDraftBody}
+                    placeholder="Share what's really on your mind..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    style={styles.fizzTextInput}
+                    multiline
+                    textAlignVertical="top"
+                  />
+
+                  {/* Draft Media Preview - Industry Standard Design */}
+                  {draftMedia.length > 0 && (
+                    <View style={styles.draftMediaPreview}>
+                      {draftMedia.length === 1 ? (
+                        // Single image - full width, Instagram-style
+                        <View style={styles.draftMediaSingle}>
+                          <Image
+                            source={{ uri: draftMedia[0].uri }}
+                            style={styles.draftMediaSingleImage}
+                          />
+                          <TouchableOpacity
+                            style={styles.draftMediaRemoveSingle}
+                            onPress={() => setDraftMedia([])}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.draftMediaRemoveSingleButton}>
+                              <X size={hp(2.2)} color={theme.colors.white} strokeWidth={2.5} />
+                            </View>
+                          </TouchableOpacity>
+                        </View>
+                      ) : draftMedia.length === 2 ? (
+                        // Two images - side by side with gap
+                        <View style={styles.draftMediaTwoGrid}>
+                          {draftMedia.map((media, index) => (
+                            <View key={index} style={styles.draftMediaTwoItem}>
+                              <Image
+                                source={{ uri: media.uri }}
+                                style={styles.draftMediaTwoImage}
+                              />
+                              <TouchableOpacity
+                                style={styles.draftMediaRemoveTwo}
+                                onPress={() => {
+                                  setDraftMedia((prev) => prev.filter((_, i) => i !== index))
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <View style={styles.draftMediaRemoveTwoButton}>
+                                  <X size={hp(1.9)} color={theme.colors.white} strokeWidth={2.5} />
+                                </View>
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        // Three or more - clean grid layout
+                        <View style={styles.draftMediaGrid}>
+                          {draftMedia.slice(0, 4).map((media, index) => (
+                            <View key={index} style={styles.draftMediaGridItem}>
+                              <Image
+                                source={{ uri: media.uri }}
+                                style={styles.draftMediaGridImage}
+                              />
+                              {index === 3 && draftMedia.length > 4 && (
+                                <View style={styles.draftMediaMoreOverlay}>
+                                  <Text style={styles.draftMediaMoreText}>+{draftMedia.length - 4}</Text>
+                                </View>
+                              )}
+                              <TouchableOpacity
+                                style={styles.draftMediaRemoveGrid}
+                                onPress={() => {
+                                  setDraftMedia((prev) => prev.filter((_, i) => i !== index))
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <View style={styles.draftMediaRemoveGridButton}>
+                                  <X size={hp(1.7)} color={theme.colors.white} strokeWidth={2.5} />
+                                </View>
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                {/* Selected Tag Display - Moved above action bar */}
+                {selectedTag && (() => {
+                  const tagColors = {
+                    'QUESTION': '#5B8DEF',
+                    'CONFESSION': '#FF7A8A',
+                    'CRUSH': '#FF8CC8',
+                    'DM ME': '#4DD0E1',
+                    'EVENT': '#FFB84D',
+                    'PSA': '#FF6B6B',
+                    'SHOUTOUT': '#4ECDC4',
+                    'DUB': '#FFD93D',
+                    'RIP': '#95A5A6',
+                    'MEME': '#A78BFA',
+                    'LOST & FOUND': '#E67E22',
+                  }
+                  const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
+                  return (
+                    <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
+                      <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
+                      <TouchableOpacity
+                        onPress={() => setSelectedTag(null)}
+                        activeOpacity={0.8}
+                        style={styles.fizzSelectedTagClose}
+                      >
+                        <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
+                      </TouchableOpacity>
+                    </View>
+                  )
+                })()}
+
+                {/* Action Bar - Above Keyboard */}
+                <View style={styles.fizzActionBar}>
+                  <View style={styles.fizzMediaIconsRow}>
                     <TouchableOpacity
-                      onPress={() => setSelectedTag(null)}
-                      activeOpacity={0.8}
-                      style={styles.fizzSelectedTagClose}
+                      style={styles.fizzMediaIcon}
+                      onPress={() => handlePickMedia('image')}
+                      activeOpacity={0.7}
                     >
-                      <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
+                      <ImageIcon size={hp(2.8)} color={theme.colors.textPrimary} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.fizzMediaIcon}
+                      onPress={() => handlePickMedia('video')}
+                      activeOpacity={0.7}
+                    >
+                      <Video size={hp(2.8)} color={theme.colors.textPrimary} strokeWidth={2} />
                     </TouchableOpacity>
                   </View>
-                )
-              })()}
-
-              {/* Action Bar - Above Keyboard */}
-              <View style={styles.fizzActionBar}>
-                <View style={styles.fizzMediaIconsRow}>
-                  <TouchableOpacity
-                    style={styles.fizzMediaIcon}
-                    onPress={() => handlePickMedia('image')}
-                    activeOpacity={0.7}
-                  >
-                    <ImageIcon size={hp(2.8)} color={theme.colors.textPrimary} strokeWidth={2} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.fizzMediaIcon}
-                    onPress={() => handlePickMedia('video')}
-                    activeOpacity={0.7}
-                  >
-                    <Video size={hp(2.8)} color={theme.colors.textPrimary} strokeWidth={2} />
-                  </TouchableOpacity>
                 </View>
-              </View>
-              {selectedTag && (() => {
-                const tagColors = {
-                  'QUESTION': '#5B8DEF',
-                  'CONFESSION': '#FF7A8A',
-                  'CRUSH': '#FF8CC8',
-                  'DM ME': '#4DD0E1',
-                  'EVENT': '#FFB84D',
-                  'PSA': '#FF6B6B',
-                  'SHOUTOUT': '#4ECDC4',
-                  'DUB': '#FFD93D',
-                  'RIP': '#95A5A6',
-                  'MEME': '#A78BFA',
-                  'LOST & FOUND': '#E67E22',
-                }
-                const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
-                return (
-                  <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
-                  <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
-                  <TouchableOpacity
-                    onPress={() => setSelectedTag(null)}
-                    activeOpacity={0.8}
-                      style={styles.fizzSelectedTagClose}
-                  >
-                      <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
-                  </TouchableOpacity>
-                </View>
-                )
-              })()}
-
-              {/* Tag Selector Overlay - Inside create post modal */}
-              {showTagSelector && (
-                <View style={styles.tagSelectorOverlay}>
-          <Pressable
-                    style={styles.tagSelectorOverlayBackdrop}
-            onPress={() => setShowTagSelector(false)}
-          >
-                    <Pressable
-                      style={styles.tagSelectorOverlayContent}
-                      onPress={(e) => e.stopPropagation()}
-                    >
-              <View style={styles.tagModalHeader}>
-                <Text style={styles.tagModalTitle}>Select Tag</Text>
-                <TouchableOpacity
-                  onPress={() => setShowTagSelector(false)}
-                  activeOpacity={0.8}
-                          style={styles.tagModalCloseButton}
-                >
-                          <X size={hp(2.2)} color={theme.colors.textSecondary} strokeWidth={2.5} />
-                </TouchableOpacity>
-              </View>
-                      <ScrollView 
-                        style={styles.tagList} 
-                        contentContainerStyle={styles.tagListContent}
-                        showsVerticalScrollIndicator={false}
+                {selectedTag && (() => {
+                  const tagColors = {
+                    'QUESTION': '#5B8DEF',
+                    'CONFESSION': '#FF7A8A',
+                    'CRUSH': '#FF8CC8',
+                    'DM ME': '#4DD0E1',
+                    'EVENT': '#FFB84D',
+                    'PSA': '#FF6B6B',
+                    'SHOUTOUT': '#4ECDC4',
+                    'DUB': '#FFD93D',
+                    'RIP': '#95A5A6',
+                    'MEME': '#A78BFA',
+                    'LOST & FOUND': '#E67E22',
+                  }
+                  const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
+                  return (
+                    <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
+                      <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
+                      <TouchableOpacity
+                        onPress={() => setSelectedTag(null)}
+                        activeOpacity={0.8}
+                        style={styles.fizzSelectedTagClose}
                       >
-                {[
-                  { label: 'QUESTION', color: '#5B8DEF', gradient: ['#5B8DEF', '#4A7CE8'] },
-                  { label: 'CONFESSION', color: '#FF7A8A', gradient: ['#FF7A8A', '#FF6B7D'] },
-                  { label: 'CRUSH', color: '#FF8CC8', gradient: ['#FF8CC8', '#FF7BB8'] },
-                  { label: 'DM ME', color: '#4DD0E1', gradient: ['#4DD0E1', '#3BC5D6'] },
-                  { label: 'EVENT', color: '#FFB84D', gradient: ['#FFB84D', '#FFA733'] },
-                  { label: 'PSA', color: '#FF6B6B', gradient: ['#FF6B6B', '#FF5555'] },
-                  { label: 'SHOUTOUT', color: '#4ECDC4', gradient: ['#4ECDC4', '#3DBBB3'] },
-                  { label: 'DUB', color: '#FFD93D', gradient: ['#FFD93D', '#FFD024'] },
-                  { label: 'RIP', color: '#95A5A6', gradient: ['#95A5A6', '#839496'] },
-                  { label: 'MEME', color: '#A78BFA', gradient: ['#A78BFA', '#9675F5'] },
-                  { label: 'LOST & FOUND', color: '#E67E22', gradient: ['#E67E22', '#D35400'] },
-                ].map((tag) => (
-                  <TouchableOpacity
-                    key={tag.label}
-                    style={[
-                      styles.fizzTagPill,
-                      selectedTag === tag.label && styles.fizzTagPillSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedTag(tag.label)
-                      setShowTagSelector(false)
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <LinearGradient
-                      colors={tag.gradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.fizzTagGradient}
+                        <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
+                      </TouchableOpacity>
+                    </View>
+                  )
+                })()}
+
+                {/* Tag Selector Overlay - Inside create post modal */}
+                {showTagSelector && (
+                  <View style={styles.tagSelectorOverlay}>
+                    <Pressable
+                      style={styles.tagSelectorOverlayBackdrop}
+                      onPress={() => setShowTagSelector(false)}
                     >
-                      <Text style={styles.fizzTagPillText}>{tag.label}</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-          </Pressable>
-                  </Pressable>
-                </View>
-              )}
-
-              {/* Post As Overlay - Inside create post modal */}
-              {showPostAsModal && (
-                <View style={styles.postAsOverlay}>
-          <Pressable
-                    style={styles.postAsOverlayBackdrop}
-            onPress={() => setShowPostAsModal(false)}
-          >
-                    <View style={styles.postAsOverlayContent}>
-              <View style={styles.postAsModalHandle} />
-              <Text style={styles.postAsModalTitle}>Post as</Text>
-              
-                      {/* Anonymous Option */}
-              <TouchableOpacity
-                style={styles.postAsOption}
-                activeOpacity={0.8}
-                        onPress={() => {
-                          setDraftIsAnon(true)
-                          setShowPostAsModal(false)
-                        }}
-              >
-                <View style={styles.postAsIcon}>
-                          <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
-                </View>
-                <View style={styles.postAsOptionText}>
-                          <Text style={styles.postAsOptionTitle}>Anonymous</Text>
-                          <Text style={styles.postAsOptionSubtitle}>Post without revealing your identity</Text>
-                </View>
-                        {draftIsAnon && (
-                          <View style={styles.postAsCheck}>
-                            <Check size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
-                          </View>
-                        )}
-              </TouchableOpacity>
-
-                      {/* Your Name Option */}
-              <TouchableOpacity
-                style={styles.postAsOption}
-                activeOpacity={0.8}
-                onPress={() => {
-                          setDraftIsAnon(false)
-                  setShowPostAsModal(false)
-                }}
-              >
-                <View style={styles.postAsIcon}>
-                  <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
-                </View>
-                <View style={styles.postAsOptionText}>
-                          <Text style={styles.postAsOptionTitle}>Your Name</Text>
-                          <Text style={styles.postAsOptionSubtitle}>Post with your name visible</Text>
-                </View>
-                        {!draftIsAnon && (
-                  <View style={styles.postAsCheck}>
-                    <Check size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                      <Pressable
+                        style={styles.tagSelectorOverlayContent}
+                        onPress={(e) => e.stopPropagation()}
+                      >
+                        <View style={styles.tagModalHeader}>
+                          <Text style={styles.tagModalTitle}>Select Tag</Text>
+                          <TouchableOpacity
+                            onPress={() => setShowTagSelector(false)}
+                            activeOpacity={0.8}
+                            style={styles.tagModalCloseButton}
+                          >
+                            <X size={hp(2.2)} color={theme.colors.textSecondary} strokeWidth={2.5} />
+                          </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                          style={styles.tagList}
+                          contentContainerStyle={styles.tagListContent}
+                          showsVerticalScrollIndicator={false}
+                        >
+                          {[
+                            { label: 'QUESTION', color: '#5B8DEF', gradient: ['#5B8DEF', '#4A7CE8'] },
+                            { label: 'CONFESSION', color: '#FF7A8A', gradient: ['#FF7A8A', '#FF6B7D'] },
+                            { label: 'CRUSH', color: '#FF8CC8', gradient: ['#FF8CC8', '#FF7BB8'] },
+                            { label: 'DM ME', color: '#4DD0E1', gradient: ['#4DD0E1', '#3BC5D6'] },
+                            { label: 'EVENT', color: '#FFB84D', gradient: ['#FFB84D', '#FFA733'] },
+                            { label: 'PSA', color: '#FF6B6B', gradient: ['#FF6B6B', '#FF5555'] },
+                            { label: 'SHOUTOUT', color: '#4ECDC4', gradient: ['#4ECDC4', '#3DBBB3'] },
+                            { label: 'DUB', color: '#FFD93D', gradient: ['#FFD93D', '#FFD024'] },
+                            { label: 'RIP', color: '#95A5A6', gradient: ['#95A5A6', '#839496'] },
+                            { label: 'MEME', color: '#A78BFA', gradient: ['#A78BFA', '#9675F5'] },
+                            { label: 'LOST & FOUND', color: '#E67E22', gradient: ['#E67E22', '#D35400'] },
+                          ].map((tag) => (
+                            <TouchableOpacity
+                              key={tag.label}
+                              style={[
+                                styles.fizzTagPill,
+                                selectedTag === tag.label && styles.fizzTagPillSelected,
+                              ]}
+                              onPress={() => {
+                                setSelectedTag(tag.label)
+                                setShowTagSelector(false)
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <LinearGradient
+                                colors={tag.gradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.fizzTagGradient}
+                              >
+                                <Text style={styles.fizzTagPillText}>{tag.label}</Text>
+                              </LinearGradient>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </Pressable>
+                    </Pressable>
                   </View>
                 )}
-              </TouchableOpacity>
 
-                      {/* Org Page Option (for admins) */}
-                      {isAdmin && (
-              <TouchableOpacity
-                style={styles.postAsOption}
-                activeOpacity={0.8}
-                onPress={() => {
-                            // TODO: Set posting as org
-                  setShowPostAsModal(false)
-                }}
-              >
-                <View style={styles.postAsIcon}>
-                  <Add size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
-                </View>
-                <View style={styles.postAsOptionText}>
-                            <Text style={styles.postAsOptionTitle}>Organization Page</Text>
-                            <Text style={styles.postAsOptionSubtitle}>Post as your organization</Text>
-                </View>
-              </TouchableOpacity>
-                      )}
-            </View>
-          </Pressable>
-                </View>
-              )}
+                {/* Post As Overlay - Inside create post modal */}
+                {showPostAsModal && (
+                  <View style={styles.postAsOverlay}>
+                    <Pressable
+                      style={styles.postAsOverlayBackdrop}
+                      onPress={() => setShowPostAsModal(false)}
+                    >
+                      <View style={styles.postAsOverlayContent}>
+                        <View style={styles.postAsModalHandle} />
+                        <Text style={styles.postAsModalTitle}>Post as</Text>
+
+                        {/* Anonymous Option */}
+                        <TouchableOpacity
+                          style={styles.postAsOption}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setDraftIsAnon(true)
+                            setShowPostAsModal(false)
+                          }}
+                        >
+                          <View style={styles.postAsIcon}>
+                            <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                          </View>
+                          <View style={styles.postAsOptionText}>
+                            <Text style={styles.postAsOptionTitle}>Anonymous</Text>
+                            <Text style={styles.postAsOptionSubtitle}>Post without revealing your identity</Text>
+                          </View>
+                          {draftIsAnon && (
+                            <View style={styles.postAsCheck}>
+                              <Check size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+
+                        {/* Your Name Option */}
+                        <TouchableOpacity
+                          style={styles.postAsOption}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setDraftIsAnon(false)
+                            setShowPostAsModal(false)
+                          }}
+                        >
+                          <View style={styles.postAsIcon}>
+                            <Person size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                          </View>
+                          <View style={styles.postAsOptionText}>
+                            <Text style={styles.postAsOptionTitle}>Your Name</Text>
+                            <Text style={styles.postAsOptionSubtitle}>Post with your name visible</Text>
+                          </View>
+                          {!draftIsAnon && (
+                            <View style={styles.postAsCheck}>
+                              <Check size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+
+                        {/* Org Page Option (for admins) */}
+                        {isAdmin && (
+                          <TouchableOpacity
+                            style={styles.postAsOption}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              // TODO: Set posting as org
+                              setShowPostAsModal(false)
+                            }}
+                          >
+                            <View style={styles.postAsIcon}>
+                              <Add size={hp(2)} color={theme.colors.white} strokeWidth={2.5} />
+                            </View>
+                            <View style={styles.postAsOptionText}>
+                              <Text style={styles.postAsOptionTitle}>Organization Page</Text>
+                              <Text style={styles.postAsOptionSubtitle}>Post as your organization</Text>
+                            </View>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </Pressable>
+                  </View>
+                )}
               </KeyboardAvoidingView>
             </SafeAreaView>
           </View>
@@ -2352,19 +3187,8 @@ export default function Forum() {
         <TouchableOpacity
           style={styles.floatingCreateButton}
           onPress={() => {
-            // Check onboarding completion
-            if (!userProfile?.onboarding_complete) {
-              Alert.alert(
-                'Complete Your Profile',
-                `Please complete your onboarding to create posts. You're ${userProfile?.profile_completion_percentage || 0}% done!`,
-                [
-                  { text: 'Later', style: 'cancel' },
-                  { text: 'Complete Now', onPress: () => router.push('/onboarding') },
-                ]
-              )
-              return
-            }
-            
+            // All users can create posts - no onboarding gate
+
             // Ensure we have a forum selected before opening modal
             if (!currentForum && visibleForums.length > 0) {
               const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
@@ -2486,8 +3310,8 @@ export default function Forum() {
           }}
           groups={[]} // TODO: Get user's groups
         />
-      </View>
-    </SafeAreaView>
+      </View >
+    </SafeAreaView >
   )
 }
 
@@ -2689,6 +3513,23 @@ const createStyles = (theme) => StyleSheet.create({
     paddingVertical: hp(0.8),
     borderRadius: hp(1),
   },
+  storiesPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(1.4),
+  },
+  storiesPlaceholderTitle: {
+    fontSize: hp(1.6),
+    fontFamily: theme.typography.fontFamily.heading,
+    color: theme.colors.textPrimary,
+    fontWeight: '600',
+  },
+  storiesPlaceholderSubtitle: {
+    marginTop: hp(0.3),
+    fontSize: hp(1.3),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+  },
   storiesRow: {
     marginBottom: hp(0.5),
   },
@@ -2768,6 +3609,12 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: hp(2.25),
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: wp(2.5),
+  },
+  postAvatarImage: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
     marginRight: wp(2.5),
   },
   postAvatarText: {
@@ -3434,6 +4281,44 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
     opacity: 0.8,
     marginBottom: hp(1),
+  },
+  postDetailActions: {
+    marginBottom: hp(1.8),
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2),
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    gap: hp(1.2),
+  },
+  postDetailVotes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+  },
+  postDetailActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: wp(2),
+  },
+  postDetailActionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1),
+  },
+  postDetailActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1),
+    paddingVertical: hp(0.4),
+    paddingHorizontal: wp(2),
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.background,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
   keyboardAvoidingView: {
     flex: 1,

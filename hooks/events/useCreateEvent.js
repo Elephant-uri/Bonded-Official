@@ -17,6 +17,19 @@ export function useCreateEvent() {
         throw new Error('User must be authenticated to create events')
       }
 
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('university_id')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError) {
+        throw profileError
+      }
+      if (!profile?.university_id) {
+        throw new Error('University is required to create events')
+      }
+
       // Map calendar event data to database schema
       const eventInput = {
         organizer_id: user.id,
@@ -36,8 +49,7 @@ export function useCreateEvent() {
         is_paid: eventData.is_paid || false,
         created_by: user.id,
         source: 'user',
-        // Note: university_id not needed - uri_events table doesn't have this column
-        // University filtering is done via the organizer's profile university_id
+        university_id: profile.university_id,
         ticket_types: eventData.ticket_types || [],
         invites: eventData.invites || [],
       }
@@ -65,6 +77,7 @@ export function useCreateEvent() {
     retry: 1,
   })
 }
+
 
 
 

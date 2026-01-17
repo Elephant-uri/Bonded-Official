@@ -37,13 +37,15 @@ export function useEvents(filters = {}) {
       }
 
       // Build query
+      // Must specify explicit FK names because there are multiple relationships (organizer_id and created_by)
       let query = supabase
-        .from('uri_events')
+        .from('events')
         .select(`
           *,
           organizer:profiles!events_organizer_id_fkey(id, full_name, avatar_url),
           created_by_profile:profiles!events_created_by_fkey(id, full_name, avatar_url)
         `)
+        .eq('university_id', profile.university_id)
         .order('start_at', { ascending: true })
 
       // Apply filters
@@ -55,10 +57,6 @@ export function useEvents(filters = {}) {
         query = query.eq('visibility', filters.visibility)
       }
       
-      // Filter by university (through organizer's university)
-      // Note: This assumes events are created by users from same university
-      // You may need to add university_id directly to events table if needed
-
       const { data, error } = await query
 
       if (error) {
@@ -79,7 +77,7 @@ export function useEvents(filters = {}) {
         maxAttendees: event.max_attendees,
         requireApproval: event.requires_approval || false,
         allowPlusOnes: event.allow_plus_ones || false,
-        coverImage: event.cover_image_url,
+        coverImage: event.image_url,
         organizer: event.organizer ? {
           id: event.organizer.id,
           name: event.organizer.full_name,
@@ -112,7 +110,7 @@ export function useEvent(eventId) {
       }
 
       const { data, error } = await supabase
-        .from('uri_events')
+        .from('events')
         .select(`
           *,
           organizer:profiles!events_organizer_id_fkey(id, full_name, avatar_url),
@@ -141,7 +139,7 @@ export function useEvent(eventId) {
         maxAttendees: data.max_attendees,
         requireApproval: data.requires_approval || false,
         allowPlusOnes: data.allow_plus_ones || false,
-        coverImage: data.cover_image_url,
+        coverImage: data.image_url,
         organizer: data.organizer ? {
           id: data.organizer.id,
           name: data.organizer.full_name,

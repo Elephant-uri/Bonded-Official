@@ -6,12 +6,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from '../app/theme'
 import ThemedText from '../app/components/ThemedText'
+import { useConversations } from '../hooks/useMessages'
+import { useMessageRequests } from '../hooks/useMessageRequests'
 
 const BottomNav = ({ scrollY = null }) => {
   const router = useRouter()
   const pathname = usePathname()
   const insets = useSafeAreaInsets()
   const theme = useAppTheme()
+  const { data: conversations = [] } = useConversations()
+  const { data: messageRequests = [] } = useMessageRequests()
+  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0) + messageRequests.length
+  const unreadLabel = totalUnread > 99 ? '99+' : String(totalUnread)
   
   // Animation for hiding/showing nav on scroll
   const navTranslateY = useRef(new Animated.Value(0)).current
@@ -147,12 +153,19 @@ const BottomNav = ({ scrollY = null }) => {
               onPress={() => handleTabPress(tab)}
               activeOpacity={0.7}
             >
-              <Ionicons
-                name={active ? tab.activeIcon : tab.icon}
-                size={active ? hp(2.5) : hp(2.2)}
-                color={active ? theme.colors.accent : theme.colors.textSecondary}
-                style={{ strokeWidth: active ? 1.5 : 1 }}
-              />
+              <View style={styles.iconWrapper}>
+                <Ionicons
+                  name={active ? tab.activeIcon : tab.icon}
+                  size={active ? hp(2.5) : hp(2.2)}
+                  color={active ? theme.colors.accent : theme.colors.textSecondary}
+                  style={{ strokeWidth: active ? 1.5 : 1 }}
+                />
+                {tab.id === 'messages' && totalUnread > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{unreadLabel}</Text>
+                  </View>
+                )}
+              </View>
               <ThemedText
                 style={[
                   styles.tabLabel,
@@ -218,6 +231,30 @@ const createStyles = (theme) => StyleSheet.create({
     gap: hp(0.2),
     position: 'relative',
   },
+  iconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -hp(0.6),
+    right: -hp(1),
+    minWidth: hp(1.8),
+    height: hp(1.8),
+    paddingHorizontal: hp(0.4),
+    borderRadius: hp(0.9),
+    backgroundColor: '#FF3B30',
+    borderWidth: 2,
+    borderColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: {
+    fontSize: hp(1.05),
+    color: theme.colors.white,
+    fontWeight: '700',
+  },
   tabActive: {
     backgroundColor: 'transparent',
   },
@@ -242,4 +279,3 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.accent,
   },
 })
-

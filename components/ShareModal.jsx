@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -10,37 +11,44 @@ import {
   TextInput,
   Platform,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from '../app/theme'
 import AppHeader from './AppHeader'
 import AppCard from './AppCard'
+import { useFriends } from '../hooks/useFriends'
+import { useCreateConversation, useSendMessage } from '../hooks/useMessages'
 
-// Mock friends list - replace with real data
-const MOCK_FRIENDS = [
-  { id: 'friend-1', name: 'Alex Johnson', avatar: 'https://randomuser.me/api/portraits/men/20.jpg', online: true },
-  { id: 'friend-2', name: 'Sarah Williams', avatar: 'https://randomuser.me/api/portraits/women/21.jpg', online: false },
-  { id: 'friend-3', name: 'Michael Brown', avatar: 'https://randomuser.me/api/portraits/men/22.jpg', online: true },
-  { id: 'friend-4', name: 'Emily Davis', avatar: 'https://randomuser.me/api/portraits/women/23.jpg', online: false },
-  { id: 'friend-5', name: 'David Miller', avatar: 'https://randomuser.me/api/portraits/men/24.jpg', online: true },
-  { id: 'friend-6', name: 'Jessica Garcia', avatar: 'https://randomuser.me/api/portraits/women/25.jpg', online: false },
-  { id: 'friend-7', name: 'Chris Wilson', avatar: 'https://randomuser.me/api/portraits/men/26.jpg', online: true },
-  { id: 'friend-8', name: 'Olivia Martinez', avatar: 'https://randomuser.me/api/portraits/women/27.jpg', online: false },
-]
-
-export default function ShareModal({ visible, content, onClose }) {
+export default function ShareModal({ visible, content, onClose, presentationStyle = 'pageSheet', transparent = false }) {
   const theme = useAppTheme()
   const styles = createStyles(theme)
+  const insets = useSafeAreaInsets()
+  const allowTransparent = transparent && (presentationStyle === 'overFullScreen' || presentationStyle === 'fullScreen')
+  const modalTransparentProps = allowTransparent ? { transparent: true } : {}
   const router = useRouter()
+  const { data: friends = [], isLoading: friendsLoading } = useFriends()
+  const createConversation = useCreateConversation()
+  const sendMessage = useSendMessage()
   const [selectedFriends, setSelectedFriends] = useState([])
   const [message, setMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSending, setIsSending] = useState(false)
+
+  // Move useMemo before early return to follow Rules of Hooks
+  const friendOptions = useMemo(() => (
+    friends.map((friend) => ({
+      id: friend.id,
+      name: friend.full_name || friend.username || 'User',
+      avatar: friend.avatar_url || null,
+      online: false,
+    }))
+  ), [friends])
 
   if (!content) return null
 
-  const filteredFriends = MOCK_FRIENDS.filter((friend) =>
+  const filteredFriends = friendOptions.filter((friend) =>
     friend.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -52,37 +60,131 @@ export default function ShareModal({ visible, content, onClose }) {
     )
   }
 
-  const handleSend = () => {
-    if (selectedFriends.length === 0) return
+  const buildShareText = () => {
+    switch (content.type) {
+      case 'event': {
+        const startDate = content.data.start_at || content.data.startDate
+        const dateLabel = startDate
+          ? new Date(startDate).toLocaleDateString()
+          : 'Event'
+        const location = content.data.location_name || content.data.location || content.data.location_address || 'Event'
+        return `Event: ${content.data.title}\n${location} • ${dateLabel}`
+      }
+      case 'post': {
+        const title = content.data.title || 'Forum Post'
+        const body = content.data.body ? content.data.body.slice(0, 140) : ''
+        return body ? `Post: ${title}\n${body}` : `Post: ${title}`
+      }
+      case 'story':
+        return `Story from ${content.data.userName || 'someone'}`
+      case 'professor':
+        return `${content.data.name} • ${content.data.department}`
+      case 'club':
+        return `${content.data.name} • ${content.data.category || 'Club'}`
+      case 'comment': {
+        const postTitle = content.data.postTitle || 'Forum Post'
+        const body = content.data.body ? content.data.body.slice(0, 140) : ''
+        return body ? `Comment on ${postTitle}\n${body}` : `Comment on ${postTitle}`
+      }
+      case 'profile': {
+        const major = content.data.majorLabel || content.data.major || 'Student'
+        const year = content.data.year ? `Class of ${content.data.year}` : null
+        return `Profile: ${content.data.name}\n${[major, year].filter(Boolean).join(' • ')}`
+      }
+      default:
+        return 'Shared content'
+    }
+  }
 
-    // TODO: Send content to selected friends via messages
-    // For now, navigate to messages with pre-filled content
+  const handleSend = async () => {
+    if (selectedFriends.length === 0) return
+    if (isSending) return
+
+    setIsSending(true)
+
+    const shareText = buildShareText()
+    const userMessage = message.trim()
+    const fullMessage = userMessage ? `${userMessage}\n\n${shareText}` : shareText
+
     const shareData = {
-      type: content.type, // 'event', 'post', 'story', 'professor'
+      type: content.type, // 'event', 'post', 'story', 'professor', 'profile'
       data: content.data,
-      message: message.trim() || `Check this out!`,
+      message: userMessage || 'Check this out!',
     }
 
-    // Navigate to messages with share data
-    router.push({
-      pathname: '/messages',
-      params: {
-        share: JSON.stringify(shareData),
-        recipients: selectedFriends.join(','),
-      },
-    })
+    try {
+      const conversationIds = []
+      for (const friendId of selectedFriends) {
+        const conversationId = await createConversation.mutateAsync({ otherUserId: friendId })
+        
+        const baseMetadata = {
+          shareType: content.type,
+          shareData: shareData,
+        }
+        // Include metadata for shared posts/comments so they can be displayed properly
+        const messageMetadata = content.type === 'post' ? {
+          ...baseMetadata,
+          postId: content.data.id,
+          forumId: content.data.forumId || content.data.forum_id || null,
+          postTitle: content.data.title || '',
+          postBody: content.data.body || '',
+        } : content.type === 'comment' ? {
+          ...baseMetadata,
+          commentId: content.data.id,
+          postId: content.data.postId,
+          forumId: content.data.forumId || null,
+          commentBody: content.data.body || '',
+          postTitle: content.data.postTitle || '',
+        } : baseMetadata
+        
+        await sendMessage.mutateAsync({ 
+          conversationId, 
+          content: fullMessage,
+          metadata: messageMetadata,
+        })
+        conversationIds.push({ friendId, conversationId })
+      }
 
-    onClose()
+      if (selectedFriends.length === 1) {
+        const recipient = friendOptions.find((friend) => friend.id === selectedFriends[0])
+        const conversationId = conversationIds[0]?.conversationId
+        if (conversationId) {
+          router.push({
+            pathname: '/chat',
+            params: {
+              conversationId,
+              userId: selectedFriends[0],
+              userName: recipient?.name || 'User',
+              share: JSON.stringify(shareData),
+            },
+          })
+        }
+      } else {
+        router.push('/messages')
+      }
+
+      onClose()
+    } catch (error) {
+      console.error('Share send failed:', error)
+      Alert.alert('Share failed', 'Could not send this to your friends. Please try again.')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const getContentPreview = () => {
     switch (content.type) {
-      case 'event':
+      case 'event': {
+        const startDate = content.data.start_at || content.data.startDate
+        const dateLabel = startDate
+          ? new Date(startDate).toLocaleDateString()
+          : 'Event'
         return {
           title: content.data.title,
-          subtitle: `${content.data.location || 'Event'} • ${new Date(content.data.startDate).toLocaleDateString()}`,
+          subtitle: `${content.data.location_name || content.data.location || content.data.location_address || 'Event'} • ${dateLabel}`,
           icon: 'calendar',
         }
+      }
       case 'post':
         return {
           title: content.data.title || 'Forum Post',
@@ -107,6 +209,24 @@ export default function ShareModal({ visible, content, onClose }) {
           subtitle: `${content.data.category} • ${content.data.members?.length || 0} members`,
           icon: 'people',
         }
+      case 'comment': {
+        const postTitle = content.data.postTitle || 'Forum Post'
+        const body = content.data.body ? content.data.body.slice(0, 60) : ''
+        return {
+          title: postTitle,
+          subtitle: body || 'Shared a comment',
+          icon: 'chatbubble',
+        }
+      }
+      case 'profile': {
+        const major = content.data.majorLabel || content.data.major || 'Student'
+        const year = content.data.year ? `Class of ${content.data.year}` : 'Yearbook'
+        return {
+          title: content.data.name,
+          subtitle: `${major} • ${year}`,
+          icon: 'person',
+        }
+      }
       default:
         return {
           title: 'Shared Content',
@@ -122,16 +242,17 @@ export default function ShareModal({ visible, content, onClose }) {
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={presentationStyle}
       onRequestClose={onClose}
+      {...modalTransparentProps}
     >
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        <View style={[styles.container, { paddingTop: Math.max(insets.top, hp(1)) }]}>
           {/* AppHeader */}
           <AppHeader
             title="Share"
-            rightAction={selectedFriends.length > 0 ? handleSend : null}
-            rightActionLabel={`Send (${selectedFriends.length})`}
+            rightAction={selectedFriends.length > 0 && !isSending ? handleSend : null}
+            rightActionLabel={isSending ? 'Sending...' : `Send (${selectedFriends.length})`}
             onBack={onClose}
           />
 
@@ -161,7 +282,7 @@ export default function ShareModal({ visible, content, onClose }) {
               <TextInput
                 style={styles.messageInput}
                 placeholder="Say something..."
-                placeholderTextColor="#8E8E93"
+                placeholderTextColor={theme.colors.textSecondary + '80'}
                 value={message}
                 onChangeText={setMessage}
                 multiline
@@ -175,57 +296,75 @@ export default function ShareModal({ visible, content, onClose }) {
             <Ionicons
               name="search-outline"
               size={hp(1.8)}
-              color="#8E8E93"
+              color={theme.colors.textSecondary}
               style={styles.searchIcon}
             />
             <TextInput
               style={styles.searchInput}
               placeholder="Search friends..."
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.colors.textSecondary + '80'}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
 
           {/* Friends List */}
-          <FlatList
-            data={filteredFriends}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => {
-              const isSelected = selectedFriends.includes(item.id)
-              return (
-                <TouchableOpacity
-                  style={styles.friendItem}
-                  onPress={() => toggleFriend(item.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.friendAvatarContainer}>
-                    <Image
-                      source={{ uri: item.avatar }}
-                      style={styles.friendAvatar}
-                    />
-                    {item.online && <View style={styles.onlineIndicator} />}
-                  </View>
-                  <Text style={styles.friendName}>{item.name}</Text>
-                  <View
-                    style={[
-                      styles.checkbox,
-                      isSelected && styles.checkboxSelected,
-                    ]}
+          {friendsLoading ? (
+            <View style={styles.loadingState}>
+              <Text style={styles.loadingText}>Loading friends…</Text>
+            </View>
+          ) : filteredFriends.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={hp(4)} color={theme.colors.textSecondary} />
+              <Text style={styles.emptyTitle}>No friends yet</Text>
+              <Text style={styles.emptySubtitle}>Add friends to share in-app.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredFriends}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => {
+                const isSelected = selectedFriends.includes(item.id)
+                return (
+                  <TouchableOpacity
+                    style={styles.friendItem}
+                    onPress={() => toggleFriend(item.id)}
+                    activeOpacity={0.7}
                   >
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={hp(1.5)}
-                        color={theme.colors.white}
-                      />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )
-            }}
-            contentContainerStyle={styles.friendsList}
-          />
+                    <View style={styles.friendAvatarContainer}>
+                      {item.avatar ? (
+                        <Image
+                          source={{ uri: item.avatar }}
+                          style={styles.friendAvatar}
+                        />
+                      ) : (
+                        <View style={styles.friendAvatarPlaceholder}>
+                          <Ionicons name="person" size={hp(2)} color={theme.colors.textSecondary} />
+                        </View>
+                      )}
+                      {item.online && <View style={styles.onlineIndicator} />}
+                    </View>
+                    <Text style={styles.friendName}>{item.name}</Text>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        isSelected && styles.checkboxSelected,
+                      ]}
+                    >
+                      {isSelected && (
+                        <Ionicons
+                          name="checkmark"
+                          size={hp(1.5)}
+                          color={theme.colors.white}
+                        />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )
+              }}
+              contentContainerStyle={styles.friendsList}
+            />
+          )}
         </View>
       </SafeAreaView>
     </Modal>
@@ -280,14 +419,14 @@ const createStyles = (theme) => StyleSheet.create({
   messageLabel: {
     fontSize: hp(1.4),
     fontWeight: '500',
-    color: '#000000',
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
   messageInputContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: theme.colors.background,
     borderRadius: hp(1.2),
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: theme.colors.border || 'rgba(0, 0, 0, 0.05)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -300,21 +439,21 @@ const createStyles = (theme) => StyleSheet.create({
   messageInput: {
     padding: wp(4),
     fontSize: hp(1.5),
-    color: '#000000',
+    color: theme.colors.textPrimary,
     minHeight: hp(8),
     textAlignVertical: 'top',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: theme.colors.background,
     marginHorizontal: wp(4),
     marginBottom: hp(1),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
     borderRadius: 9999,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: theme.colors.border || 'rgba(0, 0, 0, 0.05)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -326,7 +465,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   searchIcon: {
     marginRight: wp(2),
-    opacity: 0.6,
+    opacity: 0.7,
   },
   searchInput: {
     flex: 1,
@@ -337,6 +476,29 @@ const createStyles = (theme) => StyleSheet.create({
   friendsList: {
     padding: wp(4),
     paddingBottom: hp(10),
+  },
+  loadingState: {
+    padding: wp(4),
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+  },
+  emptyState: {
+    padding: wp(6),
+    alignItems: 'center',
+    gap: hp(0.8),
+  },
+  emptyTitle: {
+    fontSize: hp(1.8),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+  },
+  emptySubtitle: {
+    fontSize: hp(1.5),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
   },
   friendItem: {
     flexDirection: 'row',
@@ -351,6 +513,16 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(5),
     height: hp(5),
     borderRadius: hp(2.5),
+  },
+  friendAvatarPlaceholder: {
+    width: hp(5),
+    height: hp(5),
+    borderRadius: hp(2.5),
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
   onlineIndicator: {
     position: 'absolute',
@@ -375,7 +547,7 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(2.5),
     borderRadius: hp(1.25),
     borderWidth: 2,
-    borderColor: theme.colors.softBlack,
+    borderColor: theme.colors.border || theme.colors.softBlack,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -384,4 +556,3 @@ const createStyles = (theme) => StyleSheet.create({
     borderColor: theme.colors.bondedPurple,
   },
 })
-

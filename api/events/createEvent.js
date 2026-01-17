@@ -19,7 +19,7 @@ export async function createEvent(input) {
     location_address,
     visibility = 'public',
     org_id,
-    // Note: university_id removed - uri_events table doesn't have this column
+    university_id,
     requires_approval = false,
     hide_guest_list = false,
     allow_sharing = true,
@@ -33,7 +33,7 @@ export async function createEvent(input) {
   } = input
 
   // Validate required fields
-  if (!organizer_id || !title || !start_at || !end_at || !created_by) {
+  if (!organizer_id || !title || !start_at || !end_at || !created_by || !university_id) {
     throw new Error('Missing required fields')
   }
 
@@ -44,7 +44,7 @@ export async function createEvent(input) {
 
   // Start transaction by creating event
   const { data: event, error: eventError } = await supabase
-    .from('uri_events')
+    .from('events')
     .insert({
       organizer_id,
       organizer_type,
@@ -57,7 +57,7 @@ export async function createEvent(input) {
       location_address,
       visibility,
       org_id: org_id || null,
-      // Note: uri_events table doesn't have university_id column
+      university_id,
       requires_approval,
       hide_guest_list,
       allow_sharing,
@@ -88,7 +88,7 @@ export async function createEvent(input) {
 
     if (ticketError) {
       // Rollback: delete the event
-      await supabase.from('uri_events').delete().eq('id', event.id)
+      await supabase.from('events').delete().eq('id', event.id)
       throw ticketError
     }
   }
@@ -105,7 +105,7 @@ export async function createEvent(input) {
 
   if (hostAttendanceError) {
     // Rollback: delete the event
-    await supabase.from('uri_events').delete().eq('id', event.id)
+    await supabase.from('events').delete().eq('id', event.id)
     throw hostAttendanceError
   }
 
@@ -131,4 +131,3 @@ export async function createEvent(input) {
 
   return event
 }
-

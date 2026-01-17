@@ -1,37 +1,44 @@
-import React, { useState } from 'react'
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Platform,
-  Image,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Keyboard,
-} from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Calendar as CalendarIcon, ChevronRight, Lock, MapPin } from '../../components/Icons'
+import LocationPicker from '../../components/LocationPicker'
 import { hp, wp } from '../../helpers/common'
-import { geocodeLocation, getStaticMapUrlWithCoords } from '../../helpers/mapUtils'
-import { useAppTheme } from '../theme'
-import { Calendar as CalendarIcon, MapPin, ChevronRight, Users, Lock } from '../../components/Icons'
-import { useCreateEvent } from '../../hooks/events/useCreateEvent'
-import { useAuthStore } from '../../stores/authStore'
-import { supabase } from '../../lib/supabase'
+import { getStaticMapUrlWithCoords } from '../../helpers/mapUtils'
 import { createSignedUrlForPath, uploadImageToBondedMedia } from '../../helpers/mediaStorage'
+import { useCreateEvent } from '../../hooks/events/useCreateEvent'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../stores/authStore'
+import { useClubsContext } from '../../contexts/ClubsContext'
+import { useAppTheme } from '../theme'
+import { formatDateShort, formatTimeForDisplay } from '../../utils/dateFormatters'
+
+import { Logger } from '../../utils/logger'
 
 export default function CreateEvent() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
   const { user } = useAuthStore()
+  const { orgId } = useLocalSearchParams()
+  const { getClub } = useClubsContext()
+  const preselectedOrg = orgId ? getClub(orgId) : null
+  const preselectedOrgId = typeof orgId === 'string' ? orgId : null
   const createEventMutation = useCreateEvent()
 
   const [eventName, setEventName] = useState('')
@@ -46,19 +53,19 @@ export default function CreateEvent() {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false)
   const [showVisibilityModal, setShowVisibilityModal] = useState(false)
   const [showInviteesModal, setShowInviteesModal] = useState(false)
-  const [selectedVisibility, setSelectedVisibility] = useState('public')
+  const [selectedVisibility, setSelectedVisibility] = useState(preselectedOrgId ? 'org_only' : 'public')
   const [selectedInvitees, setSelectedInvitees] = useState([])
+  const [selectedOrgId, setSelectedOrgId] = useState(preselectedOrgId)
   const [locationCoords, setLocationCoords] = useState(null)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [mapPreviewUrl, setMapPreviewUrl] = useState(null)
-  const [isGeocoding, setIsGeocoding] = useState(false)
 
   const pickImage = async () => {
     try {
       // Request permissions
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-      
+
       if (!permission.granted) {
         Alert.alert(
           'Permission Required',
@@ -80,7 +87,7 @@ export default function CreateEvent() {
         setEventImage(result.assets[0].uri)
       }
     } catch (error) {
-      console.error('Image picker error:', error)
+      Logger.error('Image picker error:', error)
       Alert.alert(
         'Error',
         'Failed to open image picker. Please try again.',
@@ -89,72 +96,39 @@ export default function CreateEvent() {
     }
   }
 
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
 
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
-
-  const handleLocationSelect = async () => {
+  const handleLocationSelect = () => {
     setShowLocationPicker(true)
   }
 
-  const handleLocationChange = async (text) => {
-    setLocation(text)
-
-    // Geocode location when user types (debounced)
-    if (text.length > 3) {
-      setIsGeocoding(true)
-      try {
-        // Add 5 second timeout to prevent indefinite loading
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Geocoding timeout')), 5000)
-        )
-        const coords = await Promise.race([
-          geocodeLocation(text),
-          timeoutPromise
-        ])
-        if (coords) {
-          setLocationCoords({ lat: coords.lat, lng: coords.lng })
-          // Generate map preview using coordinates for better accuracy
-          const mapUrl = getStaticMapUrlWithCoords(coords.lat, coords.lng, wp(90), hp(20))
-          setMapPreviewUrl(mapUrl)
-        } else {
-          setLocationCoords(null)
-          setMapPreviewUrl(null)
-        }
-      } catch (error) {
-        // Log but don't show error - geocoding failure shouldn't block event creation
-        console.warn('Geocoding failed or timed out:', error.message)
-        setLocationCoords(null)
-        setMapPreviewUrl(null)
-      } finally {
-        setIsGeocoding(false)
-      }
-    } else {
-      setLocationCoords(null)
-      setMapPreviewUrl(null)
+  const handleLocationPicked = (locationData) => {
+    // locationData contains: { description, formatted_address, coordinates: { lat, lng }, ... }
+    setLocation(locationData.formatted_address || locationData.description)
+    if (locationData.coordinates) {
+      setLocationCoords({
+        lat: locationData.coordinates.lat,
+        lng: locationData.coordinates.lng,
+      })
+      // Generate map preview using coordinates
+      const mapUrl = getStaticMapUrlWithCoords(
+        locationData.coordinates.lat,
+        locationData.coordinates.lng,
+        wp(90),
+        hp(20)
+      )
+      setMapPreviewUrl(mapUrl)
     }
   }
 
   const uploadEventImage = async (eventId) => {
     if (!eventImage || !user || !eventId) {
-      console.log('Skipping image upload: no image, user, or event')
+      Logger.debug('Skipping image upload: no image, user, or event')
       return null
     }
 
     try {
       setIsUploading(true)
-      console.log('Starting image upload for event:', eventId)
+      Logger.info('Starting image upload for event:', eventId)
 
       const uploadResult = await uploadImageToBondedMedia({
         fileUri: eventImage,
@@ -169,8 +143,7 @@ export default function CreateEvent() {
       const signedUrl = await createSignedUrlForPath(uploadResult.path)
       return signedUrl
     } catch (error) {
-      console.error('Error uploading image:', error)
-      console.error('Error details:', JSON.stringify(error, null, 2))
+      Logger.error('Error uploading image:', error)
       Alert.alert(
         'Upload Error',
         `Failed to upload event image: ${error.message || 'Unknown error'}. Event will be created without image.`,
@@ -218,6 +191,7 @@ export default function CreateEvent() {
         allow_sharing: true,
         is_paid: false,
         invites: selectedInvitees.map(id => ({ user_id: id })),
+        org_id: selectedOrgId || null,
       }
 
       // Create event first (needs event_id for canonical media path)
@@ -226,9 +200,9 @@ export default function CreateEvent() {
       if (eventImage && createdEvent?.id) {
         const imageUrl = await uploadEventImage(createdEvent.id)
         if (imageUrl) {
-          // TODO: Store media path or media_id instead of signed URL in uri_events.image_url.
+          // TODO: Store media path or media_id instead of signed URL in events.image_url.
           await supabase
-            .from('uri_events')
+            .from('events')
             .update({ image_url: imageUrl })
             .eq('id', createdEvent.id)
         }
@@ -238,19 +212,12 @@ export default function CreateEvent() {
         { text: 'OK', onPress: () => router.back() }
       ])
     } catch (error) {
-      console.error('Error creating event:', error)
+      Logger.error('Error creating event:', error)
       Alert.alert('Error', error.message || 'Failed to create event. Please try again.')
     }
   }
 
-  // Mock connections data
-  const mockConnections = [
-    { id: 'user-1', name: 'Danielle Williams', avatar: 'DW', type: 'friend' },
-    { id: 'user-2', name: 'John Smith', avatar: 'JS', type: 'friend' },
-    { id: 'user-3', name: 'Sarah Johnson', avatar: 'SJ', type: 'friend' },
-    { id: 'org-1', name: 'Music Society', avatar: 'MS', type: 'org' },
-    { id: 'org-2', name: 'CS Club', avatar: 'CS', type: 'org' },
-  ]
+  const mockConnections = []
 
   const toggleInvitee = (id) => {
     setSelectedInvitees((prev) =>
@@ -348,7 +315,7 @@ export default function CreateEvent() {
             >
               <View style={styles.dateTimeContent}>
                 <CalendarIcon size={hp(2)} color={theme.colors.textSecondary} />
-                <Text style={styles.dateTimeText}>{formatDate(eventDate)}</Text>
+                <Text style={styles.dateTimeText}>{formatDateShort(eventDate)}</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.timeRow}>
@@ -359,7 +326,7 @@ export default function CreateEvent() {
               >
                 <View style={styles.dateTimeContent}>
                   <Text style={styles.timeIcon}>🕐</Text>
-                  <Text style={styles.dateTimeText}>{formatTime(eventTime)}</Text>
+                  <Text style={styles.dateTimeText}>{formatTimeForDisplay(eventTime)}</Text>
                 </View>
               </TouchableOpacity>
               <ChevronRight size={hp(2)} color={theme.colors.textSecondary} />
@@ -370,7 +337,7 @@ export default function CreateEvent() {
               >
                 <View style={styles.dateTimeContent}>
                   <Text style={styles.timeIcon}>🕐</Text>
-                  <Text style={styles.dateTimeText}>{formatTime(endTime)}</Text>
+                  <Text style={styles.dateTimeText}>{formatTimeForDisplay(endTime)}</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -399,8 +366,8 @@ export default function CreateEvent() {
                 onPress={() => setShowLocationPicker(true)}
                 activeOpacity={0.9}
               >
-                <Image 
-                  source={{ uri: mapPreviewUrl }} 
+                <Image
+                  source={{ uri: mapPreviewUrl }}
                   style={styles.mapPreviewImage}
                   resizeMode="cover"
                 />
@@ -411,17 +378,14 @@ export default function CreateEvent() {
             )}
           </View>
 
-          {/* Optional - Organization */}
+          {/* Organization */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Optional</Text>
-            <TouchableOpacity
-              style={styles.selectField}
-              onPress={() => {}}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.selectFieldText}>Select organization</Text>
-              <ChevronRight size={hp(2)} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
+            <Text style={styles.label}>Organization</Text>
+            <View style={styles.selectField}>
+              <Text style={styles.selectFieldText}>
+                {preselectedOrg?.name || 'No organization selected'}
+              </Text>
+            </View>
           </View>
 
           {/* Visibility & Access */}
@@ -435,9 +399,9 @@ export default function CreateEvent() {
               <View style={styles.selectFieldLeft}>
                 <Lock size={hp(2)} color={theme.colors.textSecondary} />
                 <Text style={styles.selectFieldText}>
-                  {selectedVisibility === 'public' ? 'Public Event' : 
-                   selectedVisibility === 'org_only' ? 'Org Members Only' : 
-                   'Invite Only'}
+                  {selectedVisibility === 'public' ? 'Public Event' :
+                    selectedVisibility === 'org_only' ? 'Org Members Only' :
+                      'Invite Only'}
                 </Text>
               </View>
               <ChevronRight size={hp(2)} color={theme.colors.textSecondary} />
@@ -449,7 +413,7 @@ export default function CreateEvent() {
             <Text style={styles.label}>Ticketing</Text>
             <TouchableOpacity
               style={styles.selectField}
-              onPress={() => {}}
+              onPress={() => { }}
               activeOpacity={0.7}
             >
               <Text style={styles.selectFieldText}>Free Event</Text>
@@ -718,9 +682,9 @@ export default function CreateEvent() {
                         selectedVisibility === option && styles.optionTextSelected,
                       ]}
                     >
-                      {option === 'public' ? 'Public Event' : 
-                       option === 'org_only' ? 'Org Members Only' : 
-                       'Invite Only'}
+                      {option === 'public' ? 'Public Event' :
+                        option === 'org_only' ? 'Org Members Only' :
+                          'Invite Only'}
                     </Text>
                     {selectedVisibility === option && (
                       <Text style={styles.checkmark}>✓</Text>
@@ -783,108 +747,13 @@ export default function CreateEvent() {
         </Modal>
 
         {/* Location Picker Modal */}
-        <Modal
+        <LocationPicker
           visible={showLocationPicker}
-          transparent
-          animationType="slide"
-          onRequestClose={() => {
-            Keyboard.dismiss()
-            setShowLocationPicker(false)
-          }}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalOverlay}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-          >
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => {
-                Keyboard.dismiss()
-                setShowLocationPicker(false)
-              }}
-            >
-              <TouchableOpacity
-                style={styles.modalContent}
-                activeOpacity={1}
-                onPress={(e) => e.stopPropagation()}
-              >
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Select Location</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      Keyboard.dismiss()
-                      setShowLocationPicker(false)
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.modalCloseText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView
-                  style={styles.modalBody}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
-                  <TextInput
-                    style={styles.locationInput}
-                    placeholder="Enter location name or address"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    value={location}
-                    onChangeText={handleLocationChange}
-                    autoFocus={true}
-                    returnKeyType="search"
-                  />
-                  {isGeocoding && (
-                    <View style={styles.geocodingIndicator}>
-                      <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
-                      <Text style={styles.geocodingText}>Finding location...</Text>
-                    </View>
-                  )}
-                  {location && mapPreviewUrl && !isGeocoding && (
-                    <View style={styles.mapPreviewContainer}>
-                      <Image 
-                        source={{ uri: mapPreviewUrl }} 
-                        style={styles.mapPreviewImage}
-                        resizeMode="cover"
-                      />
-                      {locationCoords && (
-                        <View style={styles.mapPreviewOverlay}>
-                          <MapPin size={hp(2)} color={theme.colors.white} />
-                          <Text style={styles.mapPreviewText} numberOfLines={2}>{location}</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                  {location && !mapPreviewUrl && !isGeocoding && location.length > 3 && (
-                    <View style={styles.locationError}>
-                      <Text style={styles.locationErrorText}>
-                        Could not find this location. Please try a different address.
-                      </Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={[
-                      styles.locationConfirmButton,
-                      (!location.trim() || isGeocoding) && styles.locationConfirmButtonDisabled,
-                    ]}
-                    onPress={() => {
-                      if (location.trim() && !isGeocoding) {
-                        Keyboard.dismiss()
-                        setShowLocationPicker(false)
-                      }
-                    }}
-                    activeOpacity={0.8}
-                    disabled={!location.trim() || isGeocoding}
-                  >
-                    <Text style={styles.locationConfirmButtonText}>Confirm</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </Modal>
+          onClose={() => setShowLocationPicker(false)}
+          onSelect={handleLocationPicked}
+          placeholder="Search for a location or address"
+          initialValue={location}
+        />
       </View>
     </SafeAreaView>
   )

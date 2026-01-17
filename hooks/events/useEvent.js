@@ -1,15 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-
-// Helpers for common Supabase RLS recursion error
-const isRlsRecursionError = (error) =>
-  error?.code === '42P17' || error?.message?.toLowerCase()?.includes('infinite recursion')
-
-const logRlsFixHint = (table = 'event_attendance') => {
-  console.warn(`⚠️ RLS recursion detected on ${table} – using fallback query`)
-  console.warn('💡 Fix the RLS policy on event_attendance table in Supabase to resolve this')
-  console.warn('💡 The event will still load, but attendance details may be limited')
-}
+import { isRlsRecursionError, logRlsFixHint } from '../../utils/rlsHelpers'
 
 /**
  * Hook to fetch a single event by ID
@@ -31,12 +22,12 @@ export function useEvent(eventId) {
       console.log('🔍 useEvent - Fetching event with ID:', normalizedId, 'type:', typeof normalizedId)
 
       // Try full query with attendance first
+      // Must specify explicit FK name because there are multiple relationships (organizer_id and created_by)
       let query = supabase
-        .from('uri_events')
+        .from('events')
         .select(`
           *,
           organizer:profiles!events_organizer_id_fkey(id, full_name, avatar_url),
-          org:orgs(id, name),
           ticket_types:event_ticket_types(*),
           attendance:event_attendance(
             id,
@@ -44,6 +35,7 @@ export function useEvent(eventId) {
             status,
             ticket_type_id,
             is_host,
+            is_public,
             user:profiles(id, full_name, avatar_url)
           ),
           attendees_count:event_attendance(count)
@@ -60,11 +52,10 @@ export function useEvent(eventId) {
         
         // Try without attendance join
         query = supabase
-          .from('uri_events')
+          .from('events')
           .select(`
             *,
             organizer:profiles!events_organizer_id_fkey(id, full_name, avatar_url),
-            org:orgs(id, name),
             ticket_types:event_ticket_types(*)
           `)
           .eq('id', normalizedId)
@@ -78,7 +69,7 @@ export function useEvent(eventId) {
         if (error && isRlsRecursionError(error)) {
           console.warn('⚠️ Trying minimal query without any joins')
           query = supabase
-            .from('uri_events')
+            .from('events')
             .select('*')
             .eq('id', normalizedId)
             .single()
@@ -107,9 +98,25 @@ export function useEvent(eventId) {
 
       console.log('✅ useEvent - Event fetched successfully:', { id: data.id, title: data.title })
 
+      let org = null
+      if (data.org_id) {
+        const { data: orgData, error: orgError } = await supabase
+          .from('orgs')
+          .select('id, name')
+          .eq('id', data.org_id)
+          .single()
+
+        if (orgError) {
+          console.warn('⚠️ useEvent - Failed to load org:', orgError)
+        } else {
+          org = orgData
+        }
+      }
+
       // Transform data
       return {
         ...data,
+        org,
         attendance: data.attendance || [],
         attendees_count: Array.isArray(data.attendees_count)
           ? data.attendees_count[0]?.count || 0

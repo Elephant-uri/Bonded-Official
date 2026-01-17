@@ -69,10 +69,18 @@ export const getConversationSuggestions = async (conversationContext) => {
 
 // Get conversation quality score
 export const analyzeConversationQuality = async (messages) => {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return {
+      score: 0,
+      feedback: 'Start the conversation to see insights.',
+    }
+  }
+
+  const getText = (msg) => msg?.message_text || msg?.content || ''
   let score = 50 // Base score
 
   // Check for engagement
-  const hasQuestions = messages.some((msg) => msg.message_text.includes('?'))
+  const hasQuestions = messages.some((msg) => getText(msg).includes('?'))
   if (hasQuestions) score += 10
 
   // Check for balance (both parties contributing)
@@ -80,13 +88,13 @@ export const analyzeConversationQuality = async (messages) => {
   if (uniqueSenders.size > 1) score += 15
 
   // Check for meaningful length
-  const avgLength = messages.reduce((sum, msg) => sum + msg.message_text.length, 0) / messages.length
+  const avgLength = messages.reduce((sum, msg) => sum + getText(msg).length, 0) / messages.length
   if (avgLength > 20) score += 10
 
   // Check for positive language
   const positiveWords = ['great', 'awesome', 'love', 'excited', 'happy', 'thanks']
   const hasPositive = messages.some((msg) =>
-    positiveWords.some((word) => msg.message_text.toLowerCase().includes(word))
+    positiveWords.some((word) => getText(msg).toLowerCase().includes(word))
   )
   if (hasPositive) score += 15
 
@@ -107,6 +115,7 @@ export const generateConversationStarter = async (recipientProfile) => {
 
   return starters[Math.floor(Math.random() * starters.length)]
 }
+
 
 
 

@@ -20,11 +20,11 @@ export async function getUniversityIdForUser(userId) {
     .from('profiles')
     .select('university_id')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
 
   if (error) {
-    console.error('Error fetching university_id for media upload:', error)
-    throw error
+    console.warn('⚠️ Error fetching university_id for media upload (this is normal for new users):', error.message)
+    return null
   }
 
   return data?.university_id || null
@@ -64,10 +64,10 @@ export function buildMediaPath({
       return `universities/${universityId}/users/${userId}/posts/${postId}/${mediaId}.jpg`
     case 'org_logo':
       ensureValue(orgId, 'orgId')
-      return `universities/${universityId}/orgs/${orgId}/logo/logo.jpg`
+      return `orgs/${orgId}/logo/logo.jpg`
     case 'org_cover':
       ensureValue(orgId, 'orgId')
-      return `universities/${universityId}/orgs/${orgId}/cover/cover.jpg`
+      return `orgs/${orgId}/cover/cover.jpg`
     case 'event_cover':
       ensureValue(eventId, 'eventId')
       return `universities/${universityId}/events/${eventId}/cover/cover.jpg`
@@ -75,6 +75,10 @@ export function buildMediaPath({
       ensureValue(eventId, 'eventId')
       ensureValue(mediaId, 'mediaId')
       return `universities/${universityId}/events/${eventId}/gallery/${mediaId}.jpg`
+    case 'message_media':
+      ensureValue(userId, 'userId')
+      ensureValue(mediaId, 'mediaId')
+      return `universities/${universityId}/users/${userId}/messages/${mediaId}.jpg`
     default:
       throw new Error(`Unsupported mediaType: ${mediaType}`)
   }

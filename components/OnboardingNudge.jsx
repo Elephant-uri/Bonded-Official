@@ -20,8 +20,16 @@ function OnboardingNudge() {
   useEffect(() => {
     if (isLoading || !profile) return
 
-    // Show nudge if onboarding is incomplete and not dismissed
-    if (!profile.onboarding_complete && !nudgeDismissed) {
+    // Check if user has basic profile data (username, full_name, etc.)
+    // If they do, they're an existing user and shouldn't be forced to onboarding
+    const hasBasicProfileData = profile.username && profile.full_name && 
+      (profile.avatar_url || profile.major || profile.graduation_year)
+
+    // Show nudge only if:
+    // 1. Onboarding is incomplete AND
+    // 2. User doesn't have basic profile data (new user) AND
+    // 3. Nudge hasn't been dismissed
+    if (!profile.onboarding_complete && !hasBasicProfileData && !nudgeDismissed) {
       // Show nudge after 5 seconds of being on a screen
       const timer = setTimeout(() => {
         setShowNudge(true)
@@ -43,7 +51,11 @@ function OnboardingNudge() {
     router.push('/onboarding')
   }
 
-  if (!showNudge || !profile || profile.onboarding_complete) {
+  // Check if user has basic profile data
+  const hasBasicProfileData = profile?.username && profile?.full_name && 
+    (profile?.avatar_url || profile?.major || profile?.graduation_year)
+
+  if (!showNudge || !profile || profile.onboarding_complete || hasBasicProfileData) {
     return null
   }
 

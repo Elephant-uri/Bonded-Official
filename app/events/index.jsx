@@ -17,6 +17,7 @@ import EventCard from '../../components/Events/EventCard'
 import { Add, Search } from '../../components/Icons'
 import { hp, wp } from '../../helpers/common'
 import { useEventsForUser } from '../../hooks/events/useEventsForUser'
+import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { isFeatureEnabled } from '../../utils/featureGates'
 import ThemedText from '../components/ThemedText'
@@ -50,7 +51,7 @@ export default function EventsHome() {
 
   const { user } = useAuthStore()
 
-  // Attendance is still local UI state for immediate feedback
+  // Attendance state - will be loaded from database
   const [eventAttendance, setEventAttendance] = useState({}) // { eventId: 'going' | 'pending' }
 
   const currentUserId = user?.id || 'anonymous'
@@ -90,10 +91,46 @@ export default function EventsHome() {
     return data?.pages?.some((page) => page.rlsError) || false
   }, [data])
 
+  // Load attendance status from database on mount and when events change
+  React.useEffect(() => {
+    if (!user?.id || !events || events.length === 0) return
+
+    const loadAttendance = async () => {
+      try {
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('event_attendance')
+          .select('event_id, status')
+          .eq('user_id', user.id)
+          .in('event_id', events.map(e => e.id))
+
+        if (attendanceError) {
+          console.error('Error loading attendance:', attendanceError)
+          return
+        }
+
+        // Build attendance map from database
+        const attendanceMap = {}
+        attendanceData?.forEach((att) => {
+          if (att.status === 'going' || att.status === 'approved') {
+            attendanceMap[att.event_id] = 'going'
+          } else if (att.status === 'requested') {
+            attendanceMap[att.event_id] = 'pending'
+          }
+        })
+
+        setEventAttendance(attendanceMap)
+      } catch (err) {
+        console.error('Error loading event attendance:', err)
+      }
+    }
+
+    loadAttendance()
+  }, [user?.id, events?.length])
+
   // Log loading state and errors
   React.useEffect(() => {
-    console.log('📡 Events loading state:', { isLoading, hasData: !!data, eventCount: events.length, error: error?.message })
-  }, [isLoading, data, events.length, error])
+    console.log('📡 Events loading state:', { isLoading, hasData: !!data, eventCount: events?.length || 0, error: error?.message })
+  }, [isLoading, data, events?.length, error])
 
   const onRefresh = async () => {
     setRefreshing(true)
@@ -337,6 +374,25 @@ export default function EventsHome() {
     </>
   )
 
+  const renderSkeleton = () => (
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      {renderScrollableHeader()}
+      <View style={styles.skeletonSection}>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <View key={`skeleton-${index}`} style={styles.skeletonCard}>
+            <View style={styles.skeletonImage} />
+            <View style={styles.skeletonLinePrimary} />
+            <View style={styles.skeletonLineSecondary} />
+            <View style={styles.skeletonMetaRow}>
+              <View style={styles.skeletonPill} />
+              <View style={styles.skeletonPillSmall} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  )
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
       <ThemedView style={styles.container}>
@@ -373,9 +429,7 @@ export default function EventsHome() {
           </View>
         )}
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading events...</Text>
-          </View>
+          renderSkeleton()
         ) : filteredEvents.length === 0 && !isLoading ? (
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {renderScrollableHeader()}
@@ -476,4 +530,12 @@ const createStyles = (theme) => StyleSheet.create({
   scrollContent: { paddingBottom: hp(12) },
   rlsWarningBanner: { paddingVertical: hp(1), paddingHorizontal: wp(4), alignItems: 'center' },
   rlsWarningText: { fontSize: hp(1.4), fontFamily: theme.typography.fontFamily.body, color: '#FFFFFF', textAlign: 'center' },
+  skeletonSection: { paddingHorizontal: wp(4), paddingTop: hp(1.5), gap: hp(2) },
+  skeletonCard: { borderRadius: theme.radius.xl, backgroundColor: theme.colors.surface, padding: wp(4), gap: hp(1.2), borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
+  skeletonImage: { width: '100%', height: hp(16), borderRadius: theme.radius.lg, backgroundColor: theme.colors.border },
+  skeletonLinePrimary: { height: hp(1.8), width: '70%', borderRadius: hp(1), backgroundColor: theme.colors.border },
+  skeletonLineSecondary: { height: hp(1.6), width: '55%', borderRadius: hp(1), backgroundColor: theme.colors.border },
+  skeletonMetaRow: { flexDirection: 'row', gap: wp(2), marginTop: hp(0.5) },
+  skeletonPill: { height: hp(2.8), width: wp(18), borderRadius: hp(2), backgroundColor: theme.colors.border },
+  skeletonPillSmall: { height: hp(2.8), width: wp(12), borderRadius: hp(2), backgroundColor: theme.colors.border },
 })

@@ -25,13 +25,14 @@ export function useCreatePost() {
       }
 
       const trimmedBody = body.trim()
-      const trimmedTitle = title?.trim() || null // Title is optional, don't auto-generate from body
+      // Title is optional - use empty string if not provided (database requires non-null)
+      const trimmedTitle = title?.trim() || ''
 
       // Create the post
       const postData = {
         forum_id: forumId,
         user_id: user.id,
-        title: trimmedTitle,
+        title: trimmedTitle, // Empty string for optional titles
         body: trimmedBody,
         tags: Array.isArray(tags) ? tags : [],
         media_urls: Array.isArray(mediaUrls) ? mediaUrls : [],
@@ -80,9 +81,9 @@ export function useCreatePost() {
       }
 
       // Return post with any poll error for UI feedback
-      return { 
-        post, 
-        pollError: pollCreationError 
+      return {
+        post,
+        pollError: pollCreationError
       }
     },
     onSuccess: (data, variables) => {
@@ -92,7 +93,3 @@ export function useCreatePost() {
     retry: 1,
   })
 }
-
-
-
-

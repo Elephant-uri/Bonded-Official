@@ -21,7 +21,6 @@ export default function CreateForum() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isPrivate, setIsPrivate] = useState(false)
-  const [allowStories, setAllowStories] = useState(true)
   const [allowNonAnon, setAllowNonAnon] = useState(true)
 
   return (
@@ -80,17 +79,18 @@ export default function CreateForum() {
 
         <View style={styles.toggleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Stories</Text>
-            <Text style={styles.hint}>Show stories at the top of forum.</Text>
+            <Text style={styles.label}>Stories (Coming soon)</Text>
+            <Text style={styles.hint}>Stories will be available in V2.</Text>
           </View>
           <Switch
-            value={allowStories}
-            onValueChange={setAllowStories}
+            value={false}
+            onValueChange={() => {}}
             trackColor={{
               false: theme.colors.border,
               true: theme.colors.bondedPurple,
             }}
             thumbColor={theme.colors.white}
+            disabled
           />
         </View>
 
@@ -229,6 +229,5 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: '600',
   },
 })
-
 
 

@@ -7,15 +7,18 @@ import { useEventActions } from '../../hooks/events/useEventActions'
 import { useAuthStore } from '../../stores/authStore'
 import { isFeatureEnabled } from '../../utils/featureGates'
 import AppCard from '../AppCard'
+import ShareModal from '../ShareModal'
 import { Calendar, Heart, HeartFill, MapPin, Share2, Users, Settings } from '../Icons'
 import Button from '../ui/Button'
 import Text from '../ui/Text'
+import { formatDate, formatTime } from '../../utils/dateFormatters'
 
 export default function EventCard({ event, onPress, currentUserId, attendanceStatus, onAction }) {
   const theme = useAppTheme()
   const router = useRouter()
   const { user } = useAuthStore()
   const [isSaved, setIsSaved] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
   const styles = createStyles(theme)
 
   // Use real Supabase integration if user is authenticated
@@ -43,40 +46,17 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
     }
   }
 
+  const handleInAppShare = (e) => {
+    e.stopPropagation()
+    setShowShareModal(true)
+  }
+
   const handleSave = (e) => {
     e.stopPropagation()
     setIsSaved(!isSaved)
     // In real app, save to database
   }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today'
-    } else if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow'
-    } else {
-      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
-      const monthDay = date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      })
-      return `${dayName}, ${monthDay}`
-    }
-  }
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }).toLowerCase().replace(/\s/g, '')
-  }
 
 
   const getVisibilityBadge = () => {
@@ -98,19 +78,20 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
   const attendeesCount = event.attendees_count || 0
 
   return (
-    <AppCard
-      style={[
-        styles.card,
-        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-      ]}
-      radius="lg"
-      padding={false}
-    >
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={onPress}
-        style={styles.cardContent}
+    <>
+      <AppCard
+        style={[
+          styles.card,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+        radius="lg"
+        padding={false}
       >
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={onPress}
+          style={styles.cardContent}
+        >
         {/* Event Image - Clean, no text overlay */}
         {event.image_url ? (
           <Image source={{ uri: event.image_url }} style={styles.image} resizeMode="cover" />
@@ -130,7 +111,8 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
             <View style={styles.actionIcons}>
               <TouchableOpacity
                 style={styles.actionIconButton}
-                onPress={handleShare}
+                onPress={handleInAppShare}
+                onLongPress={handleShare}
                 activeOpacity={0.7}
               >
                 <Share2 size={hp(2.2)} color={theme.colors.textSecondary} strokeWidth={2} />
@@ -202,8 +184,8 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
       </TouchableOpacity>
 
       {/* Join Button / Manage Button - Eventbrite Style */}
-      {(userId || onAction) && (
-        <View style={styles.actionContainer}>
+        {(userId || onAction) && (
+          <View style={styles.actionContainer}>
           {/* Manage Button for Organizer */}
           {isOrganizer && (
             <Button
@@ -299,9 +281,25 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
               textStyle={[styles.joinButtonText, styles.joinButtonTextPending]}
             />
           )}
-        </View>
-      )}
-    </AppCard>
+          </View>
+        )}
+      </AppCard>
+      <ShareModal
+        visible={showShareModal}
+        content={{
+          type: 'event',
+          data: {
+            id: event.id,
+            title: event.title,
+            location_name: event.location_name,
+            location_address: event.location_address,
+            start_at: event.start_at,
+            image_url: event.image_url,
+          },
+        }}
+        onClose={() => setShowShareModal(false)}
+      />
+    </>
   )
 }
 
@@ -502,4 +500,3 @@ const createStyles = (theme) =>
       color: theme.colors.bondedPurple,
     },
   })
-

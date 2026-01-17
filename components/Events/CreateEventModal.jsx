@@ -23,6 +23,7 @@ import { hp, wp } from '../../helpers/common'
 import { useAppTheme } from '../../app/theme'
 import Picker from '../Picker'
 import { useEventsContext } from '../../contexts/EventsContext'
+import { formatDate, formatTime } from '../../utils/dateFormatters'
 
 const CATEGORIES = [
   { value: 'social', label: 'Social' },
@@ -106,21 +107,6 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
     setCoverImage(null)
   }
 
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
 
   const resetForm = () => {
     setTitle('')

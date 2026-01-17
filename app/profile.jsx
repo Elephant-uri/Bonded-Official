@@ -1,21 +1,22 @@
 import { Ionicons } from '@expo/vector-icons'
-import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import React, { useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import React, { useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
-import AppHeader from '../components/AppHeader'
-import Chip from '../components/Chip'
+import { ArrowLeft, Calendar, MapPin, School, User } from '../components/Icons'
 import PrimaryButton from '../components/PrimaryButton'
 import { hp, wp } from '../helpers/common'
-import { uploadImageToBondedMedia, createSignedUrlForPath } from '../helpers/mediaStorage'
+import { createSignedUrlForPath, uploadImageToBondedMedia } from '../helpers/mediaStorage'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useFriends } from '../hooks/useFriends'
 import { useUpdateProfile } from '../hooks/useUpdateProfile'
 import { useAuthStore } from '../stores/authStore'
 import { useAppTheme } from './theme'
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
 export default function Profile() {
   const router = useRouter()
@@ -27,19 +28,11 @@ export default function Profile() {
   const { data: friends = [], isLoading: friendsLoading } = useFriends()
   const updateProfile = useUpdateProfile()
   
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Profile page state:', {
-      user: user?.id,
-      profileLoading,
-      hasProfile: !!userProfile,
-      profileError: profileError?.message,
-    })
-  }, [user, profileLoading, userProfile, profileError])
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editName, setEditName] = useState('')
   const [editQuote, setEditQuote] = useState('')
+  const [focusQuoteInput, setFocusQuoteInput] = useState(false)
   const [newAvatarUri, setNewAvatarUri] = useState(null)
   const [newBannerUri, setNewBannerUri] = useState(null)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
@@ -47,17 +40,38 @@ export default function Profile() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [galleryPhotos, setGalleryPhotos] = useState([])
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
+  const quoteInputRef = useRef(null)
   
   // Update edit fields when userProfile loads
   React.useEffect(() => {
     if (userProfile) {
       setEditName(userProfile.full_name || userProfile.name || '')
       setEditQuote(userProfile.yearbook_quote || userProfile.yearbookQuote || '')
-      // Initialize gallery photos from profile
       const photos = Array.isArray(userProfile.photos) ? userProfile.photos : []
       setGalleryPhotos(photos.map((url, index) => ({ url, id: `existing-${index}` })))
     }
   }, [userProfile])
+
+  const profilePhotos = useMemo(() => {
+    if (!userProfile) return []
+    return Array.isArray(userProfile.photos) ? userProfile.photos : []
+  }, [userProfile])
+
+  React.useEffect(() => {
+    setActivePhotoIndex(0)
+  }, [profilePhotos.length])
+
+  React.useEffect(() => {
+    if (!showEditModal || !focusQuoteInput) return
+    const timeoutId = setTimeout(() => {
+      quoteInputRef.current?.focus()
+    }, 200)
+    setFocusQuoteInput(false)
+    return () => clearTimeout(timeoutId)
+  }, [showEditModal, focusQuoteInput])
+
+  const avatarUrl = userProfile?.yearbookPhotoUrl || userProfile?.avatarUrl || profilePhotos[0] || null
+  const displayQuote = userProfile?.yearbookQuote || userProfile?.yearbook_quote || ''
 
   // Handle avatar selection
   const handleSelectAvatar = async () => {
@@ -104,11 +118,8 @@ export default function Profile() {
     if (!userProfile?.id) return
 
     const updates = {}
-    let avatarUrl = null
-    let bannerUrl = null
 
     try {
-      // Upload avatar if changed
       if (newAvatarUri) {
         setIsUploadingAvatar(true)
         const uploadResult = await uploadImageToBondedMedia({
@@ -119,12 +130,11 @@ export default function Profile() {
           userId: user.id,
           upsert: true,
         })
-        avatarUrl = await createSignedUrlForPath(uploadResult.path)
-        updates.avatar_url = avatarUrl
+        const avatarUrlNew = await createSignedUrlForPath(uploadResult.path)
+        updates.avatar_url = avatarUrlNew
         setIsUploadingAvatar(false)
       }
 
-      // Upload banner if changed
       if (newBannerUri) {
         setIsUploadingBanner(true)
         const uploadResult = await uploadImageToBondedMedia({
@@ -135,17 +145,15 @@ export default function Profile() {
           userId: user.id,
           upsert: true,
         })
-        bannerUrl = await createSignedUrlForPath(uploadResult.path)
+        const bannerUrl = await createSignedUrlForPath(uploadResult.path)
         updates.banner_url = bannerUrl
         setIsUploadingBanner(false)
       }
 
-      // Update name if changed
       if (editName.trim() !== (userProfile.full_name || userProfile.name || '')) {
         updates.full_name = editName.trim()
       }
 
-      // Update quote if changed
       if (editQuote.trim() !== (userProfile.yearbook_quote || userProfile.yearbookQuote || '')) {
         updates.yearbook_quote = editQuote.trim()
       }
@@ -179,13 +187,20 @@ export default function Profile() {
     })
 
     if (!result.canceled && result.assets) {
+      const existingUris = new Set(
+        galleryPhotos
+          .map((photo) => photo.localUri || photo.url)
+          .filter(Boolean)
+      )
       const newPhotos = result.assets.map((asset, index) => ({
         url: asset.uri,
         id: `new-${Date.now()}-${index}`,
         localUri: asset.uri,
         isNew: true,
       }))
-      setGalleryPhotos([...galleryPhotos, ...newPhotos])
+      const uniqueNewPhotos = newPhotos.filter((photo) => !existingUris.has(photo.localUri))
+      if (uniqueNewPhotos.length === 0) return
+      setGalleryPhotos([...galleryPhotos, ...uniqueNewPhotos])
     }
   }
 
@@ -228,26 +243,36 @@ export default function Profile() {
   const handleSaveAllChanges = async () => {
     if (!userProfile?.id) return
 
-    const updates = {}
-
     try {
-      // Upload new gallery photos
       const newPhotos = galleryPhotos.filter(photo => photo.isNew)
       if (newPhotos.length > 0) {
         setIsUploadingPhoto(true)
+        const uploadedUrls = []
         for (const photo of newPhotos) {
-          await uploadImageToBondedMedia({
+          const uploadResult = await uploadImageToBondedMedia({
             fileUri: photo.localUri,
             mediaType: 'profile_photo',
             ownerType: 'user',
             ownerId: user.id,
             userId: user.id,
           })
+          const signedUrl = await createSignedUrlForPath(uploadResult.path)
+          if (signedUrl) {
+            uploadedUrls.push(signedUrl)
+          }
         }
+        setGalleryPhotos((prev) => {
+          const kept = prev.filter((photo) => !photo.isNew)
+          const merged = [...kept, ...uploadedUrls.map((url, index) => ({
+            url,
+            id: `uploaded-${Date.now()}-${index}`,
+            isNew: false,
+          }))]
+          return merged
+        })
         setIsUploadingPhoto(false)
       }
 
-      // Continue with existing save logic
       await handleSaveProfile()
     } catch (error) {
       console.error('Error saving changes:', error)
@@ -258,662 +283,550 @@ export default function Profile() {
 
   const styles = createStyles(theme)
 
-  const profilePhotos = useMemo(() => {
-    if (!userProfile) return []
-    return Array.isArray(userProfile.photos) ? userProfile.photos : []
-  }, [userProfile])
+  if (profileLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
-  React.useEffect(() => {
-    setActivePhotoIndex(0)
-  }, [profilePhotos.length])
-
-  const carouselItemWidth = wp(86)
-  const coverPhotoUrl = userProfile?.banner_url || profilePhotos[0] || null
-  const avatarUrl = userProfile?.yearbookPhotoUrl || userProfile?.avatarUrl || profilePhotos[0] || null
-  const canSaveName = editName.trim().length > 0 && editName.trim() !== (userProfile?.full_name || userProfile?.name || '')
+  if (profileError) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={hp(6)} color={theme.colors.error} />
+          <Text style={styles.errorText}>Error loading profile</Text>
+          <Text style={styles.errorSubtext}>{profileError.message || 'Unknown error'}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => router.push('/onboarding')}
+          >
+            <Text style={styles.retryButtonText}>Complete Onboarding</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.container}>
-        <AppHeader
-          rightAction={() => {
-            setShowEditModal(true)
-          }}
-          rightActionLabel="•••"
-        />
+    <View style={styles.container}>
+      {/* Back Button - Fixed */}
+      <TouchableOpacity
+        style={styles.backButton}
+        activeOpacity={0.7}
+        onPress={() => router.back()}
+      >
+        <View style={styles.backButtonCircle}>
+          <ArrowLeft size={hp(2)} color="#fff" strokeWidth={2} />
+        </View>
+      </TouchableOpacity>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Cover Photo Section - Top 40% */}
-          <View style={styles.coverSection}>
-            {coverPhotoUrl ? (
-              <Image
-                source={{ uri: coverPhotoUrl }}
-                style={styles.coverImage}
-              />
-            ) : (
-              <View style={[styles.coverImage, { backgroundColor: theme.colors.backgroundSecondary }]} />
-            )}
-            <LinearGradient
-              colors={['transparent', 'rgba(0, 0, 0, 0.6)']}
-              style={styles.coverGradient}
-            />
-          </View>
+      {/* More Options Button - Fixed */}
+      <TouchableOpacity
+        style={styles.moreButton}
+        activeOpacity={0.7}
+        onPress={() => setShowEditModal(true)}
+      >
+        <Ionicons name="ellipsis-horizontal" size={hp(2.5)} color="#fff" />
+      </TouchableOpacity>
 
-          {/* Profile Cards Stack */}
-          <View style={styles.cardsContainer}>
-            {profileLoading ? (
-              <AppCard style={styles.profileCard}>
-                <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
-                <Text style={[styles.profileName, { marginTop: hp(2), textAlign: 'center' }]}>Loading profile...</Text>
-              </AppCard>
-            ) : profileError ? (
-              <AppCard style={styles.profileCard}>
-                <Text style={[styles.profileName, { color: theme.colors.error, textAlign: 'center' }]}>
-                  Error loading profile
-                </Text>
-                <Text style={[styles.profileHandle, { textAlign: 'center', marginTop: hp(1), fontSize: hp(1.4) }]}>
-                  {profileError.message || 'Unknown error'}
-                </Text>
-                <Text style={[styles.profileHandle, { textAlign: 'center', marginTop: hp(1), fontSize: hp(1.2), color: theme.colors.textSecondary }]}>
-                  Code: {profileError.code || 'N/A'}
-                </Text>
-                <TouchableOpacity
-                  style={{ marginTop: hp(2), padding: hp(1.5), backgroundColor: theme.colors.bondedPurple + '15', borderRadius: 8, alignItems: 'center' }}
-                  onPress={() => router.push('/onboarding')}
-                >
-                  <Text style={{ color: theme.colors.bondedPurple, fontWeight: '600' }}>Complete Onboarding</Text>
-                </TouchableOpacity>
-              </AppCard>
-            ) : userProfile ? (
-              <>
-                {/* Name and Username Card */}
-                <AppCard style={styles.profileCard}>
-                  <View style={styles.avatarRow}>
-                    {avatarUrl ? (
-                      <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                    ) : (
-                      <View style={styles.avatarFallback}>
-                        <Text style={styles.avatarInitial}>
-                          {(userProfile.name || userProfile.full_name || 'U').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={styles.avatarText}>
-                      <Text style={styles.profileName}>
-                        {userProfile.name || userProfile.full_name || userProfile.email?.split('@')[0] || 'User'}
-                      </Text>
-                      <Text style={styles.profileHandle}>
-                        {userProfile.handle || (userProfile.username ? `@${userProfile.username}` : `@${userProfile.email?.split('@')[0] || 'user'}`)}
-                      </Text>
-                    </View>
-                  </View>
-                  {profilePhotos.length > 0 && (
-                    <View style={styles.photoCarousel}>
-                      <FlatList
-                        data={profilePhotos}
-                        keyExtractor={(item, index) => `${item}-${index}`}
-                        horizontal
-                        snapToInterval={carouselItemWidth + wp(2)}
-                        decelerationRate="fast"
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingHorizontal: wp(1) }}
-                        onMomentumScrollEnd={(event) => {
-                          const nextIndex = Math.round(event.nativeEvent.contentOffset.x / (carouselItemWidth + wp(2)))
-                          setActivePhotoIndex(nextIndex)
-                        }}
-                        renderItem={({ item }) => (
-                          <Image source={{ uri: item }} style={[styles.carouselImage, { width: carouselItemWidth }]} />
-                        )}
-                      />
-                      <View style={styles.carouselDots}>
-                        {profilePhotos.map((_, index) => (
-                          <View
-                            key={`dot-${index}`}
-                            style={[
-                              styles.carouselDot,
-                              index === activePhotoIndex && styles.carouselDotActive,
-                            ]}
-                          />
-                        ))}
-                      </View>
-                    </View>
-                  )}
-                  {profilePhotos.length === 0 && (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons name="images-outline" size={hp(3)} color={theme.colors.textSecondary} />
-                      <Text style={styles.photoPlaceholderText}>Add photos in onboarding to show your gallery</Text>
-                    </View>
-                  )}
-                  {userProfile.yearbookQuote && (
-                    <Text style={[styles.bioText, { marginTop: hp(1), fontStyle: 'italic' }]}>
-                      "{userProfile.yearbookQuote}"
-                    </Text>
-                  )}
-                  {!userProfile.onboarding_complete && (
-                    <View style={{ marginTop: hp(1.5), padding: hp(1), backgroundColor: theme.colors.warning + '15', borderRadius: 8 }}>
-                      <Text style={{ color: theme.colors.warning, fontSize: hp(1.3), textAlign: 'center', marginBottom: hp(0.5) }}>
-                        ⚠️ Profile {userProfile.profile_completion_percentage || 0}% complete
-                      </Text>
-                      <Text style={{ color: theme.colors.textSecondary, fontSize: hp(1.2), textAlign: 'center', marginBottom: hp(0.8) }}>
-                        Complete onboarding to unlock all features
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => router.push('/onboarding')}
-                        style={{ padding: hp(0.8), backgroundColor: theme.colors.bondedPurple + '20', borderRadius: 6, alignItems: 'center' }}
-                      >
-                        <Text style={{ color: theme.colors.bondedPurple, fontWeight: '600', fontSize: hp(1.2) }}>
-                          Complete Onboarding ({userProfile.profile_completion_percentage || 0}%)
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </AppCard>
-
-                {/* Bio Card */}
-                {userProfile.bio && (
-                  <AppCard style={styles.bioCard}>
-                    <Text style={styles.bioText}>{userProfile.bio}</Text>
-                  </AppCard>
-                )}
-              </>
-            ) : (
-              <AppCard style={styles.profileCard}>
-                <Text style={styles.profileName}>No profile found</Text>
-              </AppCard>
-            )}
-
-            {/* Friends Button */}
-            <PrimaryButton
-              label={`Friends (${userProfile?.connectionsCount || 0})`}
-              icon="people-outline"
-              onPress={() => {
-                // Open friends drawer
-                if (typeof window !== 'undefined' && window.drawerRef) {
-                  window.drawerRef.openDrawer()
-                }
-                // For now, we'll use a modal approach
-                setShowFriendsModal(true)
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {/* Hero Image Carousel */}
+        <View style={styles.heroSection}>
+          {profilePhotos.length > 1 ? (
+            <FlatList
+              data={profilePhotos}
+              keyExtractor={(item, index) => `photo-${index}`}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              bounces={false}
+              scrollEventThrottle={16}
+              getItemLayout={(_, index) => ({
+                length: SCREEN_WIDTH,
+                offset: SCREEN_WIDTH * index,
+                index,
+              })}
+              onMomentumScrollEnd={(event) => {
+                const newIndex = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH)
+                setActivePhotoIndex(newIndex)
               }}
-              style={styles.friendsButton}
+              renderItem={({ item }) => (
+                <Image 
+                  source={{ uri: item }} 
+                  style={styles.heroImage} 
+                />
+              )}
             />
+          ) : avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.heroImage} />
+          ) : (
+            <View style={[styles.heroImage, { backgroundColor: theme.colors.backgroundSecondary }]}>
+              <Ionicons name="person" size={hp(10)} color={theme.colors.textSecondary} />
+            </View>
+          )}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
+            style={styles.heroGradient}
+            pointerEvents="none"
+          />
+        </View>
 
-            {/* Info Chips */}
-            {userProfile && (
-              <View style={styles.chipsRow}>
-                {userProfile.major && (
-                  <Chip
-                    label={userProfile.major}
-                    icon="school-outline"
-                    style={styles.chip}
-                  />
-                )}
-                {userProfile.grade && (
-                  <Chip
-                    label={userProfile.grade}
-                    icon="calendar-outline"
-                    style={styles.chip}
-                  />
-                )}
-                {userProfile.graduationYear && (
-                  <Chip
-                    label={`Class of ${userProfile.graduationYear}`}
-                    icon="school-outline"
-                    style={styles.chip}
-                  />
-                )}
+        {/* Content Section */}
+        <View style={styles.contentSection}>
+          {/* Avatar + Name */}
+          <View style={styles.avatarRow}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>
+                  {(userProfile?.name || userProfile?.full_name || 'U').charAt(0).toUpperCase()}
+                </Text>
               </View>
             )}
+            <View style={styles.avatarInfo}>
+              <Text style={styles.profileName}>
+                {userProfile?.name || userProfile?.full_name || userProfile?.email?.split('@')[0] || 'User'}
+              </Text>
+              <Text style={styles.profileHandle}>
+                {userProfile?.handle || (userProfile?.username ? `@${userProfile.username}` : `@${userProfile?.email?.split('@')[0] || 'user'}`)}
+              </Text>
+            </View>
+          </View>
 
-            {/* Interests */}
-            {userProfile && userProfile.interests && Array.isArray(userProfile.interests) && userProfile.interests.length > 0 && (
-              <AppCard style={styles.bioCard}>
-                <Text style={[styles.bioText, { fontWeight: '600', marginBottom: hp(0.5) }]}>Interests</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: wp(2) }}>
-                  {userProfile.interests.map((interest, index) => (
-                    <Chip
-                      key={index}
-                      label={interest}
-                      icon="heart-outline"
-                      style={[styles.chip, { marginBottom: hp(0.5) }]}
-                    />
+          {/* Photo Gallery Carousel */}
+          {profilePhotos.length > 0 && (
+            <View style={styles.galleryPreview}>
+              <FlatList
+                data={profilePhotos}
+                keyExtractor={(item, index) => `gallery-${index}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: wp(1) }}
+                renderItem={({ item }) => (
+                  <Image source={{ uri: item }} style={styles.galleryThumbnail} />
+                )}
+              />
+            </View>
+          )}
+
+          {/* Yearbook Quote */}
+          <View style={styles.quoteSection}>
+            <View style={styles.quoteHeader}>
+              <Text style={styles.quoteTitle}>Yearbook Quote</Text>
+              <TouchableOpacity
+                style={styles.quoteEditButton}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowEditModal(true)
+                  setFocusQuoteInput(true)
+                }}
+              >
+                <Text style={styles.quoteEditText}>{displayQuote ? 'Edit' : 'Add'}</Text>
+              </TouchableOpacity>
+            </View>
+            {displayQuote ? (
+              <Text style={styles.quote}>"{displayQuote}"</Text>
+            ) : (
+              <Text style={styles.quotePlaceholder}>Add a quote that feels like you.</Text>
+            )}
+          </View>
+
+          {/* Friends Button */}
+          <PrimaryButton
+            label={`Friends (${friends.length})`}
+            icon="people-outline"
+            onPress={() => setShowFriendsModal(true)}
+            style={styles.friendsButton}
+          />
+
+          {/* Meta Pills */}
+          <View style={styles.metaRow}>
+            {userProfile?.major && (
+              <View style={styles.metaPill}>
+                <School size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
+                <Text style={styles.metaPillText}>{userProfile.major}</Text>
+              </View>
+            )}
+            {userProfile?.graduationYear && (
+              <View style={styles.metaPill}>
+                <Calendar size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
+                <Text style={styles.metaPillText}>Class of {userProfile.graduationYear}</Text>
+              </View>
+            )}
+            {userProfile?.grade && (
+              <View style={styles.metaPill}>
+                <User size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
+                <Text style={styles.metaPillText}>{userProfile.grade}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Location */}
+          {userProfile?.location && (
+            <View style={styles.locationRow}>
+              <MapPin size={hp(1.8)} color={theme.colors.textSecondary} strokeWidth={2} />
+              <Text style={styles.locationText}>{userProfile.location}</Text>
+            </View>
+          )}
+
+          {/* Interests */}
+          {userProfile?.interests && Array.isArray(userProfile.interests) && userProfile.interests.length > 0 && (
+            <View style={styles.interestsSection}>
+              <Text style={styles.sectionTitle}>Interests</Text>
+              <View style={styles.tagsRow}>
+                {userProfile.interests.slice(0, 8).map((interest, idx) => (
+                  <View key={idx} style={styles.tag}>
+                    <Text style={styles.tagText}>{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Friends Modal */}
+      <Modal
+        visible={showFriendsModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowFriendsModal(false)}
+      >
+        <SafeAreaView style={styles.modalSafeArea} edges={['top']}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Friends</Text>
+            <TouchableOpacity
+              onPress={() => setShowFriendsModal(false)}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          {friendsLoading ? (
+            <View style={styles.modalEmptyState}>
+              <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
+              <Text style={styles.modalEmptyText}>Loading friends...</Text>
+            </View>
+          ) : friends.length === 0 ? (
+            <View style={styles.modalEmptyState}>
+              <Ionicons name="people-outline" size={hp(5)} color={theme.colors.textSecondary} />
+              <Text style={styles.modalEmptyText}>No friends yet</Text>
+              <Text style={styles.modalEmptySubtext}>Start connecting with people on campus!</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={friends}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.friendItem}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/yearbook',
+                      params: { profileId: item.id },
+                    })
+                    setShowFriendsModal(false)
+                  }}
+                >
+                  {item.avatar ? (
+                    <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+                  ) : (
+                    <View style={[styles.friendAvatar, styles.friendAvatarPlaceholder]}>
+                      <Ionicons name="person" size={hp(2.5)} color={theme.colors.textSecondary} />
+                    </View>
+                  )}
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{item.name}</Text>
+                    <Text style={styles.friendDetails}>
+                      {item.major ? `${item.major} • ` : ''}Class of {item.graduationYear || item.grade || 'N/A'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={styles.friendsList}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <SafeAreaView style={styles.modalSafeArea} edges={['top']}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <TouchableOpacity
+              onPress={() => setShowEditModal(false)}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            style={styles.editScrollView}
+            contentContainerStyle={styles.editScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Avatar Selection */}
+            <AppCard style={styles.editCard}>
+              <Text style={styles.editLabel}>Profile Avatar</Text>
+              <View style={styles.imagePreviewContainer}>
+                <Image
+                  source={{ uri: newAvatarUri || avatarUrl }}
+                  style={styles.avatarPreview}
+                />
+                <TouchableOpacity
+                  style={styles.changeImageButton}
+                  onPress={handleSelectAvatar}
+                  disabled={isUploadingAvatar}
+                >
+                  <Ionicons name="camera" size={hp(2)} color="#FFFFFF" />
+                  <Text style={styles.changeImageText}>
+                    {isUploadingAvatar ? 'Uploading...' : 'Change Avatar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </AppCard>
+
+            {/* Name Input */}
+            <AppCard style={styles.editCard}>
+              <Text style={styles.editLabel}>Name</Text>
+              <TextInput
+                value={editName}
+                onChangeText={setEditName}
+                style={styles.editInput}
+                placeholder="Your name"
+                placeholderTextColor={theme.colors.textSecondary}
+              />
+              <Text style={styles.editHelperText}>Usernames are locked for V1.</Text>
+            </AppCard>
+
+            {/* Yearbook Quote Input */}
+            <AppCard style={styles.editCard}>
+              <Text style={styles.editLabel}>Yearbook Quote</Text>
+              <TextInput
+                value={editQuote}
+                onChangeText={setEditQuote}
+                style={[styles.editInput, { minHeight: hp(10) }]}
+                placeholder="Add your yearbook quote..."
+                placeholderTextColor={theme.colors.textSecondary}
+                multiline
+                maxLength={150}
+                ref={quoteInputRef}
+              />
+              <Text style={styles.editHelperText}>{editQuote.length}/150 characters</Text>
+            </AppCard>
+
+            {/* Photo Gallery Management */}
+            <AppCard style={styles.editCard}>
+              <View style={styles.galleryHeader}>
+                <Text style={styles.editLabel}>Photo Gallery</Text>
+                <TouchableOpacity
+                  style={styles.addPhotosButton}
+                  onPress={handleAddPhotosToGallery}
+                  disabled={isUploadingPhoto}
+                >
+                  <Ionicons name="add-circle" size={hp(2.2)} color={theme.colors.bondedPurple} />
+                  <Text style={styles.addPhotosButtonText}>Add Photos</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.editHelperText}>
+                Manage your photo gallery. Tap a photo to set it as your yearbook photo.
+              </Text>
+
+              {galleryPhotos.length > 0 ? (
+                <View style={styles.photoGalleryGrid}>
+                  {galleryPhotos.map((photo) => (
+                    <View key={photo.id} style={styles.galleryPhotoItem}>
+                      <Image source={{ uri: photo.url }} style={styles.galleryPhotoImage} />
+                      {photo.url === avatarUrl && (
+                        <View style={styles.yearbookPhotoBadge}>
+                          <Text style={styles.yearbookPhotoBadgeText}>Yearbook</Text>
+                        </View>
+                      )}
+                      <View style={styles.galleryPhotoActions}>
+                        <TouchableOpacity
+                          style={styles.galleryActionButton}
+                          onPress={() => handleSetAsYearbookPhoto(photo.url)}
+                        >
+                          <Ionicons name="star" size={hp(1.8)} color="#FFFFFF" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.galleryActionButton, styles.removeActionButton]}
+                          onPress={() => handleRemovePhoto(photo.id)}
+                        >
+                          <Ionicons name="trash" size={hp(1.8)} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   ))}
                 </View>
-              </AppCard>
-            )}
-
-            {/* Location */}
-            {userProfile && userProfile.location && (
-              <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={hp(1.6)} color="#8E8E93" />
-                <Text style={styles.locationText}>{userProfile.location}</Text>
-              </View>
-            )}
-
-            {/* Social Links */}
-            {userProfile && userProfile.socialLinks && (
-              <AppCard style={styles.socialCard}>
-                <Text style={styles.socialTitle}>Connect</Text>
-                <View style={styles.socialLinksRow}>
-                  {userProfile.socialLinks.instagram && (
-                    <TouchableOpacity
-                      style={styles.socialLink}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        // TODO: Open Instagram
-                      }}
-                    >
-                      <Ionicons name="logo-instagram" size={hp(2.2)} color="#E4405F" />
-                      <Text style={styles.socialLinkText}>Instagram</Text>
-                    </TouchableOpacity>
-                  )}
-                  {userProfile.socialLinks.spotify && (
-                    <TouchableOpacity
-                      style={styles.socialLink}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        // TODO: Open Spotify
-                      }}
-                    >
-                      <Ionicons name="musical-notes" size={hp(2.2)} color="#1DB954" />
-                      <Text style={styles.socialLinkText}>Spotify</Text>
-                    </TouchableOpacity>
-                  )}
-                  {userProfile.socialLinks.appleMusic && (
-                    <TouchableOpacity
-                      style={styles.socialLink}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        // TODO: Open Apple Music
-                      }}
-                    >
-                      <Ionicons name="musical-note" size={hp(2.2)} color="#FA243C" />
-                      <Text style={styles.socialLinkText}>Apple Music</Text>
-                    </TouchableOpacity>
-                  )}
+              ) : (
+                <View style={styles.emptyGallery}>
+                  <Ionicons name="images-outline" size={hp(4)} color={theme.colors.textSecondary} />
+                  <Text style={styles.emptyGalleryText}>No photos in your gallery</Text>
+                  <Text style={styles.emptyGallerySubtext}>Add photos to create your gallery</Text>
                 </View>
-              </AppCard>
-            )}
-          </View>
-        </ScrollView>
+              )}
+            </AppCard>
 
-        {/* Friends Modal */}
-        <Modal
-          visible={showFriendsModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setShowFriendsModal(false)}
-        >
-          <SafeAreaView style={styles.modalSafeArea} edges={['top']}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Friends</Text>
-              <TouchableOpacity
-                onPress={() => setShowFriendsModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            {friendsLoading ? (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: hp(4) }}>
-                <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
-                <Text style={{ marginTop: hp(2), color: theme.colors.textSecondary }}>Loading friends...</Text>
-              </View>
-            ) : friends.length === 0 ? (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: hp(4) }}>
-                <Ionicons name="people-outline" size={hp(5)} color={theme.colors.textSecondary} />
-                <Text style={{ marginTop: hp(2), color: theme.colors.textSecondary, textAlign: 'center' }}>
-                  No friends yet
-                </Text>
-                <Text style={{ marginTop: hp(1), color: theme.colors.textSecondary, textAlign: 'center', fontSize: hp(1.4) }}>
-                  Start connecting with people on campus!
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                data={friends}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.friendItem}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      // TODO: Navigate to friend's profile
-                      setShowFriendsModal(false)
-                    }}
-                  >
-                    {item.avatar ? (
-                      <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
-                    ) : (
-                      <View style={[styles.friendAvatar, { backgroundColor: theme.colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="person" size={hp(2.5)} color={theme.colors.textSecondary} />
-                      </View>
-                    )}
-                    <View style={styles.friendInfo}>
-                      <Text style={styles.friendName}>{item.name}</Text>
-                      <Text style={styles.friendDetails}>
-                        {item.major ? `${item.major} • ` : ''}Class of {item.graduationYear || item.grade || 'N/A'}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-                contentContainerStyle={styles.friendsList}
-              />
-            )}
-          </SafeAreaView>
-        </Modal>
-
-        {/* Edit Profile Modal */}
-        <Modal
-          visible={showEditModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setShowEditModal(false)}
-        >
-          <SafeAreaView style={styles.modalSafeArea} edges={['top']}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity
-                onPress={() => setShowEditModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={hp(2.5)} color={theme.colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              style={styles.editScrollView}
-              contentContainerStyle={styles.editScrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Avatar Selection */}
-              <AppCard style={styles.editCard}>
-                <Text style={styles.editLabel}>Profile Avatar</Text>
-                <View style={styles.imagePreviewContainer}>
-                  <Image
-                    source={{ uri: newAvatarUri || avatarUrl }}
-                    style={styles.avatarPreview}
-                  />
-                  <TouchableOpacity
-                    style={styles.changeImageButton}
-                    onPress={handleSelectAvatar}
-                    disabled={isUploadingAvatar}
-                  >
-                    <Ionicons name="camera" size={hp(2)} color="#FFFFFF" />
-                    <Text style={styles.changeImageText}>
-                      {isUploadingAvatar ? 'Uploading...' : 'Change Avatar'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </AppCard>
-
-              {/* Banner Selection */}
-              <AppCard style={styles.editCard}>
-                <Text style={styles.editLabel}>Banner Image</Text>
-                <View style={styles.bannerPreviewContainer}>
-                  <Image
-                    source={{ uri: newBannerUri || coverPhotoUrl }}
-                    style={styles.bannerPreview}
-                  />
-                  <TouchableOpacity
-                    style={styles.changeImageButton}
-                    onPress={handleSelectBanner}
-                    disabled={isUploadingBanner}
-                  >
-                    <Ionicons name="image" size={hp(2)} color="#FFFFFF" />
-                    <Text style={styles.changeImageText}>
-                      {isUploadingBanner ? 'Uploading...' : 'Change Banner'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </AppCard>
-
-              {/* Name Input */}
-              <AppCard style={styles.editCard}>
-                <Text style={styles.editLabel}>Name</Text>
-                <TextInput
-                  value={editName}
-                  onChangeText={setEditName}
-                  style={styles.editInput}
-                  placeholder="Your name"
-                  placeholderTextColor={theme.colors.textSecondary}
-                />
-                <Text style={styles.editHelperText}>Usernames are locked for V1.</Text>
-              </AppCard>
-
-              {/* Yearbook Quote Input */}
-              <AppCard style={styles.editCard}>
-                <Text style={styles.editLabel}>Yearbook Quote</Text>
-                <TextInput
-                  value={editQuote}
-                  onChangeText={setEditQuote}
-                  style={[styles.editInput, { minHeight: hp(10) }]}
-                  placeholder="Add your yearbook quote..."
-                  placeholderTextColor={theme.colors.textSecondary}
-                  multiline
-                  maxLength={150}
-                />
-                <Text style={styles.editHelperText}>{editQuote.length}/150 characters</Text>
-              </AppCard>
-
-              {/* Photo Gallery Management */}
-              <AppCard style={styles.editCard}>
-                <View style={styles.galleryHeader}>
-                  <Text style={styles.editLabel}>Photo Gallery</Text>
-                  <TouchableOpacity
-                    style={styles.addPhotosButton}
-                    onPress={handleAddPhotosToGallery}
-                    disabled={isUploadingPhoto}
-                  >
-                    <Ionicons name="add-circle" size={hp(2.2)} color={theme.colors.bondedPurple} />
-                    <Text style={styles.addPhotosButtonText}>Add Photos</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.editHelperText}>
-                  Manage your photo gallery. Tap a photo to set it as your yearbook photo.
-                </Text>
-
-                {galleryPhotos.length > 0 ? (
-                  <View style={styles.photoGalleryGrid}>
-                    {galleryPhotos.map((photo) => (
-                      <View key={photo.id} style={styles.galleryPhotoItem}>
-                        <Image source={{ uri: photo.url }} style={styles.galleryPhotoImage} />
-
-                        {/* Badge if it's the current avatar */}
-                        {photo.url === avatarUrl && (
-                          <View style={styles.yearbookPhotoBadge}>
-                            <Text style={styles.yearbookPhotoBadgeText}>Yearbook</Text>
-                          </View>
-                        )}
-
-                        {/* Action buttons */}
-                        <View style={styles.galleryPhotoActions}>
-                          <TouchableOpacity
-                            style={styles.galleryActionButton}
-                            onPress={() => handleSetAsYearbookPhoto(photo.url)}
-                          >
-                            <Ionicons name="star" size={hp(1.8)} color="#FFFFFF" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.galleryActionButton, styles.removeActionButton]}
-                            onPress={() => handleRemovePhoto(photo.id)}
-                          >
-                            <Ionicons name="trash" size={hp(1.8)} color="#FFFFFF" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.emptyGallery}>
-                    <Ionicons name="images-outline" size={hp(4)} color={theme.colors.textSecondary} />
-                    <Text style={styles.emptyGalleryText}>No photos in your gallery</Text>
-                    <Text style={styles.emptyGallerySubtext}>Add photos to create your gallery</Text>
-                  </View>
-                )}
-              </AppCard>
-
-              <PrimaryButton
-                label={
-                  updateProfile.isPending || isUploadingAvatar || isUploadingBanner || isUploadingPhoto
-                    ? 'Saving...'
-                    : 'Save All Changes'
-                }
-                icon="checkmark"
-                onPress={handleSaveAllChanges}
-                style={styles.saveButton}
-                disabled={updateProfile.isPending || isUploadingAvatar || isUploadingBanner || isUploadingPhoto}
-              />
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
-      </View>
-    </SafeAreaView>
+            <PrimaryButton
+              label={
+                updateProfile.isPending || isUploadingAvatar || isUploadingBanner || isUploadingPhoto
+                  ? 'Saving...'
+                  : 'Save All Changes'
+              }
+              icon="checkmark"
+              onPress={handleSaveAllChanges}
+              style={styles.saveButton}
+              disabled={updateProfile.isPending || isUploadingAvatar || isUploadingBanner || isUploadingPhoto}
+            />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    </View>
   )
 }
 
 const createStyles = (theme) => StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.backgroundSecondary,
-  },
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: hp(2),
+    fontSize: hp(1.8),
+    color: theme.colors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp(8),
+  },
+  errorText: {
+    marginTop: hp(2),
+    fontSize: hp(2),
+    fontWeight: '600',
+    color: theme.colors.error,
+  },
+  errorSubtext: {
+    marginTop: hp(1),
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: hp(3),
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(1.5),
+    backgroundColor: theme.colors.bondedPurple,
+    borderRadius: theme.radius.lg,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: hp(1.6),
+  },
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? hp(6) : hp(4),
+    left: wp(4),
+    zIndex: 100,
+  },
+  backButtonCircle: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? hp(6) : hp(4),
+    right: wp(4),
+    zIndex: 100,
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: hp(10),
+    flexGrow: 1,
   },
-  coverSection: {
+  heroSection: {
     width: '100%',
-    height: hp(40),
+    height: hp(55),
     position: 'relative',
   },
-  coverImage: {
-    width: '100%',
-    height: '100%',
+  heroImage: {
+    width: SCREEN_WIDTH,
+    height: hp(55),
     resizeMode: 'cover',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  coverGradient: {
+  heroGradient: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    height: '50%',
+    bottom: 0,
   },
-  cardsContainer: {
-    paddingHorizontal: wp(4),
-    marginTop: hp(-2),
-  },
-  profileCard: {
-    marginBottom: hp(2),
-  },
-  profileName: {
-    fontSize: hp(2.6),
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-    marginBottom: hp(0.3),
-    letterSpacing: -0.3,
-  },
-  profileHandle: {
-    fontSize: hp(1.5),
-    color: theme.colors.textSecondary,
-    fontWeight: '400',
-  },
-  groupJamCard: {
-    marginBottom: hp(2),
+  contentSection: {
     backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-      },
-    }),
-  },
-  groupJamHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: hp(1),
-  },
-  groupJamLabel: {
-    fontSize: hp(1.6),
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-  },
-  groupJamValue: {
-    fontSize: hp(2),
-    fontWeight: '700',
-    color: theme.colors.bondedPurple,
-  },
-  groupJamBarContainer: {
-    height: hp(0.6),
-    backgroundColor: theme.colors.border,
-    borderRadius: 9999,
-    overflow: 'hidden',
-    marginBottom: hp(0.8),
-  },
-  groupJamBarFill: {
-    height: '100%',
-    borderRadius: 9999,
-  },
-  groupJamDescription: {
-    fontSize: hp(1.3),
-    color: theme.colors.textSecondary,
-    fontWeight: '400',
-  },
-  bioCard: {
-    marginBottom: hp(2),
-  },
-  bioText: {
-    fontSize: hp(1.5),
-    color: theme.colors.textPrimary,
-    lineHeight: hp(2.2),
-    fontWeight: '400',
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: wp(3),
-    marginBottom: hp(2),
-  },
-  actionButton: {
-    flex: 1,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: wp(2),
-    marginBottom: hp(2),
-  },
-  chip: {
-    backgroundColor: theme.colors.bondedPurple + '15',
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.5),
-    paddingVertical: hp(1),
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    marginTop: -hp(3),
+    paddingHorizontal: wp(5),
+    paddingTop: hp(3),
+    paddingBottom: hp(10),
+    minHeight: hp(50),
   },
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(3),
-    marginBottom: hp(1.5),
+    gap: wp(4),
+    marginBottom: hp(2),
   },
   avatarImage: {
     width: hp(8),
     height: hp(8),
     borderRadius: hp(4),
-    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 3,
+    borderColor: theme.colors.background,
   },
   avatarFallback: {
     width: hp(8),
@@ -922,92 +835,176 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: theme.colors.background,
   },
   avatarInitial: {
     fontSize: hp(3),
     fontWeight: '700',
     color: theme.colors.textSecondary,
   },
-  avatarText: {
+  avatarInfo: {
     flex: 1,
   },
-  photoCarousel: {
-    marginTop: hp(1),
+  profileName: {
+    fontSize: hp(2.8),
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+    letterSpacing: -0.3,
   },
-  carouselImage: {
-    width: wp(86),
-    height: hp(22),
-    borderRadius: hp(1.6),
+  profileHandle: {
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+    marginTop: hp(0.3),
+  },
+  galleryPreview: {
+    marginBottom: hp(2),
+  },
+  galleryThumbnail: {
+    width: wp(28),
+    height: wp(28),
+    borderRadius: theme.radius.md,
     marginRight: wp(2),
     backgroundColor: theme.colors.backgroundSecondary,
   },
-  carouselDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: wp(1.4),
-    marginTop: hp(1.2),
-  },
-  carouselDot: {
-    width: wp(1.6),
-    height: wp(1.6),
-    borderRadius: wp(0.8),
-    backgroundColor: theme.colors.border,
-  },
-  carouselDotActive: {
-    backgroundColor: theme.colors.bondedPurple,
-  },
-  photoPlaceholder: {
-    marginTop: hp(1),
-    paddingVertical: hp(3),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: hp(1.6),
+  quoteSection: {
+    marginBottom: hp(2.5),
+    padding: wp(3.5),
+    borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.backgroundSecondary,
-    gap: hp(1),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
-  photoPlaceholderText: {
+  quoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1),
+  },
+  quoteTitle: {
+    fontSize: hp(1.6),
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  quoteEditButton: {
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.6),
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.background,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+  },
+  quoteEditText: {
+    fontSize: hp(1.4),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+  },
+  quote: {
+    fontSize: hp(1.7),
+    color: theme.colors.textPrimary,
+    fontStyle: 'italic',
+    lineHeight: hp(2.5),
+  },
+  quotePlaceholder: {
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+    lineHeight: hp(2.4),
+  },
+  friendsButton: {
+    marginBottom: hp(2.5),
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+    marginBottom: hp(2.5),
+  },
+  metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    gap: wp(1.5),
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  metaPillText: {
+    fontSize: hp(1.4),
+    color: theme.colors.textPrimary,
+    fontWeight: '500',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
+    marginBottom: hp(2.5),
+  },
+  locationText: {
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+  },
+  interestsSection: {
+    marginBottom: hp(2.5),
+  },
+  sectionTitle: {
+    fontSize: hp(1.8),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: hp(1.2),
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+  },
+  tag: {
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.9),
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  tagText: {
+    fontSize: hp(1.5),
+    color: theme.colors.textPrimary,
+    fontWeight: '500',
+  },
+  onboardingWarning: {
+    marginTop: hp(2),
+    padding: hp(2),
+    backgroundColor: theme.colors.warning + '15',
+    borderRadius: theme.radius.lg,
+    alignItems: 'center',
+  },
+  onboardingWarningTitle: {
+    fontSize: hp(1.5),
+    fontWeight: '600',
+    color: theme.colors.warning,
+    marginBottom: hp(0.5),
+  },
+  onboardingWarningText: {
     fontSize: hp(1.3),
     color: theme.colors.textSecondary,
     textAlign: 'center',
-  },
-  locationText: {
-    fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
-    fontWeight: '400',
-  },
-  socialCard: {
-    marginTop: hp(2),
-    marginBottom: hp(2),
-  },
-  socialTitle: {
-    fontSize: hp(1.6),
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
-  socialLinksRow: {
-    flexDirection: 'row',
-    gap: wp(3),
-    flexWrap: 'wrap',
-  },
-  socialLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  onboardingButton: {
+    paddingHorizontal: wp(4),
     paddingVertical: hp(1),
-    paddingHorizontal: wp(3),
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderRadius: hp(1),
-    gap: wp(2),
-    minWidth: wp(30),
+    backgroundColor: theme.colors.bondedPurple + '20',
+    borderRadius: theme.radius.md,
   },
-  socialLinkText: {
+  onboardingButtonText: {
     fontSize: hp(1.4),
-    fontWeight: '500',
-    color: theme.colors.textPrimary,
+    fontWeight: '600',
+    color: theme.colors.bondedPurple,
   },
-  friendsButton: {
-    marginBottom: hp(2),
-  },
+  // Modal styles
   modalSafeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -1030,6 +1027,24 @@ const createStyles = (theme) => StyleSheet.create({
   modalCloseButton: {
     padding: hp(0.5),
   },
+  modalEmptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: hp(4),
+  },
+  modalEmptyText: {
+    marginTop: hp(2),
+    fontSize: hp(1.8),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  modalEmptySubtext: {
+    marginTop: hp(1),
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
   friendsList: {
     paddingVertical: hp(1),
   },
@@ -1045,6 +1060,11 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(5.5),
     borderRadius: hp(2.75),
   },
+  friendAvatarPlaceholder: {
+    backgroundColor: theme.colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   friendInfo: {
     flex: 1,
   },
@@ -1057,8 +1077,8 @@ const createStyles = (theme) => StyleSheet.create({
   friendDetails: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
-    fontWeight: '400',
   },
+  // Edit modal styles
   editScrollView: {
     flex: 1,
   },
@@ -1087,23 +1107,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.2),
     color: theme.colors.textSecondary,
   },
-  socialEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2),
-    marginBottom: hp(1.5),
-  },
-  socialInput: {
-    flex: 1,
-    fontSize: hp(1.5),
-    color: theme.colors.textPrimary,
-    paddingVertical: hp(1),
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  saveButton: {
-    marginTop: hp(2),
-  },
   imagePreviewContainer: {
     alignItems: 'center',
     gap: hp(1.5),
@@ -1112,16 +1115,6 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(12),
     height: hp(12),
     borderRadius: hp(6),
-    backgroundColor: theme.colors.backgroundSecondary,
-  },
-  bannerPreviewContainer: {
-    alignItems: 'center',
-    gap: hp(1.5),
-  },
-  bannerPreview: {
-    width: '100%',
-    height: hp(12),
-    borderRadius: hp(1),
     backgroundColor: theme.colors.backgroundSecondary,
   },
   changeImageButton: {
@@ -1166,7 +1159,7 @@ const createStyles = (theme) => StyleSheet.create({
     marginTop: hp(1.5),
   },
   galleryPhotoItem: {
-    width: (wp(92) - wp(8) - wp(4)) / 3, // Card width minus padding and gaps, divided by 3
+    width: (wp(92) - wp(8) - wp(4)) / 3,
     aspectRatio: 1,
     borderRadius: hp(1),
     overflow: 'hidden',
@@ -1224,5 +1217,8 @@ const createStyles = (theme) => StyleSheet.create({
   emptyGallerySubtext: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
+  },
+  saveButton: {
+    marginTop: hp(2),
   },
 })

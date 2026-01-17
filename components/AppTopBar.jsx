@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from '../app/theme'
 import ThemedText from '../app/components/ThemedText'
+import { useNotificationCount } from '../hooks/useNotificationCount'
 
 const AppTopBar = ({
   schoolName = 'Your University',
@@ -16,6 +17,7 @@ const AppTopBar = ({
 }) => {
   const router = useRouter()
   const theme = useAppTheme()
+  const { data: notificationCount = 0 } = useNotificationCount()
   
   // Auto-detect if we can go back, unless explicitly set
   const canGoBack = showBackButton !== null 
@@ -29,6 +31,7 @@ const AppTopBar = ({
   }
 
   const styles = createStyles(theme)
+  const displayCount = notificationCount > 99 ? '99+' : `${notificationCount}`
 
   return (
     <View style={styles.topBar}>
@@ -84,8 +87,27 @@ const AppTopBar = ({
         )}
       </View>
 
-      {/* Right: Empty space for balance */}
-      <View style={styles.iconButton} />
+      {/* Right: Notifications */}
+      <View style={styles.iconButton}>
+        {onPressNotifications && (
+          <TouchableOpacity
+            style={styles.notificationButton}
+            activeOpacity={0.6}
+            onPress={onPressNotifications}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={hp(2.4)}
+              color={theme.colors.textPrimary}
+            />
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{displayCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   )
 }
@@ -154,5 +176,32 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.error,
     borderWidth: 2,
     borderColor: theme.colors.white,
+  },
+  notificationButton: {
+    width: hp(4.5),
+    height: hp(4.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: hp(0.3),
+    right: wp(0.6),
+    minWidth: hp(1.8),
+    height: hp(1.8),
+    borderRadius: hp(0.9),
+    paddingHorizontal: wp(0.6),
+    backgroundColor: theme.colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+  notificationBadgeText: {
+    fontSize: hp(1.1),
+    color: theme.colors.white,
+    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.body,
+    includeFontPadding: false,
   },
 })

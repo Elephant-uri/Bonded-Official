@@ -7,6 +7,7 @@ import { useAppTheme } from '../../app/theme'
 import { useEventsContext } from '../../contexts/EventsContext'
 import { useClubsContext } from '../../contexts/ClubsContext'
 import ShareModal from '../ShareModal'
+import { formatDate, formatTime } from '../../utils/dateFormatters'
 
 export default function EventPost({ event, forumId }) {
   const theme = useAppTheme()
@@ -22,32 +23,6 @@ export default function EventPost({ event, forumId }) {
   
   // Get club info if event is from a club
   const club = event.clubId ? getClub(event.clubId) : null
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(today.getDate() + 1)
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today'
-    } else if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow'
-    } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      })
-    }
-  }
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
 
   const handleRSVP = (status) => {
     rsvpToEvent(event.id, currentUserId, status)

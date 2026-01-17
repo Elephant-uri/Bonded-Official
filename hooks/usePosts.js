@@ -1,7 +1,8 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { resolveMediaUrls } from '../helpers/mediaStorage'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
-import { resolveMediaUrls } from '../helpers/mediaStorage'
+import { getTimeAgo } from '../utils/dateFormatters'
 
 const POSTS_PER_PAGE = 20 // Number of posts to fetch per page
 
@@ -11,7 +12,7 @@ const POSTS_PER_PAGE = 20 // Number of posts to fetch per page
  */
 export function usePosts(forumId, filters = {}) {
   const { user } = useAuthStore()
-  
+
   return useInfiniteQuery({
     queryKey: ['posts', forumId, filters, user?.id],
     queryFn: async ({ pageParam = 0 }) => {
@@ -39,6 +40,7 @@ export function usePosts(forumId, filters = {}) {
           media_urls,
           is_anonymous,
           upvotes_count,
+          downvotes_count,
           comments_count,
           reposts_count,
           created_at,
@@ -96,8 +98,8 @@ export function usePosts(forumId, filters = {}) {
           return {
             id: post.id,
             author: post.is_anonymous ? 'Anon' : (
-              post.author?.username && post.author.username.trim() !== '' 
-                ? post.author.username 
+              post.author?.username && post.author.username.trim() !== ''
+                ? post.author.username
                 : (post.author?.email ? post.author.email.split('@')[0] : 'Anonymous')
             ),
             isAnon: post.is_anonymous || false,
@@ -106,6 +108,8 @@ export function usePosts(forumId, filters = {}) {
             forum: post.forum?.name || 'Unknown',
             forumId: post.forum_id,
             upvotes: post.upvotes_count || 0,
+            downvotes: post.downvotes_count || 0,
+            score: (post.upvotes_count || 0) - (post.downvotes_count || 0),
             commentsCount: post.comment_stats?.[0]?.count ?? post.comments_count ?? 0,
             repostsCount: post.reposts_count || 0,
             timeAgo: getTimeAgo(post.created_at),
@@ -113,6 +117,8 @@ export function usePosts(forumId, filters = {}) {
             media: resolvedMedia.map((url) => ({ uri: url, type: 'image' })),
             createdAt: post.created_at,
             userId: post.user_id,
+            anonNumber: post.is_anonymous ? (parseInt(post.user_id.replace(/[^0-9]/g, '').slice(-2)) || 1) : null,
+            authorAvatar: post.author?.avatar_url || null,
             poll: post.poll || null,
           }
         })
@@ -149,7 +155,7 @@ export function usePosts(forumId, filters = {}) {
  */
 export function usePost(postId) {
   const { user } = useAuthStore()
-  
+
   return useQuery({
     queryKey: ['post', postId, user?.id],
     queryFn: async () => {
@@ -189,24 +195,3 @@ export function usePost(postId) {
 /**
  * Helper function to calculate time ago
  */
-function getTimeAgo(dateString) {
-  if (!dateString) return 'Just now'
-  
-  const now = new Date()
-  const date = new Date(dateString)
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m`
-  if (diffHours < 24) return `${diffHours}h`
-  if (diffDays < 7) return `${diffDays}d`
-  
-  const diffWeeks = Math.floor(diffDays / 7)
-  if (diffWeeks < 4) return `${diffWeeks}w`
-  
-  const diffMonths = Math.floor(diffDays / 30)
-  return `${diffMonths}mo`
-}

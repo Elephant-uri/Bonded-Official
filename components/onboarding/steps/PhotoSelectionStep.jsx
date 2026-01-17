@@ -40,36 +40,20 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
     return true
   }
 
-  // Process image to square format
+  // Process image - resize if needed but keep full image (no cropping)
   const processImage = async (uri) => {
     try {
-      // Get image dimensions
+      // Resize to max width 1200px while maintaining aspect ratio
+      // This reduces file size without cropping the image
       const manipResult = await ImageManipulator.manipulateAsync(
         uri,
         [
-          // First, get the image to understand its dimensions
-          { resize: { width: 800 } }, // Resize to max width
+          { resize: { width: 1200 } }, // Resize to max width, height scales proportionally
         ],
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       )
 
-      // Calculate square crop (center crop)
-      const { width, height } = manipResult
-      const size = Math.min(width, height)
-      const x = (width - size) / 2
-      const y = (height - size) / 2
-
-      // Crop to square
-      const cropped = await ImageManipulator.manipulateAsync(
-        manipResult.uri,
-        [
-          { crop: { originX: x, originY: y, width: size, height: size } },
-          { resize: { width: 800, height: 800 } }, // Ensure square 800x800
-        ],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-      )
-
-      return cropped.uri
+      return manipResult.uri
     } catch (error) {
       console.error('Error processing image:', error)
       return uri // Return original if processing fails
@@ -87,8 +71,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: false,
-        allowsEditing: true,
-        aspect: [1, 1], // Square crop
+        allowsEditing: false, // Allow full image selection without forced cropping
         quality: 0.8,
       })
 
@@ -131,10 +114,10 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
       if (!result.canceled && result.assets) {
         const newPhotos = await Promise.all(
           result.assets.map(async (asset, index) => {
-            const processedUri = await processImage(asset.uri)
+          const processedUri = await processImage(asset.uri)
             return {
-              uri: processedUri,
-              localUri: processedUri,
+            uri: processedUri,
+            localUri: processedUri,
               isYearbookPhoto: false,
               order: galleryPhotos.length + index + 1,
             }
@@ -252,14 +235,14 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
         {galleryPhotos.length > 0 ? (
           <View style={styles.photoGrid}>
             {galleryPhotos.map((photo, index) => (
-              <View key={index} style={styles.photoCard}>
-                <Image source={{ uri: photo.localUri }} style={styles.photoImage} />
-                <TouchableOpacity
+          <View key={index} style={styles.photoCard}>
+            <Image source={{ uri: photo.localUri }} style={styles.photoImage} />
+            <TouchableOpacity
                   style={styles.removeButton}
                   onPress={() => handleRemoveGalleryPhoto(index)}
-                >
-                  <Ionicons name="close-circle" size={hp(3)} color="#FFFFFF" />
-                </TouchableOpacity>
+            >
+              <Ionicons name="close-circle" size={hp(3)} color="#FFFFFF" />
+            </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -291,20 +274,20 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
       </View>
 
       {/* Yearbook Quote Section */}
-      <View style={styles.quoteContainer}>
+          <View style={styles.quoteContainer}>
         <Text style={styles.quoteLabel}>Yearbook Quote (Optional)</Text>
-        <Text style={styles.quoteHint}>
+            <Text style={styles.quoteHint}>
           Add a memorable quote that represents you. This will appear on your profile.
-        </Text>
-        <TextInput
-          style={styles.quoteInput}
-          value={quote}
-          onChangeText={handleQuoteChange}
+            </Text>
+            <TextInput
+              style={styles.quoteInput}
+              value={quote}
+              onChangeText={handleQuoteChange}
           placeholder="Enter your yearbook quote..."
           placeholderTextColor="#8E8E8E"
-          multiline
-          maxLength={150}
-        />
+              multiline
+              maxLength={150}
+            />
         <Text style={styles.characterCount}>{quote.length}/150</Text>
       </View>
 
@@ -314,8 +297,8 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
           <Ionicons name="information-circle-outline" size={hp(2.5)} color="#8E8E8E" />
           <Text style={styles.skipText}>
             You can skip the yearbook photo and a generic avatar will be used. You can add photos later in settings.
-          </Text>
-        </View>
+            </Text>
+          </View>
       )}
     </ScrollView>
   )

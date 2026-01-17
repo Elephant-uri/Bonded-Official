@@ -17,30 +17,59 @@ export const useSaveOnboarding = () => {
         throw new Error('User must be authenticated to save onboarding data')
       }
 
+      // 1. Resolve university_id first (we need it for photo paths if profile doesn't exist yet)
+      let universityId = null
+      if (formData.school) {
+        // Try to find university by name or domain
+        const { data: university, error: uniError } = await supabase
+          .from('universities')
+          .select('id')
+          .or(`name.ilike.%${formData.school}%,domain.ilike.%${formData.school}%`)
+          .limit(1)
+          .maybeSingle()
+
+        if (uniError) {
+          console.warn('⚠️ Error looking up university:', uniError.message)
+        }
+
+        if (university?.id) {
+          universityId = university.id
+          console.log('✅ Resolved university_id for photo upload:', universityId)
+        } else if (formData.school.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          // If school is already a UUID, use it directly
+          universityId = formData.school
+        }
+      }
+
       // Upload photos if present and not already uploaded
       let uploadedPhotos = formData.photos || []
       let photoUploadError = null
       if (formData.photos && formData.photos.length > 0) {
         const needsUpload = formData.photos.some(photo => !photo.uploadedUrl)
         if (needsUpload) {
-          console.log(`📸 Uploading ${formData.photos.length} photo(s) to Supabase...`)
-          try {
-            uploadedPhotos = await uploadPhotosToSupabase(formData.photos, user.id)
-            const uploadedCount = uploadedPhotos.filter(p => p.uploadedUrl).length
-            console.log(`✅ Successfully uploaded ${uploadedCount} photo(s)`)
+          if (!universityId) {
+            console.warn('⚠️ Skipping photo upload - university_id not yet resolved. Photos will be uploaded once a school is selected.')
+            photoUploadError = 'Photos will be uploaded once you select your school.'
+          } else {
+            console.log(`📸 Uploading ${formData.photos.length} photo(s) to Supabase...`)
+            try {
+              uploadedPhotos = await uploadPhotosToSupabase(formData.photos, user.id, universityId)
+              const uploadedCount = uploadedPhotos.filter(p => p.uploadedUrl).length
+              console.log(`✅ Successfully uploaded ${uploadedCount} photo(s)`)
 
-            // Check if some photos failed to upload
-            const failedCount = formData.photos.length - uploadedCount
-            if (failedCount > 0) {
-              photoUploadError = `${failedCount} photo(s) failed to upload. They will be retried automatically.`
-              console.warn(`⚠️ ${failedCount} photo(s) failed to upload`)
+              // Check if some photos failed to upload
+              const failedCount = formData.photos.length - uploadedCount
+              if (failedCount > 0) {
+                photoUploadError = `${failedCount} photo(s) failed to upload. They will be retried automatically.`
+                console.warn(`⚠️ ${failedCount} photo(s) failed to upload`)
+              }
+            } catch (error) {
+              console.error('❌ Photo upload failed:', error)
+              // Don't throw - allow onboarding to continue even if photos fail
+              // Photos will be retried on next save
+              photoUploadError = 'Photos failed to upload. They will be retried automatically.'
+              console.warn('⚠️ Continuing onboarding without photos - will retry on next save')
             }
-          } catch (error) {
-            console.error('❌ Photo upload failed:', error)
-            // Don't throw - allow onboarding to continue even if photos fail
-            // Photos will be retried on next save
-            photoUploadError = 'Photos failed to upload. They will be retried automatically.'
-            console.warn('⚠️ Continuing onboarding without photos - will retry on next save')
           }
         } else {
           console.log('✅ All photos already uploaded, skipping upload step')
@@ -69,32 +98,8 @@ export const useSaveOnboarding = () => {
       }
 
       // Add basic info if present
-      // Map school name to university_id
-      if (formData.school) {
-        // formData.school might be a name string, need to look up university_id
-        // Try to find university by name or domain
-        // Use maybeSingle() instead of single() to avoid throwing when no rows found
-        const { data: university, error: uniError } = await supabase
-          .from('universities')
-          .select('id')
-          .or(`name.ilike.%${formData.school}%,domain.ilike.%${formData.school}%`)
-          .limit(1)
-          .maybeSingle()
-
-        if (uniError) {
-          console.warn('⚠️ Error looking up university:', uniError.message)
-        }
-
-        if (university?.id) {
-          updateData.university_id = university.id
-          console.log('✅ Mapped school to university_id:', formData.school, '->', university.id)
-        } else {
-          console.warn('⚠️ Could not find university for school:', formData.school)
-          // If school is already a UUID, use it directly
-          if (formData.school.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-            updateData.university_id = formData.school
-          }
-        }
+      if (universityId) {
+        updateData.university_id = universityId
       }
       if (formData.fullName) updateData.full_name = formData.fullName.trim()
       if (formData.username) updateData.username = formData.username.toLowerCase().trim()
@@ -148,6 +153,12 @@ export const useSaveOnboarding = () => {
         .single()
 
       if (error) {
+        if (error.code === '23505' && error.message.includes('profiles_username_key')) {
+          console.error('❌ Username taken:', formData.username)
+          const usernameTakenError = new Error('This username is already taken. Please pick another one.')
+          usernameTakenError.code = 'USERNAME_TAKEN'
+          throw usernameTakenError
+        }
         console.error('Error saving onboarding data:', error)
         throw error
       }

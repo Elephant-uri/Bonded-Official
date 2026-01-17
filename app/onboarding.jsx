@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Alert, ImageBackground, Keyboard, StyleSheet, Text, useColorScheme, View } from 'react-native'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Alert, ImageBackground, StyleSheet, Text, useColorScheme, View } from 'react-native'
 import ScreenWrapper from '../components/ScreenWrapper'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useSaveOnboarding } from '../hooks/useSaveOnboarding'
-import { ONBOARDING_STEPS, STEP_METADATA, useOnboardingStore, getActiveOnboardingSteps } from '../stores/onboardingStore'
+import { getActiveOnboardingSteps, ONBOARDING_STEPS, STEP_METADATA, useOnboardingStore } from '../stores/onboardingStore'
 import { useThemeMode } from './theme'
 // Onboarding always uses light mode - don't use dynamic theme
 import BackButton from '../components/BackButton'
@@ -19,28 +20,49 @@ import PhotoSelectionStep from '../components/onboarding/steps/PhotoSelectionSte
 import StudyHabitsStep from '../components/onboarding/steps/StudyHabitsStep'
 import { ONBOARDING_THEME } from '../constants/onboardingTheme'
 import { hp, wp } from '../helpers/common'
+import { useAuthStore } from '../stores/authStore'
 
 export default function Onboarding() {
   const styles = createStyles(ONBOARDING_THEME)
   const router = useRouter()
   const { setMode } = useThemeMode()
   const systemScheme = useColorScheme() || 'light'
-  const { 
-    currentStep, 
-    formData, 
-    completedSteps, 
+  const { user } = useAuthStore()
+  const { data: profile } = useCurrentUserProfile()
+  const {
+    currentStep,
+    formData,
+    completedSteps,
     completionPercentage,
     canAccessApp,
     setCurrentStep,
     updateFormData,
     markStepComplete,
     getNextIncompleteStep,
+    syncFromProfile,
+    setUserId,
   } = useOnboardingStore()
-  
+
   const { mutate: saveOnboarding, isPending: isSaving } = useSaveOnboarding()
   const [isScrollingDown, setIsScrollingDown] = useState(false)
   const [showCelebration, setShowCelebration] = useState(false)
   const lastScrollY = useRef(0)
+  const [hasSynced, setHasSynced] = useState(false)
+
+  // Sync onboarding store from profile when component mounts or profile loads
+  useEffect(() => {
+    if (user?.id && profile && !hasSynced) {
+      setUserId(user.id)
+      syncFromProfile(profile)
+      setHasSynced(true)
+
+      // Navigate to first incomplete step
+      const nextStep = getNextIncompleteStep()
+      if (nextStep) {
+        setCurrentStep(nextStep)
+      }
+    }
+  }, [user?.id, profile, hasSynced, setUserId, syncFromProfile, getNextIncompleteStep, setCurrentStep])
 
   // Force light mode while onboarding is displayed, then restore system preference
   // Use useLayoutEffect to ensure theme changes BEFORE render
@@ -96,6 +118,9 @@ export default function Onboarding() {
         },
         onError: (error) => {
           console.error('❌ Failed to save onboarding progress:', error)
+          if (error.code === 'USERNAME_TAKEN') {
+            Alert.alert('Username Taken', error.message)
+          }
         }
       })
     }, 2000) // Debounce: save 2 seconds after last change
@@ -149,11 +174,11 @@ export default function Onboarding() {
       // Mark current step as complete
       markStepComplete(currentStep)
     }
-    
+
     // Get next step in sequence (only active steps, excluding intro)
     const steps = getActiveOnboardingSteps()
     const currentStepIndex = steps.indexOf(currentStep)
-    
+
     if (currentStepIndex < steps.length - 1) {
       // Go to next step in sequence
       const nextStep = steps[currentStepIndex + 1]
@@ -182,7 +207,7 @@ export default function Onboarding() {
 
     const steps = getActiveOnboardingSteps()
     const stepIndex = steps.indexOf(currentStep)
-    
+
     if (stepIndex > 0) {
       // Go to previous step in sequence
       const prevStep = steps[stepIndex - 1]
@@ -201,11 +226,11 @@ export default function Onboarding() {
   const handleScroll = (event) => {
     const currentScrollY = event.nativeEvent.contentOffset.y
     const scrollingDown = currentScrollY > lastScrollY.current && currentScrollY > 50
-    
+
     if (scrollingDown !== isScrollingDown) {
       setIsScrollingDown(scrollingDown)
     }
-    
+
     lastScrollY.current = currentScrollY
   }
 
@@ -216,12 +241,14 @@ export default function Onboarding() {
       updateFormData,
       onScroll: handleScroll,
     }
-    
+
     switch (currentStep) {
       case ONBOARDING_STEPS.BASIC_INFO:
         return <BasicInfoStep {...commonProps} />
       case ONBOARDING_STEPS.PHOTOS:
         return <PhotoSelectionStep {...commonProps} />
+      case ONBOARDING_STEPS.CLASS_SCHEDULE:
+        return <ClassScheduleStep {...commonProps} />
       case ONBOARDING_STEPS.INTERESTS:
         return <InterestsStep {...commonProps} />
       case ONBOARDING_STEPS.STUDY_HABITS:
@@ -230,8 +257,6 @@ export default function Onboarding() {
         return <LivingHabitsStep {...commonProps} />
       case ONBOARDING_STEPS.PERSONALITY:
         return <PersonalityStep {...commonProps} />
-      case ONBOARDING_STEPS.CLASS_SCHEDULE:
-        return <ClassScheduleStep {...commonProps} />
       default:
         return <BasicInfoStep {...commonProps} />
     }
@@ -264,22 +289,22 @@ export default function Onboarding() {
       })}
     </View>
   )
-  
+
   // Can continue logic - all steps require validation
   const canContinue =
     (currentStep === ONBOARDING_STEPS.BASIC_INFO &&
-     formData.school && formData.age && formData.grade && formData.gender && formData.major && formData.fullName && formData.username) ||
+      formData.school && formData.age && formData.grade && formData.gender && formData.major && formData.fullName && formData.username) ||
     (currentStep === ONBOARDING_STEPS.PHOTOS && formData.photos?.length > 0) ||
     (currentStep === ONBOARDING_STEPS.INTERESTS && formData.interests?.length > 0) ||
     (currentStep === ONBOARDING_STEPS.CLASS_SCHEDULE && formData.classSchedule?.courses?.length > 0) ||
     (currentStep === ONBOARDING_STEPS.STUDY_HABITS &&
-     formData.studyHabits?.preferredStudyTime && formData.studyHabits?.studyLocation &&
-     formData.studyHabits?.studyStyle && formData.studyHabits?.noiseLevel) ||
+      formData.studyHabits?.preferredStudyTime && formData.studyHabits?.studyLocation &&
+      formData.studyHabits?.studyStyle && formData.studyHabits?.noiseLevel) ||
     (currentStep === ONBOARDING_STEPS.LIVING_HABITS &&
-     formData.livingHabits?.sleepSchedule && formData.livingHabits?.cleanliness &&
-     formData.livingHabits?.socialLevel && formData.livingHabits?.guests) ||
+      formData.livingHabits?.sleepSchedule && formData.livingHabits?.cleanliness &&
+      formData.livingHabits?.socialLevel && formData.livingHabits?.guests) ||
     (currentStep === ONBOARDING_STEPS.PERSONALITY &&
-     Object.keys(formData.personalityAnswers || {}).length > 0)
+      Object.keys(formData.personalityAnswers || {}).length > 0)
 
   // Show celebration screen
   if (showCelebration) {
@@ -306,12 +331,12 @@ export default function Onboarding() {
       <ScreenWrapper bg='transparent'>
         <StatusBar style='light' />
         <BackButton onPress={handleBack} visible={!isScrollingDown} theme={ONBOARDING_THEME} />
-        
+
         {/* Step Progress at Top */}
         <View style={styles.stepProgressBar}>
           {renderStepPills()}
         </View>
-        
+
         <View style={styles.container}>
           {/* Step Content - Conditional rendering */}
           <View style={styles.stepContainer}>
@@ -337,27 +362,20 @@ const createStyles = () => StyleSheet.create({
     flex: 1,
     width: '100%',
   },
-  stepProgressBar: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: hp(7), // Account for safe area + back button
-    paddingBottom: hp(1),
-  },
   container: {
     flex: 1,
-    paddingHorizontal: wp(6),
-    paddingTop: hp(1),
+    justifyContent: 'space-between',
   },
-  stepContainer: {
-    flex: 1,
-    minHeight: 0, // Allow ScrollView inside to flex/scroll
-    // Remove justifyContent to allow ScrollView to work properly
+  stepProgressBar: {
+    alignItems: 'center',
+    paddingTop: hp(1),
+    paddingBottom: hp(1),
   },
   stepPillsContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: wp(1.5),
+    justifyContent: 'center',
+    gap: wp(2),
   },
   stepPill: {
     width: hp(3.2),
@@ -390,5 +408,8 @@ const createStyles = () => StyleSheet.create({
   stepPillTextActive: {
     color: '#FFFFFF',
     fontSize: hp(1.5),
+  },
+  stepContainer: {
+    flex: 1,
   },
 })

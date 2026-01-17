@@ -52,4 +52,3 @@ export const getEnabledFeatures = () => {
 export const getDisabledFeatures = () => {
   return Object.keys(FEATURE_GATES).filter(key => FEATURE_GATES[key] === false)
 }
-

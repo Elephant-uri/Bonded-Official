@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { hp, wp } from '../../../helpers/common'
 import { useAppTheme } from '../../theme'
+import { formatDateTime, formatTimeForDisplay } from '../../../utils/dateFormatters'
 import { useEvent } from '../../../hooks/events/useEvent'
 import { useAuthStore } from '../../../stores/authStore'
 import { supabase } from '../../../lib/supabase'
@@ -54,7 +55,7 @@ export default function ManageEvent() {
   const deleteEventMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
-        .from('uri_events')
+        .from('events')
         .delete()
         .eq('id', eventId)
 
@@ -103,23 +104,6 @@ export default function ManageEvent() {
     Alert.alert('Coming Soon', 'Event editing will be available soon!')
   }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
 
   if (isLoading) {
     return (
@@ -280,7 +264,7 @@ export default function ManageEvent() {
                   {formatDate(event.start_at)}
                 </Text>
                 <Text style={styles.detailValue}>
-                  {formatTime(event.start_at)} - {formatTime(event.end_at)}
+                  {formatTimeForDisplay(event.start_at)} - {formatTimeForDisplay(event.end_at)}
                 </Text>
               </View>
             </View>

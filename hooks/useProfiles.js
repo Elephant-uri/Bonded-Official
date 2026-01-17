@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 
@@ -6,16 +6,23 @@ import { useAuthStore } from '../stores/authStore'
  * Hook to fetch profiles for Yearbook
  * Returns profiles from the same university as the current user
  * Respects RLS policies (campus isolation)
+ *
+ * OPTIMIZED:
+ * - Fetches profiles without gallery photos for fast initial load
+ * - Gallery photos are loaded lazily when viewing a profile modal
  */
 export function useProfiles(filters = {}) {
   const { user } = useAuthStore()
-  
+
   return useQuery({
     queryKey: ['profiles', filters, user?.id],
     queryFn: async () => {
       if (!user) {
         throw new Error('User must be authenticated to view profiles')
       }
+
+      console.log('🎓 Fetching yearbook profiles...')
+      const startTime = Date.now()
 
       // Get user's university first to filter profiles
       const { data: userProfile } = await supabase
@@ -27,8 +34,6 @@ export function useProfiles(filters = {}) {
       if (!userProfile?.university_id) {
         return []
       }
-
-      console.log('🎓 Fetching yearbook profiles for university:', userProfile.university_id)
 
       // Build query - simplified to avoid RLS recursion
       let query = supabase
@@ -47,45 +52,39 @@ export function useProfiles(filters = {}) {
           graduation_year,
           interests,
           personality_tags,
+          yearbook_quote,
           yearbook_visible,
           onboarding_complete,
           created_at,
           university_id
         `)
-        .eq('university_id', userProfile.university_id) // Filter by same university
-        .or('yearbook_visible.eq.true,yearbook_visible.is.null') // Show if visible or not set
+        .eq('university_id', userProfile.university_id)
+        .or('yearbook_visible.eq.true,yearbook_visible.is.null')
         .order('created_at', { ascending: false })
+        .limit(100)
 
       // Apply filters
       if (filters.graduationYear) {
         query = query.eq('graduation_year', filters.graduationYear)
       }
-
       if (filters.grade) {
         query = query.eq('grade', filters.grade)
       }
-
       if (filters.major) {
         query = query.eq('major', filters.major)
       }
-
       if (filters.gender) {
         query = query.eq('gender', filters.gender)
       }
-
       if (filters.searchQuery) {
         const search = filters.searchQuery.toLowerCase().trim()
-        query = query.or(`full_name.ilike.%${search}%,major.ilike.%${search}%,bio.ilike.%${search}%`)
+        query = query.or(`full_name.ilike.%${search}%,major.ilike.%${search}%,bio.ilike.%${search}%,yearbook_quote.ilike.%${search}%`)
       }
-
-      // Age filter (if provided)
-      if (filters.ageMin || filters.ageMax) {
-        if (filters.ageMin) {
-          query = query.gte('age', filters.ageMin)
-        }
-        if (filters.ageMax) {
-          query = query.lte('age', filters.ageMax)
-        }
+      if (filters.ageMin) {
+        query = query.gte('age', filters.ageMin)
+      }
+      if (filters.ageMax) {
+        query = query.lte('age', filters.ageMax)
       }
 
       const { data, error } = await query
@@ -95,22 +94,11 @@ export function useProfiles(filters = {}) {
         throw error
       }
 
-      console.log(`✅ Fetched ${data?.length || 0} profiles for yearbook`)
-
-      // Get university name separately to avoid RLS recursion
-      const universityIds = [...new Set((data || []).map(p => p.university_id).filter(Boolean))]
-      let universitiesMap = {}
-      if (universityIds.length > 0) {
-        const { data: universities } = await supabase
-          .from('universities')
-          .select('id, name')
-          .in('id', universityIds)
-        if (universities) {
-          universitiesMap = Object.fromEntries(universities.map(u => [u.id, u.name]))
-        }
-      }
+      const fetchTime = Date.now() - startTime
+      console.log(`✅ Fetched ${data?.length || 0} profiles in ${fetchTime}ms`)
 
       // Transform data to match Yearbook component expectations
+      // Gallery photos are loaded lazily via useProfilePhotos hook
       return (data || []).map((profile) => ({
         id: profile.id,
         name: profile.full_name || profile.username || 'Anonymous',
@@ -125,15 +113,61 @@ export function useProfiles(filters = {}) {
         photoUrl: profile.avatar_url, // Required by Yearbook card
         interests: Array.isArray(profile.interests) ? profile.interests : [],
         personalityTags: Array.isArray(profile.personality_tags) ? profile.personality_tags : [],
-        university: universitiesMap[profile.university_id] || 'University',
-        // For compatibility with existing Yearbook component
-        quote: profile.bio || 'No bio yet',
-        photos: profile.avatar_url ? [profile.avatar_url] : [],
+        university: 'University', // Skip university lookup for speed
+        quote: profile.yearbook_quote || profile.bio || 'No quote yet',
+        photos: profile.avatar_url ? [profile.avatar_url] : [], // Just avatar initially
       }))
     },
-    enabled: !!user, // Only run if user is authenticated
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     retry: 1,
+  })
+}
+
+/**
+ * Hook to fetch gallery photos for a specific profile (lazy loading)
+ * Used when user opens a profile modal
+ */
+export function useProfilePhotos(profileId) {
+  return useQuery({
+    queryKey: ['profilePhotos', profileId],
+    queryFn: async () => {
+      if (!profileId) return []
+
+      const { data: mediaData } = await supabase
+        .from('media')
+        .select('id, path, media_type, created_at')
+        .eq('owner_id', profileId)
+        .eq('owner_type', 'user')
+        .in('media_type', ['profile_photo', 'profile_avatar'])
+        .order('created_at', { ascending: true })
+
+      if (!mediaData || mediaData.length === 0) return []
+
+      // Import helper to create signed URLs
+      const { createSignedUrlForPath } = await import('../helpers/mediaStorage')
+
+      // Generate signed URLs in parallel
+      const urlPromises = mediaData
+        .filter(media => media.media_type === 'profile_photo')
+        .map(async (media) => {
+          try {
+            return await createSignedUrlForPath(media.path)
+          } catch (error) {
+            console.warn('Failed to get signed URL for media:', media.id)
+            return null
+          }
+        })
+
+      const urls = await Promise.all(urlPromises)
+      return urls.filter(Boolean)
+    },
+    enabled: !!profileId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 15 * 60 * 1000, // 15 minutes
   })
 }
 

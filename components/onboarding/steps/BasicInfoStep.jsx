@@ -325,42 +325,44 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
 
 export default BasicInfoStep
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
   },
   contentContainer: {
     paddingVertical: hp(2),
+    paddingHorizontal: wp(5),
     paddingBottom: hp(20), // Extra padding for fixed navigation buttons at bottom
   },
   title: {
-    fontSize: hp(4),
+    fontSize: hp(3.5),
     fontWeight: '800',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary || '#1A1A1A',
+    fontFamily: theme.typography?.fontFamily?.heading || 'System',
     marginBottom: hp(1),
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: hp(2.2),
-    color: '#8E8E8E',
-    fontFamily: 'System',
-    marginBottom: hp(4),
+    fontSize: hp(2),
+    color: theme.colors.textSecondary || '#8E8E8E',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
+    marginBottom: hp(5),
     textAlign: 'center',
   },
   inputGroup: {
-    marginBottom: hp(3),
+    marginBottom: hp(2.5),
   },
   validationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2),
-    marginTop: hp(1),
+    marginTop: hp(0.8),
   },
   validationText: {
-    fontSize: hp(1.6),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    fontSize: hp(1.5),
+    color: theme.colors.textSecondary || '#8E8E8E',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
   },
   validationSuccess: {
     color: '#4CAF50',
@@ -369,9 +371,10 @@ const createStyles = () => StyleSheet.create({
     color: '#EF4444',
   },
   helperText: {
-    fontSize: hp(1.4),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary || '#8E8E8E',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginTop: hp(0.5),
+    opacity: 0.7,
   },
 })

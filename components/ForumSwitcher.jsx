@@ -36,6 +36,7 @@ const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
         return theme.colors.bondedPurple
     }
   }
+  const hasMemberCount = currentForum?.memberCount !== undefined && currentForum?.memberCount !== null
 
   return (
     <TouchableOpacity
@@ -54,11 +55,11 @@ const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
         <Text style={styles.forumName} numberOfLines={1}>
           {currentForum?.name || 'Main Forum'}
         </Text>
-        {currentForum?.memberCount && (
+        {hasMemberCount ? (
           <Text style={styles.memberCount}>
             {currentForum.memberCount} members
           </Text>
-        )}
+        ) : null}
       </View>
       <Ionicons
         name="chevron-down"
@@ -149,4 +150,3 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.white,
   },
 })
-

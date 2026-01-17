@@ -385,7 +385,7 @@ function getCurrentTermCode() {
   const now = new Date()
   const month = now.getMonth()
   const year = now.getFullYear()
-  
+
   if (month >= 0 && month <= 4) {
     return `${year}SP`
   } else if (month >= 5 && month <= 7) {
@@ -393,4 +393,147 @@ function getCurrentTermCode() {
   } else {
     return `${year}FA`
   }
+}
+
+/**
+ * Convenience export for Network page - wraps useAllClassmates
+ * Returns profiles with shared class info, sorted by most shared classes
+ */
+export function useClassMatching() {
+  const { user } = useAuthStore()
+
+  return useQuery({
+    queryKey: ['classmates', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return []
+
+      // Get current user's class enrollments
+      const { data: myEnrollments, error: enrollmentError } = await supabase
+        .from('user_class_enrollments')
+        .select('class_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+
+      if (enrollmentError) {
+        console.error('Error fetching user enrollments:', enrollmentError)
+        return []
+      }
+
+      if (!myEnrollments?.length) {
+        return []
+      }
+
+      const classIds = myEnrollments.map(e => e.class_id)
+
+      // Find other users enrolled in the same classes
+      const { data: classmates, error: classmatesError } = await supabase
+        .from('user_class_enrollments')
+        .select(`
+          user_id,
+          class_id,
+          class:class_id(id, class_code, class_name),
+          profiles:user_id(
+            id,
+            full_name,
+            username,
+            avatar_url,
+            major,
+            graduation_year,
+            grade,
+            interests,
+            personality_tags,
+            yearbook_quote,
+            university_id
+          )
+        `)
+        .in('class_id', classIds)
+        .eq('is_active', true)
+        .neq('user_id', user.id)
+
+      if (classmatesError) {
+        console.error('Error fetching classmates:', classmatesError)
+        return []
+      }
+
+      // Group by user and count shared classes
+      const userMap = {}
+      classmates?.forEach(enrollment => {
+        const uid = enrollment.user_id
+        if (!enrollment.profiles) return // Skip if no profile
+
+        if (!userMap[uid]) {
+          userMap[uid] = {
+            ...enrollment.profiles,
+            sharedClasses: [],
+            sharedClassCount: 0,
+          }
+        }
+        if (enrollment.class) {
+          userMap[uid].sharedClasses.push(enrollment.class)
+          userMap[uid].sharedClassCount++
+        }
+      })
+
+      // Sort by shared class count (most first)
+      return Object.values(userMap).sort((a, b) => b.sharedClassCount - a.sharedClassCount)
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+/**
+ * Fallback hook to get profiles from the same university
+ * Used when user has no class enrollments
+ */
+export function useUniversityProfiles() {
+  const { user } = useAuthStore()
+
+  return useQuery({
+    queryKey: ['university-profiles', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return []
+
+      // Get current user's university
+      const { data: currentProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('university_id')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError || !currentProfile?.university_id) {
+        console.error('Error fetching user university:', profileError)
+        return []
+      }
+
+      // Get other profiles from the same university
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          username,
+          avatar_url,
+          major,
+          graduation_year,
+          grade,
+          interests,
+          personality_tags,
+          yearbook_quote,
+          university_id
+        `)
+        .eq('university_id', currentProfile.university_id)
+        .neq('id', user.id)
+        .limit(100)
+
+      if (profilesError) {
+        console.error('Error fetching university profiles:', profilesError)
+        return []
+      }
+
+      return profiles || []
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
 }

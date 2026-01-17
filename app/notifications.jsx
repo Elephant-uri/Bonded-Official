@@ -1,33 +1,20 @@
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import React, { useMemo, useState } from 'react'
-import { ActivityIndicator, Animated, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import React, { useMemo, useState, useEffect } from 'react'
+import { ActivityIndicator, Animated, FlatList, Image, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
+import YearbookProfileModalContent from '../components/YearbookProfileModalContent'
 import { hp, wp } from '../helpers/common'
 import { useFriendRequests, useAcceptFriendRequest, useDeclineFriendRequest } from '../hooks/useFriends'
+import { useNotifications } from '../hooks/useNotifications'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useAppTheme } from './theme'
-
-// Format time ago
-const formatTimeAgo = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now - date
-  
-  const minutes = Math.floor(diff / (60 * 1000))
-  const hours = Math.floor(diff / (60 * 60 * 1000))
-  const days = Math.floor(diff / (24 * 60 * 60 * 1000))
-  
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days < 7) return `${days}d ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+import { supabase } from '../lib/supabase'
+import { formatTimeAgo } from '../utils/dateFormatters'
 
 export default function Notifications() {
   const theme = useAppTheme()
@@ -36,10 +23,23 @@ export default function Notifications() {
   
   // Fetch friend requests
   const { data: friendRequests = [], isLoading, refetch } = useFriendRequests()
+  const { data: notificationsData = [] } = useNotifications()
+  const { data: currentUserProfile } = useCurrentUserProfile()
   const acceptRequest = useAcceptFriendRequest()
   const declineRequest = useDeclineFriendRequest()
   
   const [refreshing, setRefreshing] = useState(false)
+  const [activeProfile, setActiveProfile] = useState(null)
+  const [seenRequestIds, setSeenRequestIds] = useState(() => new Set())
+
+  useEffect(() => {
+    if (!friendRequests.length) return
+    setSeenRequestIds((prev) => {
+      const next = new Set(prev)
+      friendRequests.forEach((request) => next.add(request.id))
+      return next
+    })
+  }, [friendRequests])
 
   const onRefresh = async () => {
     setRefreshing(true)
@@ -47,21 +47,66 @@ export default function Notifications() {
     setRefreshing(false)
   }
 
+  useEffect(() => {
+    const unreadIds = notificationsData.filter((n) => !n.read_at).map((n) => n.id)
+    if (unreadIds.length === 0) return
+    supabase
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .in('id', unreadIds)
+  }, [notificationsData])
+
+  const formatNotificationBody = (item) => {
+    const name = item.actor?.full_name || item.actor?.username || 'Someone'
+    switch (item.type) {
+      case 'post_like':
+        return `${name} liked your post`
+      case 'post_comment':
+        return `${name} commented on your post`
+      case 'comment_reply':
+        return `${name} replied to your comment`
+      case 'comment_like':
+        return `${name} liked your comment`
+      default:
+        return `${name} interacted with your post`
+    }
+  }
+
   // Transform friend requests into notification format
   const notifications = useMemo(() => {
-    return friendRequests.map(request => ({
+    const requestItems = friendRequests.map(request => ({
       id: request.id,
       type: 'friend_request',
       title: 'Friend Request',
       body: `${request.sender?.full_name || request.sender?.username || 'Someone'} wants to be your friend`,
       timeAgo: formatTimeAgo(request.created_at),
       icon: 'person-add-outline',
-      read: false,
+      read: seenRequestIds.has(request.id),
       sender: request.sender,
       senderId: request.sender_id,
       message: request.message,
+      created_at: request.created_at,
     }))
-  }, [friendRequests])
+
+    const notificationItems = notificationsData.map((item) => ({
+      id: item.id,
+      type: 'notification',
+      title: 'Notification',
+      body: formatNotificationBody(item),
+      timeAgo: formatTimeAgo(item.created_at),
+      icon: item.type === 'post_like' ? 'heart-outline' : 'chatbubble-ellipses-outline',
+      read: !!item.read_at,
+      actor: item.actor,
+      entityType: item.entity_type,
+      entityId: item.entity_id,
+      data: item.data || {},
+      created_at: item.created_at,
+    }))
+
+    return [...requestItems, ...notificationItems].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    )
+  }, [friendRequests, notificationsData, seenRequestIds])
 
   const handleAccept = (item) => {
     acceptRequest.mutate({
@@ -106,18 +151,33 @@ export default function Notifications() {
         }}
       >
         <AppCard style={styles.notificationCardWrapper}>
-          <LinearGradient
-            colors={['#A855F7', '#7C3AED']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.unreadStrip}
-          />
+          {!item.read && (
+            <LinearGradient
+              colors={['#A855F7', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.unreadStrip}
+            />
+          )}
           <View style={styles.friendRequestCard}>
             {/* Avatar */}
             <TouchableOpacity
               style={styles.avatarContainer}
               onPress={() => {
-                // Could navigate to profile
+                const sender = item.sender || {}
+                setActiveProfile({
+                  id: sender.id || item.senderId,
+                  name: sender.full_name || sender.username || 'User',
+                  photoUrl: sender.avatar_url || null,
+                  quote: sender.bio || 'No bio yet',
+                  major: sender.major || 'Undeclared',
+                  year: sender.graduation_year?.toString() || '2025',
+                  grade: sender.grade || null,
+                  location: sender.university?.name || null,
+                  university: sender.university?.name || null,
+                  interests: Array.isArray(sender.interests) ? sender.interests : [],
+                  photos: Array.isArray(sender.photos) ? sender.photos : [],
+                })
               }}
             >
               {item.sender?.avatar_url ? (
@@ -220,6 +280,14 @@ export default function Notifications() {
           <TouchableOpacity
             style={styles.notificationCard}
             activeOpacity={0.7}
+            onPress={() => {
+              if (item.entityId) {
+                router.push({
+                  pathname: '/forum',
+                  params: { postId: item.data?.post_id || item.entityId },
+                })
+              }
+            }}
           >
             <View style={styles.notificationIconContainer}>
               <Ionicons
@@ -294,6 +362,22 @@ export default function Notifications() {
         )}
 
         <BottomNav />
+
+        <Modal
+          visible={!!activeProfile}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setActiveProfile(null)}
+        >
+          <YearbookProfileModalContent
+            activeProfile={activeProfile}
+            setActiveProfile={setActiveProfile}
+            theme={theme}
+            router={router}
+            currentUserInterests={new Set(currentUserProfile?.interests || [])}
+            onClose={() => setActiveProfile(null)}
+          />
+        </Modal>
       </View>
     </SafeAreaView>
   )

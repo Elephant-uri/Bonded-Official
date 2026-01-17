@@ -2,17 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getDefaultAvatar } from '../constants/defaultAvatar'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
-
-const isRlsRecursionError = (error) =>
-  error?.code === '42P17' ||
-  error?.code === '54001' ||
-  error?.message?.toLowerCase()?.includes('infinite recursion') ||
-  error?.message?.toLowerCase()?.includes('stack depth')
-
-const logRlsFixHint = (table = 'profiles') => {
-  console.warn(`⚠️ RLS recursion detected on ${table} – returning minimal profile`)
-  console.warn('💡 Run database/fix-profiles-rls-recursion.sql in Supabase SQL Editor to unblock')
-}
+import { isRlsRecursionError, logRlsFixHint } from '../utils/rlsHelpers'
 
 const normalizeProfilePhotos = (photos, avatarUrl, yearbookPhotoUrl) => {
   const photoArray = Array.isArray(photos) ? [...photos] : []
@@ -45,14 +35,17 @@ export function useCurrentUserProfile() {
   return useQuery({
     queryKey: ['currentUserProfile', user?.id],
     queryFn: async () => {
-      if (!user) {
-        throw new Error('User must be authenticated to view profile')
-      }
+      try {
+        if (!user) {
+          // Return null instead of throwing to prevent crashes
+          console.warn('⚠️ useCurrentUserProfile called without user')
+          return null
+        }
 
-      console.log('🔍 Fetching profile for user:', user.id, user.email)
+        console.log('🔍 Fetching profile for user:', user.id, user.email)
 
-      // Fetch profile data
-      const { data: profile, error: profileError } = await supabase
+        // Fetch profile data
+        const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(`
           id,
@@ -179,7 +172,7 @@ export function useCurrentUserProfile() {
       })
 
       // Fetch connections count (friends) - count both outgoing and incoming
-      const [outgoingResult, incomingResult] = await Promise.all([
+      const [outgoingResult, incomingResult, mediaResult] = await Promise.all([
         supabase
           .from('relationships')
           .select('*', { count: 'exact', head: true })
@@ -191,10 +184,38 @@ export function useCurrentUserProfile() {
           .select('*', { count: 'exact', head: true })
           .eq('target_user_id', user.id)
           .eq('relationship_type', 'friend')
-          .eq('status', 'accepted')
+          .eq('status', 'accepted'),
+        // Fetch profile photos from media table
+        supabase
+          .from('media')
+          .select('id, path, media_type, created_at')
+          .eq('owner_id', user.id)
+          .eq('owner_type', 'user')
+          .in('media_type', ['profile_photo', 'profile_avatar'])
+          .order('created_at', { ascending: true })
       ])
 
       const connectionsCount = (outgoingResult.count || 0) + (incomingResult.count || 0)
+      
+      // Generate signed URLs for all profile photos
+      let profilePhotos = []
+      if (mediaResult.data && mediaResult.data.length > 0) {
+        const { createSignedUrlForPath } = await import('../helpers/mediaStorage')
+        profilePhotos = await Promise.all(
+          mediaResult.data
+            .filter(m => m.media_type === 'profile_photo')
+            .map(async (media) => {
+              try {
+                const signedUrl = await createSignedUrlForPath(media.path)
+                return signedUrl
+              } catch (error) {
+                console.warn('Failed to get signed URL for media:', media.id, error)
+                return null
+              }
+            })
+        )
+        profilePhotos = profilePhotos.filter(Boolean)
+      }
 
       // Fetch yearbook quote (if exists in a separate table or as part of profile)
       // For now, we'll check if there's a yearbook_quote field or similar
@@ -203,6 +224,12 @@ export function useCurrentUserProfile() {
       // Get display name and default avatar
       const displayName = profile.full_name || profile.email?.split('@')[0] || 'User'
       const defaultAvatar = getDefaultAvatar(displayName)
+
+      // Build final photos array: avatar first, then gallery photos
+      const avatarUrl = profile.avatar_url || defaultAvatar
+      const allPhotos = [avatarUrl, ...profilePhotos].filter((url, index, self) => 
+        url && self.indexOf(url) === index // Remove duplicates
+      )
 
       return {
         ...profile,
@@ -214,9 +241,9 @@ export function useCurrentUserProfile() {
         major: profile.major,
         year: profile.grade || (profile.graduation_year ? `Class of ${profile.graduation_year}` : null),
         graduationYear: profile.graduation_year,
-        avatarUrl: profile.avatar_url || defaultAvatar,
-        yearbookPhotoUrl: profile.avatar_url || defaultAvatar,
-        photos: profile.avatar_url ? [profile.avatar_url] : [defaultAvatar], // Photos now stored in media table
+        avatarUrl: avatarUrl,
+        yearbookPhotoUrl: avatarUrl,
+        photos: allPhotos, // Now includes gallery photos from media table
         // Include all onboarding fields
         age: profile.age,
         gender: profile.gender,
@@ -233,10 +260,44 @@ export function useCurrentUserProfile() {
         // Yearbook quote would come from a separate field if it exists
         yearbookQuote: profile.yearbook_quote || null,
       }
+    } catch (error) {
+        // Catch any unexpected errors to prevent crashes
+        console.error('❌ Unexpected error in useCurrentUserProfile:', error)
+        // Return minimal profile instead of throwing
+        const displayName = user?.email?.split('@')[0] || 'User'
+        return {
+          id: user?.id || null,
+          email: user?.email || null,
+          name: displayName,
+          handle: `@${displayName}`,
+          onboarding_complete: false,
+          connectionsCount: 0,
+          location: 'University',
+          yearbookQuote: null,
+          photos: [],
+          yearbookPhotoUrl: null,
+          full_name: null,
+          username: null,
+          bio: null,
+          major: null,
+          grade: null,
+          graduation_year: null,
+          interests: null,
+        }
+      }
     },
-    enabled: !!user,
+    enabled: !!user && !!user.id, // Only run when user is authenticated
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1,
+    retry: (failureCount, error) => {
+      // Don't retry on network errors or RLS errors
+      if (error?.code === 'PGRST116' || error?.code === '42P17') {
+        return false
+      }
+      // Retry up to 1 time for other errors
+      return failureCount < 1
+    },
+    retryOnMount: false, // Don't retry on mount to prevent crashes
+    refetchOnWindowFocus: false, // Don't refetch on focus to prevent crashes
   })
 }
 

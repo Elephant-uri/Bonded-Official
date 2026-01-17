@@ -12,37 +12,36 @@ import {
   Platform,
   ScrollView,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from '../app/theme'
-
-// Mock data for users - in a real app, this would come from a users context or API
-const MOCK_USERS = [
-  { id: 'user-1', name: 'Alex Johnson', photoUrl: 'https://randomuser.me/api/portraits/men/20.jpg', isFriend: true },
-  { id: 'user-2', name: 'Sarah Williams', photoUrl: 'https://randomuser.me/api/portraits/women/21.jpg', isFriend: true },
-  { id: 'user-3', name: 'Michael Brown', photoUrl: 'https://randomuser.me/api/portraits/men/22.jpg', isFriend: false },
-  { id: 'user-4', name: 'Emily Davis', photoUrl: 'https://randomuser.me/api/portraits/women/23.jpg', isFriend: true },
-  { id: 'user-5', name: 'David Miller', photoUrl: 'https://randomuser.me/api/portraits/men/24.jpg', isFriend: false },
-  { id: 'user-6', name: 'Jessica Garcia', photoUrl: 'https://randomuser.me/api/portraits/women/25.jpg', isFriend: true },
-  { id: 'user-7', name: 'Chris Wilson', photoUrl: 'https://randomuser.me/api/portraits/men/26.jpg', isFriend: false },
-  { id: 'user-8', name: 'Sophia Martinez', photoUrl: 'https://randomuser.me/api/portraits/women/27.jpg', isFriend: true },
-]
+import { useFriends } from '../hooks/useFriends'
 
 export default function InviteModal({ visible, clubName, onClose, onInvite }) {
   const theme = useAppTheme()
   const styles = createStyles(theme)
+  const insets = useSafeAreaInsets()
+  const { data: friends = [], isLoading } = useFriends()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedUsers, setSelectedUsers] = useState([])
 
+  const friendOptions = useMemo(() => (
+    friends.map((friend) => ({
+      id: friend.id,
+      name: friend.full_name || friend.username || 'User',
+      photoUrl: friend.avatar_url || null,
+    }))
+  ), [friends])
+
   const filteredUsers = useMemo(() => {
     if (!searchQuery) {
-      return MOCK_USERS
+      return friendOptions
     }
-    return MOCK_USERS.filter((user) =>
+    return friendOptions.filter((user) =>
       user.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  }, [searchQuery])
+  }, [searchQuery, friendOptions])
 
   const toggleUserSelection = (userId) => {
     setSelectedUsers((prev) =>
@@ -62,21 +61,22 @@ export default function InviteModal({ visible, clubName, onClose, onInvite }) {
 
   const renderUser = ({ item }) => {
     const isSelected = selectedUsers.includes(item.id)
+    const initial = item.name?.charAt(0)?.toUpperCase() || 'U'
     return (
       <TouchableOpacity
         style={styles.userItem}
         onPress={() => toggleUserSelection(item.id)}
         activeOpacity={0.7}
       >
-        <Image source={{ uri: item.photoUrl }} style={styles.userAvatar} />
+        {item.photoUrl ? (
+          <Image source={{ uri: item.photoUrl }} style={styles.userAvatar} />
+        ) : (
+          <View style={styles.userAvatarPlaceholder}>
+            <Text style={styles.userAvatarInitial}>{initial}</Text>
+          </View>
+        )}
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{item.name}</Text>
-          {item.isFriend && (
-            <View style={styles.friendBadge}>
-              <Ionicons name="checkmark-circle" size={hp(1.2)} color={theme.colors.bondedPurple} />
-              <Text style={styles.friendText}>Friend</Text>
-            </View>
-          )}
         </View>
         {isSelected && (
           <Ionicons name="checkmark-circle" size={hp(2.5)} color={theme.colors.bondedPurple} />
@@ -94,8 +94,12 @@ export default function InviteModal({ visible, clubName, onClose, onInvite }) {
         >
           <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <View style={[styles.header, { paddingTop: Math.max(hp(1.5), insets.top * 0.6) }]}>
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.closeButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Ionicons name="close" size={hp(3)} color={theme.colors.charcoal} />
               </TouchableOpacity>
               <View style={styles.headerContent}>
@@ -130,31 +134,53 @@ export default function InviteModal({ visible, clubName, onClose, onInvite }) {
               <View style={styles.selectedUsersContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectedUsersScroll}>
                   {selectedUsers.map((userId) => {
-                    const user = MOCK_USERS.find((u) => u.id === userId)
-                    return user ? (
+                    const user = friendOptions.find((u) => u.id === userId)
+                    if (!user) return null
+                    return (
                       <TouchableOpacity
                         key={user.id}
                         style={styles.selectedUserPill}
                         onPress={() => toggleUserSelection(user.id)}
                       >
-                        <Image source={{ uri: user.photoUrl }} style={styles.selectedUserAvatar} />
+                        {user.photoUrl ? (
+                          <Image source={{ uri: user.photoUrl }} style={styles.selectedUserAvatar} />
+                        ) : (
+                          <View style={styles.selectedUserAvatarFallback}>
+                            <Text style={styles.selectedUserAvatarInitial}>
+                              {(user.name?.charAt(0) || 'U').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
                         <Text style={styles.selectedUserName}>{user.name}</Text>
                         <Ionicons name="close-circle" size={hp(1.8)} color={theme.colors.white} />
                       </TouchableOpacity>
-                    ) : null
+                    )
                   })}
                 </ScrollView>
               </View>
             )}
 
             {/* Users List */}
-            <FlatList
-              data={filteredUsers}
-              keyExtractor={(item) => item.id}
-              renderItem={renderUser}
-              contentContainerStyle={styles.usersList}
-              showsVerticalScrollIndicator={false}
-            />
+            {isLoading ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>Loading friends...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredUsers}
+                keyExtractor={(item) => item.id}
+                renderItem={renderUser}
+                contentContainerStyle={styles.usersList}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>
+                      {searchQuery ? 'No matches found' : 'No friends to invite yet'}
+                    </Text>
+                  </View>
+                }
+              />
+            )}
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -179,13 +205,13 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.5),
+    paddingBottom: hp(1.5),
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.offWhite,
     backgroundColor: theme.colors.background,
   },
   closeButton: {
-    padding: wp(1),
+    padding: wp(1.5),
   },
   headerContent: {
     flex: 1,
@@ -261,6 +287,20 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(2.5),
     borderRadius: hp(1.25),
   },
+  selectedUserAvatarFallback: {
+    width: hp(2.5),
+    height: hp(2.5),
+    borderRadius: hp(1.25),
+    backgroundColor: theme.colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedUserAvatarInitial: {
+    fontSize: hp(1.2),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '700',
+    color: theme.colors.bondedPurple,
+  },
   selectedUserName: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
@@ -285,6 +325,21 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: theme.radius.full,
     marginRight: wp(3),
   },
+  userAvatarPlaceholder: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: theme.radius.full,
+    marginRight: wp(3),
+    backgroundColor: theme.colors.bondedPurple + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatarInitial: {
+    fontSize: hp(1.8),
+    fontFamily: theme.typography.fontFamily.heading,
+    fontWeight: '700',
+    color: theme.colors.bondedPurple,
+  },
   userInfo: {
     flex: 1,
   },
@@ -295,16 +350,14 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: '500',
     marginBottom: hp(0.2),
   },
-  friendBadge: {
-    flexDirection: 'row',
+  emptyState: {
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(4),
     alignItems: 'center',
-    gap: wp(1),
   },
-  friendText: {
-    fontSize: hp(1.2),
+  emptyStateText: {
+    fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    color: theme.colors.textSecondary,
   },
 })
-

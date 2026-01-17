@@ -48,7 +48,15 @@
       "expo-video",
       "expo-audio",
       "expo-secure-store",
-      "expo-dev-client"
+      "expo-dev-client",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "bonded-official",
+          "project": "bonded",
+          "url": "https://sentry.io/"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

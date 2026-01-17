@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { getTimeAgo } from '../utils/dateFormatters'
 
 export function useComments(postId) {
   const { user } = useAuthStore()
@@ -48,37 +49,42 @@ export function useComments(postId) {
       const commentMap = {}
       const roots = []
 
-      ;(data || []).forEach((row) => {
-        const authorLabel = row.is_anonymous
-          ? 'Anonymous'
-          : (
-            row.author?.username?.trim()
-              ? row.author.username
-              : (row.author?.full_name?.trim()
-                ? row.author.full_name
-                : (row.author?.email ? row.author.email.split('@')[0] : 'Anonymous'))
-          )
+        ; (data || []).forEach((row) => {
+          const authorLabel = row.is_anonymous
+            ? 'Anonymous'
+            : (
+              row.author?.username?.trim()
+                ? row.author.username
+                : (row.author?.full_name?.trim()
+                  ? row.author.full_name
+                  : (row.author?.email ? row.author.email.split('@')[0] : 'Anonymous'))
+            )
 
-        commentMap[row.id] = {
-          id: row.id,
-          author: authorLabel,
-          isAnon: row.is_anonymous || false,
-          body: row.body,
-          upvotes: row.upvotes_count || 0,
-          downvotes: row.downvotes_count || 0,
-          timeAgo: getTimeAgo(row.created_at),
-          replies: [],
-        }
-      })
+          commentMap[row.id] = {
+            id: row.id,
+            userId: row.user_id,
+            author: authorLabel,
+            isAnon: row.is_anonymous || false,
+            body: row.body,
+            upvotes: row.upvotes_count || 0,
+            downvotes: row.downvotes_count || 0,
+            timeAgo: getTimeAgo(row.created_at),
+            anonNumber: row.is_anonymous ? (parseInt(row.user_id.replace(/[^0-9]/g, '').slice(-2)) || 1) : null,
+            authorAvatar: row.author?.avatar_url || null,
+            createdAt: row.created_at,
+            parentId: row.parent_id || null, // Store parent_id for filtering
+            replies: [],
+          }
+        })
 
-      ;(data || []).forEach((row) => {
-        const comment = commentMap[row.id]
-        if (row.parent_id && commentMap[row.parent_id]) {
-          commentMap[row.parent_id].replies.push(comment)
-        } else if (!row.parent_id) {
-          roots.push(comment)
-        }
-      })
+        ; (data || []).forEach((row) => {
+          const comment = commentMap[row.id]
+          if (row.parent_id && commentMap[row.parent_id]) {
+            commentMap[row.parent_id].replies.push(comment)
+          } else if (!row.parent_id) {
+            roots.push(comment)
+          }
+        })
 
       return roots
     },
@@ -87,26 +93,4 @@ export function useComments(postId) {
     refetchInterval: 15000,
     retry: 1,
   })
-}
-
-function getTimeAgo(dateString) {
-  if (!dateString) return 'Just now'
-
-  const now = new Date()
-  const date = new Date(dateString)
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m`
-  if (diffHours < 24) return `${diffHours}h`
-  if (diffDays < 7) return `${diffDays}d`
-
-  const diffWeeks = Math.floor(diffDays / 7)
-  if (diffWeeks < 4) return `${diffWeeks}w`
-
-  const diffMonths = Math.floor(diffDays / 30)
-  return `${diffMonths}mo`
 }

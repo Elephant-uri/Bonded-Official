@@ -665,9 +665,9 @@ const createStyles = (theme: any) =>
       paddingVertical: hp(1),
       paddingHorizontal: wp(3.5),
       borderRadius: 20,
-      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+      backgroundColor: '#F8F8F8',
       borderWidth: 1.5,
-      borderColor: '#E8E8E8',
+      borderColor: '#D0D0D0',
     },
     dayChipSelected: {
       backgroundColor: theme.colors.primary,
@@ -680,11 +680,12 @@ const createStyles = (theme: any) =>
     },
     dayChipText: {
       fontSize: hp(1.4),
-      color: '#999',
-      fontWeight: '600',
+      color: '#4A4A4A',
+      fontWeight: '700',
     },
     dayChipTextSelected: {
       color: '#FFFFFF',
+      fontWeight: '700',
     },
     timeRow: {
       flexDirection: 'row',
@@ -903,12 +904,16 @@ const createStyles = (theme: any) =>
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.4)',
       justifyContent: 'flex-end',
+      zIndex: 1000,
+      elevation: 1000,
     },
     timePickerModal: {
       backgroundColor: '#FFFFFF',
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       paddingBottom: hp(4),
+      zIndex: 1001,
+      elevation: 1001,
     },
     timePickerHeader: {
       flexDirection: 'row',

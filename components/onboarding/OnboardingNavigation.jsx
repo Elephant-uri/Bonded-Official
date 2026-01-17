@@ -42,9 +42,12 @@ const createStyles = (theme) => StyleSheet.create({
   primaryButtons: {
     flexDirection: 'row',
     gap: wp(3),
+    paddingHorizontal: wp(5),
   },
   button: {
     flex: 1,
+    maxWidth: '90%',
+    alignSelf: 'center',
     paddingVertical: hp(1.4),
     borderRadius: 14,
   },

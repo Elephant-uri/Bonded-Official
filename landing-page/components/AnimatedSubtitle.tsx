@@ -4,9 +4,10 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 
 const phrases = [
-  'Find new friends.',
-  'Find new roommates.',
-  'Find new clubs.',
+  'Find study partners.',
+  'Find roommates.',
+  'Find your people.',
+  'Find your clubs.',
 ]
 
 export default function AnimatedSubtitle() {
@@ -15,21 +16,21 @@ export default function AnimatedSubtitle() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % phrases.length)
-    }, 2600) // Match the app's timing
+    }, 2200) // Snappier timing
 
     return () => clearInterval(interval)
   }, [])
 
   return (
-    <div className="relative h-16 sm:h-20 lg:h-24 flex items-center justify-center lg:justify-start overflow-hidden">
+    <div className="relative h-14 sm:h-16 lg:h-20 flex items-center overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.p
           key={currentIndex}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-medium text-gray-700"
+          initial={{ opacity: 0, y: 30, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: -30, filter: 'blur(4px)' }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="text-2xl sm:text-3xl lg:text-4xl font-medium text-gray-500"
         >
           {phrases[currentIndex]}
         </motion.p>
@@ -37,6 +38,8 @@ export default function AnimatedSubtitle() {
     </div>
   )
 }
+
+
 
 
 

@@ -186,12 +186,14 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
           activeOpacity={0.7}
         >
           <View style={styles.sectionHeaderLeft}>
-            <Ionicons
-              name={icon}
-              size={hp(2)}
-              color={theme.colors.textSecondary}
-              style={styles.sectionIcon}
-            />
+            {icon ? (
+              <Ionicons
+                name={icon}
+                size={hp(2)}
+                color={theme.colors.textSecondary}
+                style={styles.sectionIcon}
+              />
+            ) : null}
             <Text style={styles.sectionTitle}>{title}</Text>
             {hasUnread && <View style={styles.sectionUnreadDot} />}
             <Text style={styles.sectionCount}>({forums.length})</Text>
@@ -280,13 +282,14 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
                 <View>
-                  {renderSection('🏠 Main Forum', filteredForums.campus, 'campus', 'home')}
+                  {renderSection('Main Forum', filteredForums.campus, 'campus', null)}
                   {renderSection('⭐ Pinned', filteredForums.pinned.filter(f => f.type !== 'campus'), 'pinned', 'star')}
                   {renderSection('📚 My Classes', filteredForums.classes, 'classes', 'school')}
                   {renderSection('🏢 My Organizations', filteredForums.orgs, 'orgs', 'people')}
                   {renderSection('🔒 Private Forums', filteredForums.private, 'private', 'lock-closed')}
-                  {filteredForums.other.length > 0 &&
-                    renderSection('🌐 Other Forums', filteredForums.other, 'other', 'globe')}
+                  {filteredForums.other.length > 0
+                    ? renderSection('🌐 Other Forums', filteredForums.other, 'other', 'globe')
+                    : null}
                 </View>
               }
             />

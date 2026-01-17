@@ -1,34 +1,19 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import React, { useMemo, useState } from 'react'
-import { ActivityIndicator, FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import BottomNav from '../components/BottomNav'
+import SkeletonShimmer from '../components/SkeletonLoader'
 import { hp, wp } from '../helpers/common'
 import { useFriends } from '../hooks/useFriends'
-import { useConversations, useCreateConversation } from '../hooks/useMessages'
+import { useConversations, useCreateConversation, useMarkAsRead } from '../hooks/useMessages'
 import { useProfiles } from '../hooks/useProfiles'
+import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { useAppTheme } from './theme'
-
-// Helper to format timestamp
-const formatTimestamp = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now - date
-  
-  // Less than 1 minute
-  if (diff < 60 * 1000) return 'Just now'
-  // Less than 1 hour
-  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}m`
-  // Less than 24 hours
-  if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}h`
-  // Less than 7 days
-  if (diff < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(diff / (24 * 60 * 60 * 1000))}d`
-  // Else show date
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+import { useAcceptMessageRequest, useDeclineMessageRequest, useMessageRequests } from '../hooks/useMessageRequests'
+import { formatTimestamp } from '../utils/dateFormatters'
 
 export default function Messages() {
   const router = useRouter()
@@ -39,31 +24,39 @@ export default function Messages() {
   const [isFriendSelectionVisible, setIsFriendSelectionVisible] = useState(false)
   const [isForumSelectionVisible, setIsForumSelectionVisible] = useState(false)
   const [activeProfile, setActiveProfile] = useState(null)
+  const [pendingChatIds, setPendingChatIds] = useState(new Set())
 
   // Fetch real data
   const { data: conversations = [], isLoading: conversationsLoading } = useConversations()
   const { data: allProfiles = [], isLoading: profilesLoading } = useProfiles({})
   const { data: friendsList = [], isLoading: friendsLoading } = useFriends()
   const createConversation = useCreateConversation()
+  const markAsRead = useMarkAsRead()
+  const { data: messageRequests = [] } = useMessageRequests()
+  const acceptMessageRequest = useAcceptMessageRequest()
+  const declineMessageRequest = useDeclineMessageRequest()
 
-  // Suggested people = profiles not in current conversations and not friends
+  // Suggested people = friends not already in conversations
   const suggestedPeople = useMemo(() => {
-    if (!allProfiles.length) return []
-    
+    if (!friendsList.length) return []
+
     // Get IDs of people we already have conversations with
     const conversationUserIds = new Set()
     conversations.forEach(conv => {
       conv.participants?.forEach(p => conversationUserIds.add(p.id))
     })
-    
-    // Get IDs of friends
-    const friendIds = new Set(friendsList.map(f => f.id))
-    
-    // Filter out current user, people we have convos with, and friends
-    return allProfiles
-      .filter(p => p.id !== user?.id && !conversationUserIds.has(p.id) && !friendIds.has(p.id))
-      .slice(0, 10) // Limit to 10 suggestions
-  }, [allProfiles, conversations, friendsList, user?.id])
+
+    // Friends without existing convos
+    return friendsList
+      .filter(f => f.id !== user?.id && !conversationUserIds.has(f.id) && !pendingChatIds.has(f.id))
+      .map(f => ({
+        id: f.id,
+        name: f.full_name || f.username || 'User',
+        photoUrl: f.avatar_url,
+        major: f.major || '',
+      }))
+      .slice(0, 10)
+  }, [conversations, friendsList, pendingChatIds, user?.id])
 
   // Transform friends to match expected format
   const friends = useMemo(() => {
@@ -75,28 +68,364 @@ export default function Messages() {
     }))
   }, [friendsList])
 
-  // TODO: Fetch private forums from 'forums' table
-  const privateForums = []
+  // Fetch private forums (org-type forums user is a member of)
+  const [privateForums, setPrivateForums] = useState([])
+  const [isLoadingForums, setIsLoadingForums] = useState(false)
+  const [isCreatingGroupChat, setIsCreatingGroupChat] = useState(false)
+
+  const fetchPrivateForums = useCallback(async () => {
+    if (!user?.id) return
+
+    try {
+      setIsLoadingForums(true)
+
+      // Fetch forums where user is a member and type is 'org' (club/org forums)
+      const { data, error } = await supabase
+        .from('forum_members')
+        .select(`
+          forum_id,
+          forums!inner(id, name, type, description)
+        `)
+        .eq('user_id', user.id)
+
+      if (error?.code === 'PGRST205') {
+        const { data: orgMemberships, error: orgMembersError } = await supabase
+          .from('org_members')
+          .select('organization_id')
+          .eq('user_id', user.id)
+
+        if (orgMembersError) {
+          console.error('Error fetching org memberships:', orgMembersError)
+          return
+        }
+
+        const orgIds = (orgMemberships || []).map((row) => row.organization_id)
+        if (orgIds.length === 0) {
+          setPrivateForums([])
+          return
+        }
+
+        const { data: orgs, error: orgsError } = await supabase
+          .from('organizations')
+          .select('id, name, mission_statement')
+          .in('id', orgIds)
+
+        if (orgsError) {
+          console.error('Error fetching orgs for chats:', orgsError)
+          return
+        }
+
+        let forumsMap = {}
+        let forumsData = []
+        let forumsError = null
+        ;({ data: forumsData, error: forumsError } = await supabase
+          .from('forums')
+          .select('id, org_id, name, type')
+          .in('org_id', orgIds)
+          .eq('type', 'org'))
+
+        if (forumsError?.message?.includes('org_id')) {
+          const orgNames = (orgs || []).map((org) => org.name)
+          ;({ data: forumsData, error: forumsError } = await supabase
+            .from('forums')
+            .select('id, name, type')
+            .in('name', orgNames)
+            .eq('type', 'org'))
+        }
+
+        forumsMap = (forumsData || []).reduce((acc, forum) => {
+          if (forum.org_id) {
+            acc[forum.org_id] = forum.id
+          } else if (forum.name) {
+            acc[forum.name] = forum.id
+          }
+          return acc
+        }, {})
+
+        const forumsWithCounts = await Promise.all(
+          (orgs || []).map(async (org) => {
+            const forumId = forumsMap[org.id] || forumsMap[org.name] || null
+            let memberCount = 0
+            try {
+              const { count } = await supabase
+              .from('org_members')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', org.id)
+              memberCount = count || 0
+            } catch (countError) {
+              memberCount = 0
+            }
+            return {
+              id: forumId || `org-${org.id}`,
+              orgId: org.id,
+              name: org.name,
+              description: org.mission_statement || '',
+              memberCount,
+            }
+          })
+        )
+
+        setPrivateForums(forumsWithCounts)
+        return
+      }
+
+      if (error) {
+        console.error('Error fetching private forums:', error)
+        return
+      }
+
+      // Filter for org-type forums and get member counts
+      const forumsWithCounts = await Promise.all(
+        (data || [])
+          .filter(d => d.forums?.type === 'org')
+          .map(async (d) => {
+            // Get member count for this forum
+            const { count } = await supabase
+              .from('forum_members')
+              .select('*', { count: 'exact', head: true })
+              .eq('forum_id', d.forums.id)
+
+            return {
+              id: d.forums.id,
+              name: d.forums.name,
+              description: d.forums.description,
+              memberCount: count || 0,
+            }
+          })
+      )
+
+      setPrivateForums(forumsWithCounts)
+    } catch (err) {
+      console.error('Error in fetchPrivateForums:', err)
+    } finally {
+      setIsLoadingForums(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchPrivateForums()
+  }, [fetchPrivateForums])
+
+  // Create group conversation from forum members
+  const handleForumGroupChat = async (forum) => {
+    if (!user?.id || isCreatingGroupChat) return
+
+    try {
+      setIsCreatingGroupChat(true)
+
+      let forumId = forum.id
+      if (forum.orgId && forumId?.startsWith('org-')) {
+        try {
+          const { data: existingForum, error: existingError } = await supabase
+            .from('forums')
+            .select('id, org_id, name')
+            .eq('type', 'org')
+            .eq('org_id', forum.orgId)
+            .maybeSingle()
+
+          if (!existingError && existingForum?.id) {
+            forumId = existingForum.id
+          } else if (existingError?.message?.includes('org_id')) {
+            const { data: namedForum } = await supabase
+              .from('forums')
+              .select('id, name')
+              .eq('type', 'org')
+              .eq('name', forum.name)
+              .maybeSingle()
+            if (namedForum?.id) {
+              forumId = namedForum.id
+            }
+          }
+        } catch (resolveError) {
+          // Ignore and try to create below
+        }
+
+        if (forumId?.startsWith('org-')) {
+          let universityId = null
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('university_id')
+              .eq('id', user.id)
+              .single()
+            universityId = profile?.university_id || null
+          } catch (profileError) {
+            universityId = null
+          }
+
+          if (universityId) {
+            const { data: newForum, error: newForumError } = await supabase
+              .from('forums')
+              .insert({
+                name: forum.name,
+                type: 'org',
+                description: forum.description || 'Organization forum',
+                university_id: universityId,
+                org_id: forum.orgId,
+              })
+              .select()
+              .single()
+
+            if (!newForumError && newForum?.id) {
+              forumId = newForum.id
+            } else if (newForumError?.message?.includes('org_id')) {
+              const { data: fallbackForum, error: fallbackError } = await supabase
+                .from('forums')
+                .insert({
+                  name: forum.name,
+                  type: 'org',
+                  description: forum.description || 'Organization forum',
+                  university_id: universityId,
+                })
+                .select()
+                .single()
+              if (!fallbackError && fallbackForum?.id) {
+                forumId = fallbackForum.id
+              }
+            }
+          }
+        }
+      }
+
+      if (!forumId) {
+        return
+      }
+
+      let memberIds = []
+      if (forum.orgId) {
+        const { data: orgMembers, error: orgMembersError } = await supabase
+          .from('org_members')
+          .select('user_id, role')
+          .eq('organization_id', forum.orgId)
+          .in('role', ['member', 'admin'])
+
+        if (orgMembersError) {
+          console.error('Error fetching org members:', orgMembersError)
+          return
+        }
+        memberIds = orgMembers?.map(m => m.user_id).filter(id => id !== user.id) || []
+      } else {
+        // Get all forum members
+        const { data: members, error: membersError } = await supabase
+          .from('forum_members')
+          .select('user_id')
+          .eq('forum_id', forumId)
+
+        if (membersError?.code === 'PGRST205') {
+          console.error('forum_members table missing:', membersError)
+          return
+        }
+        if (membersError) {
+          console.error('Error fetching forum members:', membersError)
+          return
+        }
+        memberIds = members?.map(m => m.user_id).filter(id => id !== user.id) || []
+      }
+
+      // Create group conversation
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('name', forum.name)
+        .eq('type', 'group')
+        .single()
+
+      let conversationId
+
+      if (existingConv) {
+        conversationId = existingConv.id
+      } else {
+        // Create new group conversation
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            name: forum.name,
+            type: 'group',
+            created_by: user.id,
+          })
+          .select()
+          .single()
+
+        if (convError) {
+          console.error('Error creating group conversation:', convError)
+          return
+        }
+
+        conversationId = newConv.id
+
+        // Add all members as participants (including current user)
+        const allMemberIds = [...memberIds, user.id]
+        const participants = allMemberIds.map(userId => ({
+          conversation_id: conversationId,
+          user_id: userId,
+        }))
+
+        const { error: participantsError } = await supabase
+          .from('conversation_participants')
+          .insert(participants)
+
+        if (participantsError) {
+          console.error('Error adding participants:', participantsError)
+        }
+      }
+
+      // Navigate to chat
+      setIsForumSelectionVisible(false)
+      router.push({
+        pathname: '/chat',
+        params: {
+          conversationId,
+          forumName: forum.name,
+          isGroupChat: 'true',
+          forumId,
+        },
+      })
+    } catch (err) {
+      console.error('Error creating forum group chat:', err)
+    } finally {
+      setIsCreatingGroupChat(false)
+    }
+  }
 
   const filteredMessages = useMemo(() => {
     if (!searchQuery.trim()) return conversations
     
     const query = searchQuery.toLowerCase()
     return conversations.filter((conv) => {
+      const displayName = conv.type === 'group'
+        ? (conv.name || 'Group Chat')
+        : (conv.participants?.[0]?.full_name || conv.participants?.[0]?.username || '')
       const participantNames = conv.participants?.map(p => 
         (p.full_name || p.username || '').toLowerCase()
       ).join(' ') || ''
       
-      return participantNames.includes(query) ||
+      return displayName.toLowerCase().includes(query) ||
+        participantNames.includes(query) ||
         (conv.lastMessage || '').toLowerCase().includes(query) ||
         (conv.name || '').toLowerCase().includes(query)
     })
   }, [conversations, searchQuery])
 
+  const groupConversations = useMemo(
+    () => filteredMessages.filter((conv) => conv.type === 'group'),
+    [filteredMessages]
+  )
+
+  const directConversations = useMemo(
+    () => filteredMessages.filter((conv) => conv.type !== 'group'),
+    [filteredMessages]
+  )
+
   // Handle starting a new conversation
   const handleStartChat = async (otherUserId, userName) => {
     try {
+      setPendingChatIds((prev) => new Set(prev).add(otherUserId))
       const conversationId = await createConversation.mutateAsync({ otherUserId })
+      setPendingChatIds((prev) => {
+        const next = new Set(prev)
+        next.delete(otherUserId)
+        return next
+      })
       router.push({
         pathname: '/chat',
         params: { 
@@ -107,6 +436,11 @@ export default function Messages() {
       })
     } catch (error) {
       console.error('Error starting chat:', error)
+      setPendingChatIds((prev) => {
+        const next = new Set(prev)
+        next.delete(otherUserId)
+        return next
+      })
     }
   }
 
@@ -134,6 +468,27 @@ export default function Messages() {
     </TouchableOpacity>
   )
 
+  const handleAcceptMessageRequest = async (request) => {
+    try {
+      const conversationId = await acceptMessageRequest.mutateAsync({
+        requestId: request.id,
+        senderId: request.sender_id,
+      })
+      if (conversationId) {
+        router.push({
+          pathname: '/chat',
+          params: {
+            conversationId,
+            userId: request.sender_id,
+            userName: request.sender?.full_name || request.sender?.username || 'User',
+          },
+        })
+      }
+    } catch (error) {
+      console.error('Error accepting message request:', error)
+    }
+  }
+
   const renderMessageThread = ({ item }) => {
     // Get the other participant for display
     const otherParticipant = item.participants?.[0] || {}
@@ -149,12 +504,17 @@ export default function Messages() {
         style={styles.messageThread}
         activeOpacity={0.7}
         onPress={() => {
+          if (item.id) {
+            markAsRead.mutate(item.id)
+          }
           router.push({
             pathname: '/chat',
             params: { 
               conversationId: item.id,
               userId: otherParticipant.id, 
-              userName: displayName 
+              userName: displayName,
+              isGroupChat: item.type === 'group' ? 'true' : 'false',
+              forumName: item.type === 'group' ? item.name : undefined,
             },
           })
         }}
@@ -212,6 +572,20 @@ export default function Messages() {
     )
   }
 
+  const renderLoadingThreads = () => (
+    <View style={styles.loadingList}>
+      {Array.from({ length: 6 }).map((_, index) => (
+        <View key={`conversation-skeleton-${index}`} style={styles.loadingThread}>
+          <SkeletonShimmer style={styles.loadingAvatar} />
+          <View style={styles.loadingContent}>
+            <SkeletonShimmer style={styles.loadingName} />
+            <SkeletonShimmer style={styles.loadingLine} />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+
   const styles = createStyles(theme)
 
   return (
@@ -264,10 +638,10 @@ export default function Messages() {
           </View>
         </View>
 
-        {/* People you may vibe with - Improved */}
+        {/* Quick starts */}
         <View style={styles.suggestedSection}>
           <View style={styles.suggestedHeader}>
-            <Text style={styles.suggestedTitle}>People you may vibe with</Text>
+            <Text style={styles.suggestedTitle}>Start a chat</Text>
             <TouchableOpacity activeOpacity={0.7}>
               <Ionicons
                 name="chevron-forward"
@@ -285,35 +659,170 @@ export default function Messages() {
             {suggestedPeople.length > 0 ? (
               suggestedPeople.map(renderSuggestedPerson)
             ) : (
-              <View style={{ paddingHorizontal: wp(4), paddingVertical: hp(2) }}>
-                <Text style={{ fontSize: hp(1.4), color: theme.colors.textSecondary, textAlign: 'center' }}>
-                  No suggestions available
-                </Text>
+              <View style={styles.suggestedEmpty}>
+                <Text style={styles.suggestedEmptyText}>No suggestions yet</Text>
               </View>
             )}
           </ScrollView>
         </View>
 
+        {/* Org chats */}
+        {privateForums.length > 0 && (
+          <View style={styles.orgChatsSection}>
+            <View style={styles.orgChatsHeader}>
+              <Text style={styles.orgChatsTitle}>Org chats</Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsForumSelectionVisible(true)}
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={hp(1.8)}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.orgChatsList}
+            >
+              {privateForums.map((forum) => (
+                <TouchableOpacity
+                  key={forum.id}
+                  style={styles.orgChatCard}
+                  activeOpacity={0.7}
+                  onPress={() => handleForumGroupChat(forum)}
+                >
+                  <View style={styles.orgChatIcon}>
+                    <Ionicons name="people" size={hp(2.2)} color={theme.colors.bondedPurple} />
+                  </View>
+                  <Text style={styles.orgChatName} numberOfLines={1}>
+                    {forum.name}
+                  </Text>
+                  <Text style={styles.orgChatMeta}>{forum.memberCount} members</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Group chats */}
+        {groupConversations.length > 0 && (
+          <View style={styles.groupChatsSection}>
+            <View style={styles.groupChatsHeader}>
+              <Text style={styles.groupChatsTitle}>Group chats</Text>
+              <Text style={styles.groupChatsCount}>{groupConversations.length}</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.groupChatsList}
+            >
+              {groupConversations.map((conv) => (
+                <TouchableOpacity
+                  key={conv.id}
+                  style={styles.groupChatCard}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/chat',
+                      params: {
+                        conversationId: conv.id,
+                        userName: conv.name || 'Group Chat',
+                        isGroupChat: 'true',
+                        forumName: conv.name || undefined,
+                      },
+                    })
+                  }}
+                >
+                  <View style={styles.groupChatIcon}>
+                    <Ionicons name="people" size={hp(2.2)} color={theme.colors.bondedPurple} />
+                  </View>
+                  <Text style={styles.groupChatName} numberOfLines={1}>
+                    {conv.name || 'Group Chat'}
+                  </Text>
+                  <Text style={styles.groupChatMeta} numberOfLines={1}>
+                    {conv.lastMessage || 'No messages yet'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Message Threads List */}
         {conversationsLoading ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
-            <Text style={[styles.emptyStateText, { marginTop: hp(2) }]}>Loading conversations...</Text>
-          </View>
-        ) : filteredMessages.length > 0 ? (
-          <FlatList
-            data={filteredMessages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessageThread}
-            contentContainerStyle={styles.messagesList}
-            showsVerticalScrollIndicator={false}
-          />
+          renderLoadingThreads()
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={hp(6)} color={theme.colors.textSecondary} style={{ opacity: 0.5, marginBottom: hp(2) }} />
-            <Text style={styles.emptyStateTitle}>No messages yet</Text>
-            <Text style={styles.emptyStateText}>Start a conversation by tapping the compose button or selecting someone from suggestions</Text>
-          </View>
+          <>
+            {messageRequests.length > 0 && (
+              <View style={styles.requestsSection}>
+                <View style={styles.requestsHeader}>
+                  <Text style={styles.requestsTitle}>Message requests</Text>
+                  <Text style={styles.requestsCount}>{messageRequests.length}</Text>
+                </View>
+                {messageRequests.map((request) => (
+                  <View key={request.id} style={styles.requestCard}>
+                    <View style={styles.requestAvatar}>
+                      {request.sender?.avatar_url ? (
+                        <Image source={{ uri: request.sender.avatar_url }} style={styles.requestAvatarImage} />
+                      ) : (
+                        <View style={[styles.requestAvatarImage, styles.requestAvatarFallback]}>
+                          <Text style={styles.requestAvatarFallbackText}>
+                            {(request.sender?.full_name || request.sender?.username || 'U').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.requestContent}>
+                      <Text style={styles.requestName}>
+                        {request.sender?.full_name || request.sender?.username || 'User'}
+                      </Text>
+                      <Text style={styles.requestSubtitle}>Wants to message you</Text>
+                    </View>
+                    <View style={styles.requestActions}>
+                      <TouchableOpacity
+                        style={styles.requestAccept}
+                        onPress={() => handleAcceptMessageRequest(request)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.requestAcceptText}>Accept</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.requestDecline}
+                        onPress={() => declineMessageRequest.mutate({ requestId: request.id })}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.requestDeclineText}>Decline</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+            {directConversations.length > 0 ? (
+              <>
+                <View style={styles.directHeader}>
+                  <Text style={styles.directTitle}>Messages</Text>
+                  <Text style={styles.directCount}>{directConversations.length}</Text>
+                </View>
+                <FlatList
+                  data={directConversations}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderMessageThread}
+                  contentContainerStyle={styles.messagesList}
+                  showsVerticalScrollIndicator={false}
+                />
+              </>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="chatbubbles-outline" size={hp(6)} color={theme.colors.textSecondary} style={{ opacity: 0.5, marginBottom: hp(2) }} />
+                <Text style={styles.emptyStateTitle}>No messages yet</Text>
+                <Text style={styles.emptyStateText}>Start a conversation by tapping the compose button or selecting someone from suggestions</Text>
+              </View>
+            )}
+          </>
         )}
 
         <BottomNav />
@@ -383,78 +892,86 @@ export default function Messages() {
         {/* Friend Selection Modal */}
         <Modal
           visible={isFriendSelectionVisible}
-          transparent={false}
           animationType="slide"
           onRequestClose={() => setIsFriendSelectionVisible(false)}
         >
-          <SafeAreaView style={styles.modalSafeArea} edges={['top', 'left', 'right']}>
-            <View style={styles.selectionContainer}>
-              <View style={styles.selectionHeader}>
+          <View style={styles.friendSelectionSafeArea}>
+            <SafeAreaView style={styles.friendSelectionHeaderSafeArea} edges={['top']}>
+              {/* Header */}
+              <View style={styles.friendSelectionHeader}>
                 <TouchableOpacity
-                  style={styles.backButton}
+                  style={styles.friendSelectionBackButton}
                   activeOpacity={0.7}
                   onPress={() => setIsFriendSelectionVisible(false)}
                 >
-                  <Ionicons name="arrow-back" size={hp(2.5)} color={theme.colors.charcoal} />
+                  <Ionicons name="arrow-back" size={hp(2.4)} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
-                <Text style={styles.selectionTitle}>Select Friend</Text>
-                <View style={styles.backButton} />
+                <View style={styles.friendSelectionTitleContainer}>
+                  <Text style={styles.friendSelectionTitle}>New Message</Text>
+                </View>
+                <View style={styles.friendSelectionBackButton} />
+              </View>
+            </SafeAreaView>
+            <View style={styles.friendSelectionContainer}>
+
+              {/* Search Bar */}
+              <View style={styles.friendSelectionSearchWrapper}>
+                <View style={styles.friendSelectionSearchContainer}>
+                  <Ionicons
+                    name="search-outline"
+                    size={hp(2)}
+                    color={theme.colors.textSecondary}
+                  />
+                  <TextInput
+                    style={styles.friendSelectionSearchInput}
+                    placeholder="Search friends..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                  />
+                </View>
               </View>
 
-              <View style={styles.searchContainer}>
-                <Ionicons
-                  name="search-outline"
-                  size={hp(2.2)}
-                  color={theme.colors.textSecondary}
-                  style={{ opacity: 0.6 }}
-                />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search friends..."
-                  placeholderTextColor={theme.colors.softBlack}
-                />
-              </View>
-
+              {/* Friends List */}
               {friends.length > 0 ? (
                 <FlatList
                   data={friends}
                   keyExtractor={(item) => item.id}
                   renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.friendItem}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      handleStartChat(item.id, item.name)
-                      setIsFriendSelectionVisible(false)
-                    }}
-                  >
-                    {item.photoUrl ? (
-                      <Image source={{ uri: item.photoUrl }} style={styles.friendAvatar} />
-                    ) : (
-                      <View style={[styles.friendAvatar, { backgroundColor: theme.colors.bondedPurple, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Text style={{ color: theme.colors.white, fontSize: hp(2), fontWeight: '600' }}>
-                          {(item.name || 'U').charAt(0).toUpperCase()}
-                        </Text>
+                    <TouchableOpacity
+                      style={styles.friendSelectionItem}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        handleStartChat(item.id, item.name)
+                        setIsFriendSelectionVisible(false)
+                      }}
+                    >
+                      {item.photoUrl ? (
+                        <Image source={{ uri: item.photoUrl }} style={styles.friendSelectionAvatar} />
+                      ) : (
+                        <View style={[styles.friendSelectionAvatar, styles.friendSelectionAvatarPlaceholder]}>
+                          <Text style={styles.friendSelectionAvatarText}>
+                            {(item.name || 'U').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.friendSelectionInfo}>
+                        <Text style={styles.friendSelectionName}>{item.name}</Text>
+                        <Text style={styles.friendSelectionMajor}>{item.major || 'Student'}</Text>
                       </View>
-                    )}
-                    <View style={styles.friendInfo}>
-                      <Text style={styles.friendName}>{item.name}</Text>
-                      <Text style={styles.friendMajor}>{item.major || 'Student'}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.softBlack} style={{ opacity: 0.5 }} />
-                  </TouchableOpacity>
+                      <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
+                    </TouchableOpacity>
                   )}
-                  contentContainerStyle={styles.friendsList}
+                  contentContainerStyle={styles.friendSelectionList}
+                  showsVerticalScrollIndicator={false}
                 />
               ) : (
-                <View style={styles.emptyState}>
-                  <Ionicons name="people-outline" size={hp(5)} color={theme.colors.textSecondary} style={{ opacity: 0.5, marginBottom: hp(2) }} />
-                  <Text style={styles.emptyStateTitle}>No friends yet</Text>
-                  <Text style={styles.emptyStateText}>Connect with people to start messaging</Text>
+                <View style={styles.friendSelectionEmptyState}>
+                  <Ionicons name="people-outline" size={hp(6)} color={theme.colors.textSecondary} style={{ opacity: 0.4, marginBottom: hp(2) }} />
+                  <Text style={styles.friendSelectionEmptyTitle}>No friends yet</Text>
+                  <Text style={styles.friendSelectionEmptyText}>Add friends from the Yearbook to start messaging</Text>
                 </View>
               )}
             </View>
-          </SafeAreaView>
+          </View>
         </Modal>
 
         {/* Forum Selection Modal */}
@@ -468,49 +985,48 @@ export default function Messages() {
             <View style={styles.selectionContainer}>
               <View style={styles.selectionHeader}>
                 <TouchableOpacity
-                  style={styles.backButton}
+                  style={styles.selectionBackButton}
                   activeOpacity={0.7}
                   onPress={() => setIsForumSelectionVisible(false)}
                 >
                   <Ionicons name="arrow-back" size={hp(2.5)} color={theme.colors.charcoal} />
                 </TouchableOpacity>
                 <Text style={styles.selectionTitle}>Select Private Forum</Text>
-                <View style={styles.backButton} />
+                <View style={styles.selectionBackButton} />
               </View>
 
               <Text style={styles.selectionSubtitle}>
                 Create a group chat with all members of a private forum
               </Text>
 
-              {privateForums.length > 0 ? (
+              {isLoadingForums ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>Loading forums...</Text>
+                </View>
+              ) : privateForums.length > 0 ? (
                 <FlatList
                   data={privateForums}
                   keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.forumItem}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      router.push({
-                        pathname: '/chat',
-                        params: {
-                          forumId: item.id,
-                          forumName: item.name,
-                          isGroupChat: 'true',
-                        },
-                      })
-                      setIsForumSelectionVisible(false)
-                    }}
-                  >
-                    <View style={styles.forumIcon}>
-                      <Ionicons name="people" size={hp(2.5)} color={theme.colors.bondedPurple} />
-                    </View>
-                    <View style={styles.forumInfo}>
-                      <Text style={styles.forumName}>{item.name}</Text>
-                      <Text style={styles.forumMemberCount}>{item.memberCount} members</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.softBlack} style={{ opacity: 0.5 }} />
-                  </TouchableOpacity>
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.forumItem}
+                      activeOpacity={0.7}
+                      disabled={isCreatingGroupChat}
+                      onPress={() => handleForumGroupChat(item)}
+                    >
+                      <View style={styles.forumIcon}>
+                        <Ionicons name="people" size={hp(2.5)} color={theme.colors.bondedPurple} />
+                      </View>
+                      <View style={styles.forumInfo}>
+                        <Text style={styles.forumName}>{item.name}</Text>
+                        <Text style={styles.forumMemberCount}>{item.memberCount} members</Text>
+                      </View>
+                      {isCreatingGroupChat ? (
+                        <Text style={{ fontSize: hp(1.2), color: theme.colors.textSecondary }}>Creating...</Text>
+                      ) : (
+                        <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.softBlack} style={{ opacity: 0.5 }} />
+                      )}
+                    </TouchableOpacity>
                   )}
                   contentContainerStyle={styles.forumsList}
                 />
@@ -704,7 +1220,7 @@ const createStyles = (theme) => StyleSheet.create({
   // Improved Suggested Section
   suggestedSection: {
     paddingTop: hp(1.2),
-    paddingBottom: hp(1.5),
+    paddingBottom: hp(1.2),
     backgroundColor: theme.colors.background,
   },
   suggestedHeader: {
@@ -716,7 +1232,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   suggestedTitle: {
     fontSize: theme.typography.sizes.base,
-    fontWeight: theme.typography.weights.medium,
+    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.textSecondary,
     opacity: theme.ui.metaOpacity,
     letterSpacing: -0.1,
@@ -724,6 +1240,123 @@ const createStyles = (theme) => StyleSheet.create({
   suggestedList: {
     paddingHorizontal: wp(4),
     paddingRight: wp(4),
+  },
+  suggestedEmpty: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+  },
+  suggestedEmptyText: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+  },
+  orgChatsSection: {
+    paddingTop: hp(0.8),
+    paddingBottom: hp(1.6),
+    backgroundColor: theme.colors.background,
+  },
+  orgChatsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1.2),
+    paddingHorizontal: wp(4),
+  },
+  orgChatsTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  orgChatsList: {
+    paddingHorizontal: wp(4),
+    gap: wp(3),
+  },
+  orgChatCard: {
+    width: wp(36),
+    paddingVertical: hp(1.6),
+    paddingHorizontal: wp(3),
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  orgChatIcon: {
+    width: hp(4.2),
+    height: hp(4.2),
+    borderRadius: hp(2.1),
+    backgroundColor: theme.colors.bondedPurple + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(0.8),
+  },
+  orgChatName: {
+    fontSize: hp(1.7),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: hp(0.3),
+  },
+  orgChatMeta: {
+    fontSize: hp(1.2),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
+  },
+  groupChatsSection: {
+    paddingTop: hp(0.6),
+    paddingBottom: hp(1.6),
+    backgroundColor: theme.colors.background,
+  },
+  groupChatsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1.1),
+    paddingHorizontal: wp(4),
+  },
+  groupChatsTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  groupChatsCount: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  groupChatsList: {
+    paddingHorizontal: wp(4),
+    gap: wp(3),
+  },
+  groupChatCard: {
+    width: wp(42),
+    paddingVertical: hp(1.6),
+    paddingHorizontal: wp(3),
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  groupChatIcon: {
+    width: hp(4.2),
+    height: hp(4.2),
+    borderRadius: hp(2.1),
+    backgroundColor: theme.colors.bondedPurple + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(0.8),
+  },
+  groupChatName: {
+    fontSize: hp(1.7),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: hp(0.3),
+  },
+  groupChatMeta: {
+    fontSize: hp(1.2),
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
   },
   suggestedPerson: {
     alignItems: 'center',
@@ -755,10 +1388,153 @@ const createStyles = (theme) => StyleSheet.create({
     paddingBottom: hp(12),
     paddingTop: hp(0.5),
   },
-  messageThread: {
+  directHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+    marginTop: hp(1),
+    marginBottom: hp(0.6),
+  },
+  directTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  directCount: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.textSecondary,
+  },
+  requestsSection: {
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+    paddingBottom: hp(1.5),
+  },
+  requestsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1),
+  },
+  requestsTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+  },
+  requestsCount: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  requestCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3),
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: hp(1),
+  },
+  requestAvatar: {
+    marginRight: wp(3),
+  },
+  requestAvatarImage: {
+    width: hp(5),
+    height: hp(5),
+    borderRadius: hp(2.5),
+  },
+  requestAvatarFallback: {
+    backgroundColor: theme.colors.bondedPurple,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestAvatarFallbackText: {
+    color: theme.colors.white,
+    fontSize: hp(1.8),
+    fontWeight: '600',
+  },
+  requestContent: {
+    flex: 1,
+  },
+  requestName: {
+    fontSize: hp(1.6),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+  },
+  requestSubtitle: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    marginTop: hp(0.2),
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: wp(2),
+  },
+  requestAccept: {
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.radius.md,
+  },
+  requestAcceptText: {
+    color: theme.colors.white,
+    fontSize: hp(1.3),
+    fontWeight: '600',
+  },
+  requestDecline: {
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  requestDeclineText: {
+    color: theme.colors.textSecondary,
+    fontSize: hp(1.3),
+    fontWeight: '600',
+  },
+  loadingList: {
+    paddingTop: hp(1),
+    paddingBottom: hp(12),
+  },
+  loadingThread: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: hp(1.8),
+    paddingHorizontal: wp(4),
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 0.5,
+    borderBottomColor: theme.colors.border,
+  },
+  loadingAvatar: {
+    width: hp(5.5),
+    height: hp(5.5),
+    borderRadius: hp(2.75),
+    marginRight: wp(3),
+  },
+  loadingContent: {
+    flex: 1,
+    gap: hp(0.8),
+  },
+  loadingName: {
+    width: '45%',
+    height: hp(1.6),
+    borderRadius: hp(0.8),
+  },
+  loadingLine: {
+    width: '70%',
+    height: hp(1.4),
+    borderRadius: hp(0.7),
+  },
+  messageThread: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: hp(1.4),
     paddingHorizontal: wp(4),
     backgroundColor: theme.colors.background,
     borderBottomWidth: 0.5,
@@ -809,7 +1585,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   userName: {
     fontSize: hp(1.7),
-    fontWeight: '500',
+    fontWeight: '600',
     color: theme.colors.textPrimary,
     flex: 1,
     letterSpacing: -0.1,
@@ -944,7 +1720,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: hp(2),
   },
-  backButton: {
+  selectionBackButton: {
     width: hp(4),
     height: hp(4),
     alignItems: 'center',
@@ -1175,5 +1951,136 @@ const createStyles = (theme) => StyleSheet.create({
     textAlign: 'center',
     lineHeight: hp(2.2),
   },
+  // Friend Selection Modal - New Styles
+  friendSelectionSafeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  friendSelectionHeaderSafeArea: {
+    backgroundColor: theme.colors.background,
+  },
+  friendSelectionContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
+  friendSelectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    backgroundColor: theme.colors.background,
+    minHeight: hp(6),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  friendSelectionBackButton: {
+    width: hp(4.5),
+    height: hp(4.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendSelectionTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendSelectionTitle: {
+    fontSize: hp(1.9),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  friendSelectionSearchWrapper: {
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1.5),
+    paddingBottom: hp(1.5),
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
+  friendSelectionSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    borderRadius: hp(1.2),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1),
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  friendSelectionSearchInput: {
+    flex: 1,
+    fontSize: hp(1.6),
+    color: theme.colors.textPrimary,
+    marginLeft: wp(2.5),
+    fontWeight: '400',
+  },
+  friendSelectionList: {
+    paddingTop: hp(0.5),
+    paddingBottom: hp(4),
+  },
+  friendSelectionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(4),
+    marginHorizontal: wp(4),
+    marginBottom: hp(1),
+    borderRadius: hp(1.5),
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  friendSelectionAvatar: {
+    width: hp(5.5),
+    height: hp(5.5),
+    borderRadius: hp(2.75),
+    marginRight: wp(3.5),
+  },
+  friendSelectionAvatarPlaceholder: {
+    backgroundColor: theme.colors.bondedPurple,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendSelectionAvatarText: {
+    color: theme.colors.white,
+    fontSize: hp(2),
+    fontWeight: '600',
+  },
+  friendSelectionInfo: {
+    flex: 1,
+  },
+  friendSelectionName: {
+    fontSize: hp(1.8),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+    marginBottom: hp(0.3),
+  },
+  friendSelectionMajor: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+  },
+  friendSelectionEmptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(8),
+  },
+  friendSelectionEmptyTitle: {
+    fontSize: hp(2),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.heading,
+    marginBottom: hp(1),
+  },
+  friendSelectionEmptyText: {
+    fontSize: hp(1.5),
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
+    textAlign: 'center',
+    lineHeight: hp(2.2),
+  },
 })
-
