@@ -14,13 +14,13 @@
 export function parseICalFile(icsContent) {
   const classes = []
   const lines = icsContent.split('\n')
-  
+
   let currentClass = null
   let inEvent = false
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
-    
+
     if (line === 'BEGIN:VEVENT') {
       inEvent = true
       currentClass = {
@@ -104,7 +104,7 @@ export function parseICalFile(icsContent) {
       }
     }
   }
-  
+
   return classes
 }
 
@@ -115,19 +115,19 @@ export function parseICalFile(icsContent) {
 export function parseCSVFile(csvContent) {
   const classes = []
   const lines = csvContent.split('\n').filter(line => line.trim())
-  
+
   // Skip header row if present
   const startIndex = lines[0].toLowerCase().includes('class') ? 1 : 0
-  
+
   for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i].trim()
     if (!line) continue
-    
+
     // Parse CSV (handle quoted fields)
     const fields = parseCSVLine(line)
-    
+
     if (fields.length < 2) continue
-    
+
     const classObj = {
       class_code: fields[0]?.trim() || '',
       class_name: fields[1]?.trim() || '',
@@ -138,12 +138,12 @@ export function parseCSVFile(csvContent) {
       location: fields[6]?.trim() || '',
       section: fields[7]?.trim() || ''
     }
-    
+
     if (classObj.class_code) {
       classes.push(classObj)
     }
   }
-  
+
   return classes
 }
 
@@ -154,10 +154,10 @@ function parseCSVLine(line) {
   const fields = []
   let currentField = ''
   let inQuotes = false
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i]
-    
+
     if (char === '"') {
       inQuotes = !inQuotes
     } else if (char === ',' && !inQuotes) {
@@ -167,7 +167,7 @@ function parseCSVLine(line) {
       currentField += char
     }
   }
-  
+
   fields.push(currentField) // Add last field
   return fields
 }
@@ -177,7 +177,7 @@ function parseCSVLine(line) {
  */
 function parseDays(daysStr) {
   if (!daysStr) return []
-  
+
   const dayMap = {
     'M': 'Monday',
     'T': 'Tuesday',
@@ -194,10 +194,10 @@ function parseDays(daysStr) {
     'SAT': 'Saturday',
     'SUN': 'Sunday'
   }
-  
+
   const days = []
   const upper = daysStr.toUpperCase().trim()
-  
+
   // Handle comma-separated
   if (upper.includes(',')) {
     const parts = upper.split(',').map(p => p.trim())
@@ -215,7 +215,7 @@ function parseDays(daysStr) {
         days.push(day)
       }
     }
-    
+
     // Handle full names
     if (days.length === 0) {
       Object.values(dayMap).forEach(day => {
@@ -225,7 +225,7 @@ function parseDays(daysStr) {
       })
     }
   }
-  
+
   return days
 }
 
@@ -234,54 +234,78 @@ function parseDays(daysStr) {
  */
 function parseTime(timeStr) {
   if (!timeStr) return null
-  
+
   // Handle time range (e.g., "9:00-10:30")
   if (timeStr.includes('-')) {
     const [start] = timeStr.split('-')
     return parseTime(start.trim())
   }
-  
+
   // Remove AM/PM and parse
   const cleaned = timeStr.replace(/\s*(AM|PM)\s*/i, '').trim()
   const match = cleaned.match(/(\d{1,2}):(\d{2})/)
-  
+
   if (match) {
     let hours = parseInt(match[1])
     const minutes = parseInt(match[2])
-    
+
     // Handle 12-hour format
     if (timeStr.toUpperCase().includes('PM') && hours !== 12) {
       hours += 12
     } else if (timeStr.toUpperCase().includes('AM') && hours === 12) {
       hours = 0
     }
-    
+
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   }
-  
+
   return null
 }
 
+import { extractTextFromImage } from '../utils/ocr/extractText'
+import { parseSchedule } from '../utils/schedule/parseSchedule'
+
 /**
- * Parse screenshot/image (placeholder for OCR implementation)
- * This would use OCR service to extract text from schedule image
+ * Parse screenshot/image using production-ready OCR and spatial parsing
+ * 
+ * @param imageUri - Local URI of the image
+ * @returns Structured class data compatible with the app's internal format
  */
 export async function parseScheduleImage(imageUri) {
-  // TODO: Implement OCR
-  // Options:
-  // 1. Use Google Cloud Vision API
-  // 2. Use AWS Textract
-  // 3. Use Tesseract.js (client-side)
-  // 4. Use Supabase Edge Function with OCR service
-  
-  // For now, return empty array
-  // In production, this would:
-  // 1. Upload image to storage
-  // 2. Call OCR service
-  // 3. Parse extracted text
-  // 4. Return structured class data
-  
-  throw new Error('OCR parsing not yet implemented. Please use iCal or CSV upload, or manual entry.')
+  try {
+    console.log('🚀 Starting schedule OCR and parsing for:', imageUri)
+
+    // 1. Extract text and blocks using ML Kit (production) or Cloud fallback
+    const ocrResult = await extractTextFromImage(imageUri)
+
+    if (!ocrResult || !ocrResult.rawText) {
+      throw new Error('No text could be extracted from this image. Please try a clearer photo or manual entry.')
+    }
+
+    // 2. Parse text blocks spatially into structured course drafts
+    const parsed = parseSchedule(ocrResult)
+
+    if (!parsed || parsed.courses.length === 0) {
+      throw new Error('No classes found in the image. Please ensure the schedule is clearly visible.')
+    }
+
+    // 3. Convert CourseDraft format to the legacy class_code/class_name format used by saveSchedule
+    // This ensures compatibility with existing database hooks
+    return parsed.courses.map(course => ({
+      class_code: course.courseCode,
+      class_name: course.courseCode, // Parser usually only gets code + section
+      professor: course.components[0]?.professor || '',
+      days_of_week: course.components[0]?.days || [],
+      start_time: course.components[0]?.startTime || null,
+      end_time: course.components[0]?.endTime || null,
+      location: course.components[0]?.location || '',
+      section: course.sectionId
+    }))
+
+  } catch (error) {
+    console.error('❌ Schedule parsing failed:', error)
+    throw error
+  }
 }
 
 /**
@@ -289,27 +313,27 @@ export async function parseScheduleImage(imageUri) {
  */
 export function validateClassData(classData) {
   const errors = []
-  
+
   if (!classData.class_code || classData.class_code.trim() === '') {
     errors.push('Class code is required')
   }
-  
+
   if (!classData.class_name || classData.class_name.trim() === '') {
     errors.push('Class name is required')
   }
-  
+
   if (classData.days_of_week && classData.days_of_week.length === 0) {
     errors.push('At least one day of week is required')
   }
-  
+
   if (classData.start_time && !isValidTime(classData.start_time)) {
     errors.push('Invalid start time format')
   }
-  
+
   if (classData.end_time && !isValidTime(classData.end_time)) {
     errors.push('Invalid end time format')
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors
@@ -326,7 +350,7 @@ function isValidTime(time) {
  */
 export function normalizeClassCode(classCode) {
   if (!classCode) return ''
-  
+
   // Remove spaces, dashes, convert to uppercase
   return classCode
     .replace(/\s+/g, '')

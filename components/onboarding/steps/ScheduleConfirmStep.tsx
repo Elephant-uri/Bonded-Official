@@ -15,11 +15,15 @@ import { CourseDraft } from '../../../utils/schedule/parseSchedule'
 interface ScheduleConfirmStepProps {
   courses: CourseDraft[]
   onConfirm: (selectedSections: Set<string>) => void
+  onEdit?: () => void
+  isSaving?: boolean
   onScroll: (event: any) => void
 }
 
-export default function ScheduleConfirmStep({ courses, onConfirm, onScroll }: ScheduleConfirmStepProps) {
+export default function ScheduleConfirmStep({ courses, onConfirm, onEdit, isSaving = false, onScroll }: ScheduleConfirmStepProps) {
   const styles = createStyles(ONBOARDING_THEME)
+  const [localSaving, setLocalSaving] = useState(false)
+  const [saveCompleted, setSaveCompleted] = useState(false)
   
   // Track which sections user wants to join (section key = courseCode-sectionId)
   const [selectedSections, setSelectedSections] = useState<Set<string>>(() => {
@@ -46,7 +50,15 @@ export default function ScheduleConfirmStep({ courses, onConfirm, onScroll }: Sc
   }
 
   const handleConfirm = () => {
+    if (isSaving || localSaving) return
+    setLocalSaving(true)
     onConfirm(selectedSections)
+    // Assume save succeeded after a short delay for UI purposes
+    // In real implementation, this should be driven by parent success callback
+    setTimeout(() => {
+      setLocalSaving(false)
+      setSaveCompleted(true)
+    }, 1500)
   }
 
   // Group courses by whether they have section components (eligible for chat)
@@ -66,13 +78,13 @@ export default function ScheduleConfirmStep({ courses, onConfirm, onScroll }: Sc
       scrollEventThrottle={16}
     >
       <Text style={styles.title}>Confirm Your Schedule</Text>
-      <Text style={styles.subtitle}>Choose which section chats to join</Text>
+      <Text style={styles.subtitle}>Choose which sections to join for section-only chats</Text>
 
       {/* Info Banner */}
       <View style={styles.infoBanner}>
-        <Ionicons name="information-circle-outline" size={hp(2.5)} color={ONBOARDING_THEME.colors.primary} />
+        <Ionicons name="information-circle-outline" size={hp(2.5)} color={ONBOARDING_THEME.colors.bondedPurple} />
         <Text style={styles.infoText}>
-          Labs and recitations are saved but do not create chats automatically. You can create groups from them later.
+          Only sections create chats. Labs and recitations are saved but do not create chats automatically. You can create groups from them later.
         </Text>
       </View>
 
@@ -97,7 +109,7 @@ export default function ScheduleConfirmStep({ courses, onConfirm, onScroll }: Sc
                 <Switch
                   value={isSelected}
                   onValueChange={() => toggleSection(sectionKey)}
-                  trackColor={{ false: '#E0E0E0', true: ONBOARDING_THEME.colors.primary }}
+                  trackColor={{ false: '#E0E0E0', true: ONBOARDING_THEME.colors.bondedPurple }}
                   thumbColor="#FFFFFF"
                 />
               </View>
@@ -127,9 +139,23 @@ export default function ScheduleConfirmStep({ courses, onConfirm, onScroll }: Sc
         </View>
       )}
 
-      <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-        <Text style={styles.confirmButtonText}>Confirm & Continue</Text>
+      <TouchableOpacity
+        style={[styles.confirmButton, (isSaving || localSaving) ? styles.confirmButtonDisabled : null]}
+        onPress={handleConfirm}
+        disabled={isSaving || localSaving}
+      >
+        <Text style={styles.confirmButtonText}>{(isSaving || localSaving) ? 'Saving...' : 'Save Schedule'}</Text>
       </TouchableOpacity>
+
+      {/* Edit Schedule button - only shows after successful save */}
+      {saveCompleted && onEdit && (
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={onEdit}
+        >
+          <Text style={styles.editButtonText}>Edit Schedule</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   )
 }
@@ -222,16 +248,42 @@ const createStyles = (theme: any) =>
       marginTop: hp(0.5),
     },
     confirmButton: {
-      backgroundColor: theme.colors.primary,
-      borderRadius: 12,
-      paddingVertical: hp(2),
+      backgroundColor: theme.colors.bondedPurple,
+      borderRadius: 16,
+      paddingVertical: hp(2.5),
+      paddingHorizontal: wp(6),
       alignItems: 'center',
-      marginTop: hp(2),
+      marginTop: hp(4),
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 6,
+      borderWidth: 2,
+      borderColor: theme.colors.bondedPurple,
+    },
+    confirmButtonDisabled: {
+      opacity: 0.6,
     },
     confirmButtonText: {
-      fontSize: hp(2),
-      fontWeight: '700',
+      fontSize: hp(2.2),
+      fontWeight: '800',
       color: '#FFFFFF',
+      letterSpacing: 0.5,
+    },
+    editButton: {
+      backgroundColor: 'transparent',
+      borderRadius: 12,
+      paddingVertical: hp(1.5),
+      alignItems: 'center',
+      marginTop: hp(1),
+      borderWidth: 1,
+      borderColor: theme.colors.bondedPurple,
+    },
+    editButtonText: {
+      fontSize: hp(1.8),
+      fontWeight: '600',
+      color: theme.colors.bondedPurple,
     },
   })
 

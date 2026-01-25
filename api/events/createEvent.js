@@ -30,6 +30,9 @@ export async function createEvent(input) {
     ticket_types = [],
     // Invites
     invites = [],
+    // New fields
+    type = 'event',
+    sticker = null,
   } = input
 
   // Validate required fields
@@ -64,6 +67,8 @@ export async function createEvent(input) {
       is_paid,
       created_by,
       source,
+      type,
+      sticker,
     })
     .select()
     .single()

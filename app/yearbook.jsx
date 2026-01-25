@@ -6,19 +6,21 @@ import { ActionSheetIOS, ActivityIndicator, Alert, Animated, Dimensions, FlatLis
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import BottomNav from '../components/BottomNav'
-import { ArrowLeft, Calendar, Check, Clock, Filter, MapPin, MessageCircle, MoreHorizontal, School, User, UserMinus, UserPlus, X } from '../components/Icons'
-import { YearbookSkeleton } from '../components/SkeletonLoader'
+import { ArrowLeft, Calendar, Check, Clock, Filter, MapPin, MessageCircle, MoreHorizontal, School, User, UserPlus, X } from '../components/Icons'
 import Picker from '../components/Picker'
 import ShareModal from '../components/ShareModal'
+import { YearbookSkeleton } from '../components/SkeletonLoader'
+import { useProfileModal } from '../contexts/ProfileModalContext'
 import { hp, wp } from '../helpers/common'
-import { useFriendshipStatus, useSendFriendRequest, useAcceptFriendRequest, useCancelFriendRequest, useRemoveFriend } from '../hooks/useFriends'
-import { useProfiles, useProfilePhotos } from '../hooks/useProfiles'
+import { useAcceptFriendRequest, useCancelFriendRequest, useFriendshipStatus, useRemoveFriend, useSendFriendRequest } from '../hooks/useFriends'
 import { useCreateConversation } from '../hooks/useMessages'
 import { useNotificationCount } from '../hooks/useNotificationCount'
+import { useProfilePhotos, useProfiles } from '../hooks/useProfiles'
+import { useProfileViewTracker } from '../hooks/useProfileViews'
 import { useUserPosts } from '../hooks/useUserPosts'
 import { useAuthStore } from '../stores/authStore'
-import { useAppTheme } from './theme'
 import { formatTimeAgo } from '../utils/dateFormatters'
+import { useAppTheme } from './theme'
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
 
@@ -89,22 +91,24 @@ const ProfileModal = ({ activeProfile, setActiveProfile, theme, router, currentU
   const [isVisible, setIsVisible] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const scrollYRef = useRef(0)
-  
+
+  useProfileViewTracker(activeProfile?.id, 'yearbook_profile', !!activeProfile)
+
   // Find current profile index for navigation
   const currentIndex = useMemo(() => {
     if (!activeProfile || !allProfiles.length) return -1
     return allProfiles.findIndex(p => p.id === activeProfile.id)
   }, [activeProfile, allProfiles])
-  
+
   const navigateToProfile = useCallback((direction) => {
     if (currentIndex === -1 || allProfiles.length === 0) return
-    
-    const nextIndex = direction === 'next' 
+
+    const nextIndex = direction === 'next'
       ? (currentIndex + 1) % allProfiles.length
-      : currentIndex === 0 
-        ? allProfiles.length - 1 
+      : currentIndex === 0
+        ? allProfiles.length - 1
         : currentIndex - 1
-    
+
     const nextProfile = allProfiles[nextIndex]
     if (nextProfile) {
       // Animate out current, then animate in next
@@ -168,17 +172,17 @@ const ProfileModal = ({ activeProfile, setActiveProfile, theme, router, currentU
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
         const isAtTop = scrollYRef.current <= 5
         if (!isAtTop) return false
-        
+
         // Check for vertical swipe down (dismiss)
         const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 2
         const isSwipingDown = gestureState.dy > 15
         if (isVertical && isSwipingDown) return true
-        
+
         // Check for horizontal swipe (navigate profiles) - only in top whitespace area
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2
         // Only capture horizontal swipes in the top area (whitespace, not on photos)
         if (isHorizontal && allProfiles.length > 1 && gestureState.dy < 100) return true
-        
+
         return false
       },
       onPanResponderGrant: () => {
@@ -187,7 +191,7 @@ const ProfileModal = ({ activeProfile, setActiveProfile, theme, router, currentU
       onPanResponderMove: (_, gestureState) => {
         const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
-        
+
         if (isVertical && gestureState.dy > 0) {
           // Vertical swipe down - dismiss
           translateY.setValue(gestureState.dy)
@@ -200,7 +204,7 @@ const ProfileModal = ({ activeProfile, setActiveProfile, theme, router, currentU
         setIsDragging(false)
         const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
-        
+
         if (isVertical && gestureState.dy > 0) {
           // Vertical swipe down - dismiss
           if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
@@ -402,16 +406,18 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
           'Are you sure you want to cancel this friend request?',
           [
             { text: 'No', style: 'cancel' },
-            { text: 'Yes, Cancel', style: 'destructive', onPress: () => {
-              cancelRequest.mutate({ requestId: friendshipStatus.requestId })
-            }}
+            {
+              text: 'Yes, Cancel', style: 'destructive', onPress: () => {
+                cancelRequest.mutate({ requestId: friendshipStatus.requestId })
+              }
+            }
           ]
         )
         break
       case 'request_received':
-        acceptRequest.mutate({ 
-          requestId: friendshipStatus.requestId, 
-          senderId: activeProfile.id 
+        acceptRequest.mutate({
+          requestId: friendshipStatus.requestId,
+          senderId: activeProfile.id
         })
         break
       case 'friends':
@@ -420,9 +426,11 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
           `Are you sure you want to remove ${activeProfile.name} as a friend?`,
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => {
-              removeFriend.mutate({ friendId: activeProfile.id })
-            }}
+            {
+              text: 'Remove', style: 'destructive', onPress: () => {
+                removeFriend.mutate({ friendId: activeProfile.id })
+              }
+            }
           ]
         )
         break
@@ -431,32 +439,32 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
 
   const handleMessage = async () => {
     if (!user?.id || !activeProfile) return
-    
+
     // Capture profile data before closing modal
     const profileId = activeProfile.id
     const profileName = activeProfile.name
-    
+
     try {
       // Close the modal first - ensure it's fully closed before navigation
       setActiveProfile(null)
-      
+
       // Wait for modal to start closing animation
       await new Promise(resolve => setTimeout(resolve, 300))
-      
-      const conversationId = await createConversation.mutateAsync({ 
-        otherUserId: profileId 
+
+      const conversationId = await createConversation.mutateAsync({
+        otherUserId: profileId
       })
-      
+
       // Additional delay to ensure modal is fully unmounted
       await new Promise(resolve => setTimeout(resolve, 200))
-      
+
       // Navigate to chat using replace to prevent back navigation to modal
       router.replace({
         pathname: '/chat',
-        params: { 
+        params: {
           conversationId,
-          userId: profileId, 
-          userName: profileName 
+          userId: profileId,
+          userName: profileName
         }
       })
     } catch (error) {
@@ -543,8 +551,8 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
   }
 
   const buttonConfig = getFriendButtonConfig()
-  const isActionLoading = sendRequest.isPending || cancelRequest.isPending || 
-                          acceptRequest.isPending || removeFriend.isPending
+  const isActionLoading = sendRequest.isPending || cancelRequest.isPending ||
+    acceptRequest.isPending || removeFriend.isPending
 
   const styles = createProfileModalStyles(theme)
   const handleOpenPost = (post) => {
@@ -562,12 +570,12 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Drag indicator pill - visual cue for swipe */}
       <View style={styles.dragIndicatorContainer} pointerEvents="none">
         <View style={styles.dragIndicator} />
       </View>
-      
+
       {/* Back Button - fixed position */}
       <TouchableOpacity
         style={styles.backButton}
@@ -621,21 +629,21 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
                 index,
               })}
               renderItem={({ item }) => (
-                <Image 
-                  source={{ uri: item }} 
-                  style={{ 
-                    width: SCREEN_WIDTH, 
+                <Image
+                  source={{ uri: item }}
+                  style={{
+                    width: SCREEN_WIDTH,
                     height: hp(50),
                     resizeMode: 'cover',
-                  }} 
+                  }}
                 />
               )}
             />
           ) : (
-          <Image 
-            source={{ uri: activeProfile.photoUrl }} 
-            style={styles.heroImage} 
-          />
+            <Image
+              source={{ uri: activeProfile.photoUrl }}
+              style={styles.heroImage}
+            />
           )}
           <LinearGradient
             colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
@@ -643,185 +651,185 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
             pointerEvents="none"
           />
         </View>
-        
+
         {/* Content Section */}
         <View style={styles.contentSection}>
           {/* Name */}
           <Text style={styles.name}>{activeProfile.name}</Text>
-        
-        {/* Handle */}
-        <Text style={styles.handle}>
-          @{activeProfile.name.toLowerCase().replace(/\s+/g, '').slice(0, 8)}
-        </Text>
-        
-        {/* Bio */}
-        <Text style={styles.bio}>{activeProfile.quote}</Text>
-        
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              buttonConfig.style === 'friends' && styles.actionButtonFriends,
-              buttonConfig.style === 'pending' && styles.actionButtonPending,
-              buttonConfig.style === 'accept' && styles.actionButtonAccept,
-              buttonConfig.style === 'secondary' && styles.actionButtonSecondary,
-            ]}
-            activeOpacity={0.7}
-            onPress={handleFriendAction}
-            disabled={isActionLoading || buttonConfig.loading}
-          >
-            {isActionLoading || buttonConfig.loading ? (
-              <ActivityIndicator size="small" color={theme.colors.textPrimary} />
-            ) : (
-              <>
-                {buttonConfig.icon && (
-                  <buttonConfig.icon 
-                    size={hp(2)} 
-                    color={buttonConfig.style === 'accept' ? theme.colors.white : theme.colors.textPrimary} 
-                    strokeWidth={2} 
-                  />
-                )}
-                <Text style={[
-                  styles.actionButtonText,
-                  buttonConfig.style === 'accept' && styles.actionButtonTextAccept
-                ]}>
-                  {buttonConfig.text}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.actionButtonPrimary}
-            activeOpacity={0.7}
-            onPress={handleMessage}
-            disabled={createConversation.isPending}
-          >
-            {createConversation.isPending ? (
-              <ActivityIndicator size="small" color={theme.colors.white} />
-            ) : (
-              <>
-                <MessageCircle size={hp(2)} color={theme.colors.white} strokeWidth={2} />
-                <Text style={styles.actionButtonPrimaryText}>Message</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-        
-        {/* Meta Info Pills */}
-        <View style={styles.metaRow}>
-          <View style={styles.metaPill}>
-            <School size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.metaPillText}>{getMajorLabel(activeProfile.major)}</Text>
+
+          {/* Handle */}
+          <Text style={styles.handle}>
+            @{activeProfile.name.toLowerCase().replace(/\s+/g, '').slice(0, 8)}
+          </Text>
+
+          {/* Bio */}
+          <Text style={styles.bio}>{activeProfile.quote}</Text>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtonsRow}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                buttonConfig.style === 'friends' && styles.actionButtonFriends,
+                buttonConfig.style === 'pending' && styles.actionButtonPending,
+                buttonConfig.style === 'accept' && styles.actionButtonAccept,
+                buttonConfig.style === 'secondary' && styles.actionButtonSecondary,
+              ]}
+              activeOpacity={0.7}
+              onPress={handleFriendAction}
+              disabled={isActionLoading || buttonConfig.loading}
+            >
+              {isActionLoading || buttonConfig.loading ? (
+                <ActivityIndicator size="small" color={theme.colors.textPrimary} />
+              ) : (
+                <>
+                  {buttonConfig.icon && (
+                    <buttonConfig.icon
+                      size={hp(2)}
+                      color={buttonConfig.style === 'accept' ? theme.colors.white : theme.colors.textPrimary}
+                      strokeWidth={2}
+                    />
+                  )}
+                  <Text style={[
+                    styles.actionButtonText,
+                    buttonConfig.style === 'accept' && styles.actionButtonTextAccept
+                  ]}>
+                    {buttonConfig.text}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButtonPrimary}
+              activeOpacity={0.7}
+              onPress={handleMessage}
+              disabled={createConversation.isPending}
+            >
+              {createConversation.isPending ? (
+                <ActivityIndicator size="small" color={theme.colors.white} />
+              ) : (
+                <>
+                  <MessageCircle size={hp(2)} color={theme.colors.white} strokeWidth={2} />
+                  <Text style={styles.actionButtonPrimaryText}>Message</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
-          <View style={styles.metaPill}>
-            <Calendar size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.metaPillText}>Class of {activeProfile.year}</Text>
-          </View>
-          {activeProfile.grade && (
+
+          {/* Meta Info Pills */}
+          <View style={styles.metaRow}>
             <View style={styles.metaPill}>
-              <User size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
-              <Text style={styles.metaPillText}>{getGradeLabel(activeProfile.grade)}</Text>
+              <School size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
+              <Text style={styles.metaPillText}>{getMajorLabel(activeProfile.major)}</Text>
+            </View>
+            <View style={styles.metaPill}>
+              <Calendar size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
+              <Text style={styles.metaPillText}>Class of {activeProfile.year}</Text>
+            </View>
+            {activeProfile.grade && (
+              <View style={styles.metaPill}>
+                <User size={hp(1.6)} color={theme.colors.textSecondary} strokeWidth={2} />
+                <Text style={styles.metaPillText}>{getGradeLabel(activeProfile.grade)}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Location */}
+          <View style={styles.locationRow}>
+            <MapPin size={hp(1.8)} color={theme.colors.textSecondary} strokeWidth={2} />
+            <Text style={styles.locationText}>
+              {activeProfile.location || activeProfile.university || 'University of Rhode Island'}
+            </Text>
+          </View>
+
+          {/* Interests Section */}
+          {activeProfile.interests && activeProfile.interests.length > 0 && (
+            <View style={styles.tagsSection}>
+              <Text style={styles.tagsTitle}>Interests</Text>
+              <View style={styles.tagsRow}>
+                {activeProfile.interests.slice(0, 8).map((interest, idx) => {
+                  const isShared = currentUserInterests.has(interest)
+                  return (
+                    <View
+                      key={idx}
+                      style={[styles.tag, isShared && styles.tagShared]}
+                    >
+                      {isShared && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={hp(1.4)}
+                          color={theme.colors.bondedPurple}
+                          style={{ marginRight: wp(1) }}
+                        />
+                      )}
+                      <Text style={[styles.tagText, isShared && styles.tagTextShared]}>
+                        {interest}
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+              {currentUserInterests.size > 0 && (
+                <Text style={styles.sharedHint}>Highlighted interests match yours</Text>
+              )}
             </View>
           )}
-        </View>
-        
-        {/* Location */}
-        <View style={styles.locationRow}>
-          <MapPin size={hp(1.8)} color={theme.colors.textSecondary} strokeWidth={2} />
-          <Text style={styles.locationText}>
-            {activeProfile.location || activeProfile.university || 'University of Rhode Island'}
-          </Text>
-        </View>
-        
-        {/* Interests Section */}
-        {activeProfile.interests && activeProfile.interests.length > 0 && (
-          <View style={styles.tagsSection}>
-            <Text style={styles.tagsTitle}>Interests</Text>
-            <View style={styles.tagsRow}>
-              {activeProfile.interests.slice(0, 8).map((interest, idx) => {
-                const isShared = currentUserInterests.has(interest)
-                return (
-                  <View 
-                    key={idx} 
-                    style={[styles.tag, isShared && styles.tagShared]}
-                  >
-                    {isShared && (
-                      <Ionicons 
-                        name="checkmark-circle" 
-                        size={hp(1.4)} 
-                        color={theme.colors.bondedPurple} 
-                        style={{ marginRight: wp(1) }}
-                      />
-                    )}
-                    <Text style={[styles.tagText, isShared && styles.tagTextShared]}>
-                      {interest}
-                    </Text>
-                  </View>
-                )
-              })}
-            </View>
-            {currentUserInterests.size > 0 && (
-              <Text style={styles.sharedHint}>Highlighted interests match yours</Text>
-            )}
-          </View>
-        )}
 
-        <View style={styles.postsSection}>
-          <View style={styles.postsSectionHeader}>
-            <Ionicons name="chatbubbles-outline" size={hp(2)} color={theme.colors.textSecondary} />
-            <Text style={styles.postsTitle}>Recent forum posts</Text>
-          </View>
-          {recentPostsLoading ? (
-            <View style={styles.postsLoadingContainer}>
-              <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
-              <Text style={styles.postsEmptyText}>Loading posts...</Text>
+          <View style={styles.postsSection}>
+            <View style={styles.postsSectionHeader}>
+              <Ionicons name="chatbubbles-outline" size={hp(2)} color={theme.colors.textSecondary} />
+              <Text style={styles.postsTitle}>Recent forum posts</Text>
             </View>
-          ) : recentPosts.length === 0 ? (
-            <View style={styles.postsEmptyContainer}>
-              <Ionicons name="document-text-outline" size={hp(3)} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
-              <Text style={styles.postsEmptyText}>No recent posts yet</Text>
-            </View>
-          ) : (
-            <View style={styles.postsListContainer}>
-              {recentPosts.map((post, index) => (
-                <TouchableOpacity
-                  key={post.id}
-                  style={[
-                    styles.postCard,
-                    index === recentPosts.length - 1 && styles.postCardLast
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => handleOpenPost(post)}
-                >
-                  <View style={styles.postCardContent}>
-                    <View style={styles.postCardTextContainer}>
-                      <Text style={styles.postCardTitle} numberOfLines={2}>
-                        {post.title || post.body || 'Untitled post'}
-                      </Text>
-                      <View style={styles.postCardMetaRow}>
-                        <Text style={styles.postCardAuthor}>
-                          {post.is_anonymous ? 'Anonymous' : (post.author?.username || post.author?.full_name || 'User')}
+            {recentPostsLoading ? (
+              <View style={styles.postsLoadingContainer}>
+                <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
+                <Text style={styles.postsEmptyText}>Loading posts...</Text>
+              </View>
+            ) : recentPosts.length === 0 ? (
+              <View style={styles.postsEmptyContainer}>
+                <Ionicons name="document-text-outline" size={hp(3)} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
+                <Text style={styles.postsEmptyText}>No recent posts yet</Text>
+              </View>
+            ) : (
+              <View style={styles.postsListContainer}>
+                {recentPosts.map((post, index) => (
+                  <TouchableOpacity
+                    key={post.id}
+                    style={[
+                      styles.postCard,
+                      index === recentPosts.length - 1 && styles.postCardLast
+                    ]}
+                    activeOpacity={0.7}
+                    onPress={() => handleOpenPost(post)}
+                  >
+                    <View style={styles.postCardContent}>
+                      <View style={styles.postCardTextContainer}>
+                        <Text style={styles.postCardTitle} numberOfLines={2}>
+                          {post.title || post.body || 'Untitled post'}
                         </Text>
-                        <Text style={styles.postCardSeparator}>•</Text>
-                        <View style={styles.postCardForumTag}>
-                          <Text style={styles.postCardForumText}>
-                            {post.forum?.name || 'Forum'}
+                        <View style={styles.postCardMetaRow}>
+                          <Text style={styles.postCardAuthor}>
+                            {post.is_anonymous ? 'Anonymous' : (post.author?.username || post.author?.full_name || 'User')}
+                          </Text>
+                          <Text style={styles.postCardSeparator}>•</Text>
+                          <View style={styles.postCardForumTag}>
+                            <Text style={styles.postCardForumText}>
+                              {post.forum?.name || 'Forum'}
+                            </Text>
+                          </View>
+                          <Text style={styles.postCardTime}>
+                            {formatTimeAgo(post.created_at)}
                           </Text>
                         </View>
-                        <Text style={styles.postCardTime}>
-                          {formatTimeAgo(post.created_at)}
-                        </Text>
                       </View>
+                      <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.textSecondary} style={{ opacity: 0.5 }} />
                     </View>
-                    <Ionicons name="chevron-forward" size={hp(2)} color={theme.colors.textSecondary} style={{ opacity: 0.5 }} />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
       <ShareModal
@@ -1196,7 +1204,7 @@ export default function Yearbook() {
   const [genderFilter, setGenderFilter] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false)
-  const [activeProfile, setActiveProfile] = useState(null)
+  const { openProfile } = useProfileModal()
   const scrollY = useRef(new Animated.Value(0)).current
   const lastScrollY = useRef(0)
   const headerTranslateY = useRef(new Animated.Value(0)).current
@@ -1242,7 +1250,7 @@ export default function Yearbook() {
   // Apply sorting and put current user first (filtering is done in the query)
   const filteredProfiles = useMemo(() => {
     if (profiles.length === 0) return []
-    
+
     // Separate current user from others
     const currentUser = profiles.find(p => p.id === user?.id)
     let others = profiles.filter(p => p.id !== user?.id)
@@ -1264,6 +1272,9 @@ export default function Yearbook() {
     return others
   }, [profiles, sortOption, user?.id])
 
+  // Track profile view for current user if they are in the list
+  useProfileViewTracker(user?.id, 'yearbook_list', true)
+
   const numColumns = 3
   const gap = theme.spacing.sm // Gap between columns
   const padding = theme.spacing.sm // Horizontal padding matches listContent
@@ -1271,7 +1282,7 @@ export default function Yearbook() {
 
   const renderProfileCard = ({ item, index }) => {
     const isYou = item.isCurrentUser
-    
+
     return (
       <TouchableOpacity
         style={[styles.cardWrapper, { width: cardWidth }]}
@@ -1280,7 +1291,7 @@ export default function Yearbook() {
           if (isYou) {
             router.push('/profile')
           } else {
-            setActiveProfile(item)
+            openProfile(item.id)
           }
         }}
       >
@@ -1311,7 +1322,7 @@ export default function Yearbook() {
             </Text>
             {/* Major Badge - Below Quote */}
             <View style={styles.cardBadge}>
-              <Text 
+              <Text
                 style={styles.cardBadgeText}
                 numberOfLines={1}
                 ellipsizeMode="tail"
@@ -1332,18 +1343,18 @@ export default function Yearbook() {
       listener: (event) => {
         const currentScrollY = event.nativeEvent.contentOffset.y
         const scrollDifference = currentScrollY - lastScrollY.current
-  
+
         // Prevent multiple animations from running
         if (isAnimating.current) {
           lastScrollY.current = currentScrollY
           return
         }
-  
+
         // Ignore small scrolls
         if (Math.abs(scrollDifference) < 3) {
           return
         }
-  
+
         if (currentScrollY <= 0) {
           // At the very top - always show
           isAnimating.current = true
@@ -1375,7 +1386,7 @@ export default function Yearbook() {
             isAnimating.current = false
           })
         }
-  
+
         lastScrollY.current = currentScrollY
       },
     }
@@ -1407,7 +1418,7 @@ export default function Yearbook() {
             >
               <Ionicons name="arrow-back" size={hp(2.4)} color={theme.colors.textPrimary} />
             </TouchableOpacity>
-            
+
             <View style={styles.topBarCenter}>
               <Image
                 source={require('../assets/images/transparent-bonded.png')}
@@ -1416,7 +1427,7 @@ export default function Yearbook() {
               />
               <Text style={styles.topBarTitle}>Bonded</Text>
             </View>
-            
+
             <TouchableOpacity
               style={styles.topBarButton}
               activeOpacity={0.7}
@@ -1450,7 +1461,7 @@ export default function Yearbook() {
                 />
               </TouchableOpacity>
             </View>
-            
+
             {/* Search Bar */}
             <View style={styles.searchContainer}>
               <Ionicons
@@ -1529,16 +1540,6 @@ export default function Yearbook() {
             }
           />
         )}
-
-        {/* Profile Modal */}
-        <ProfileModal
-            activeProfile={activeProfile}
-            setActiveProfile={setActiveProfile}
-            theme={theme}
-            router={router}
-            currentUserInterests={currentUserInterests}
-          allProfiles={filteredProfiles}
-          />
 
         {/* Filters Modal */}
         <Modal

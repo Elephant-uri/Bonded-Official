@@ -202,9 +202,11 @@ export const useOnboardingStore = create(
         // Calculate completion
         const completedSteps = getCompletedSteps(newFormData)
         const completionPercentage = calculateCompletion(completedSteps)
-        // Can access app only after ALL active steps are complete (100%)
+
+        // Can access app if all REQUIRED steps are complete
         const activeSteps = getActiveOnboardingSteps()
-        const canAccessApp = activeSteps.every(step => completedSteps.includes(step))
+        const requiredSteps = activeSteps.filter(step => STEP_METADATA[step]?.isRequired)
+        const canAccessApp = requiredSteps.every(step => completedSteps.includes(step))
 
         set({
           formData: newFormData,
@@ -321,8 +323,11 @@ export const useOnboardingStore = create(
         // Calculate completed steps from synced data
         const completedSteps = getCompletedSteps(syncedFormData)
         const completionPercentage = calculateCompletion(completedSteps)
+
+        // Can access app if all REQUIRED steps are complete
         const activeSteps = getActiveOnboardingSteps()
-        const canAccessApp = activeSteps.every(step => completedSteps.includes(step))
+        const requiredSteps = activeSteps.filter(step => STEP_METADATA[step]?.isRequired)
+        const canAccessApp = requiredSteps.every(step => completedSteps.includes(step))
 
         // Set current step to first incomplete step
         let nextStep = activeSteps.find(step => !completedSteps.includes(step))

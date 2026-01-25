@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import { useFocusEffect } from '@react-navigation/native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useMemo, useState } from 'react'
@@ -36,7 +37,7 @@ export default function Clubs() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
-  const { getAllClubs, isUserInterested, showInterest, removeInterest } = useClubsContext()
+  const { getAllClubs, isUserInterested, showInterest, removeInterest, refetch } = useClubsContext()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
@@ -60,6 +61,12 @@ export default function Clubs() {
   }
 
   const allClubs = getAllClubs()
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch()
+    }, [refetch])
+  )
 
   const filteredClubs = useMemo(() => {
     return allClubs.filter((club) => {

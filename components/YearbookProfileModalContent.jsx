@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Dimensions,
@@ -9,6 +10,7 @@ import {
   Image,
   Platform,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -23,6 +25,7 @@ import {
   Clock,
   MapPin,
   MessageCircle,
+  MoreHorizontal,
   School,
   User,
   UserPlus,
@@ -52,6 +55,8 @@ const YearbookProfileModalContent = ({
   scrollYRef,
   onClose,
   panResponder,
+  onShareProfile,
+  onBlockProfile,
 }) => {
   const scrollY = useRef(0)
 
@@ -200,6 +205,77 @@ const YearbookProfileModalContent = ({
     }
   }
 
+  const handleShare = async () => {
+    if (!activeProfile) return
+    const sharePayload = {
+      id: activeProfile.id,
+      name: activeProfile.name,
+      majorLabel: activeProfile.major,
+      year: activeProfile.year,
+      avatar: activeProfile.photoUrl,
+      grade: activeProfile.grade,
+      quote: activeProfile.quote,
+    }
+    if (onShareProfile) {
+      onShareProfile(sharePayload)
+      return
+    }
+    try {
+      await Share.share({
+        message: `Check out ${activeProfile.name} on Bonded.`,
+      })
+    } catch (error) {
+      console.warn('Share failed:', error)
+    }
+  }
+
+  const confirmBlock = () => {
+    if (!activeProfile) return
+    if (onBlockProfile) {
+      onBlockProfile(activeProfile)
+      return
+    }
+    Alert.alert(
+      'Block user?',
+      `You won't see ${activeProfile.name} again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Blocked', 'Block is coming soon.')
+          },
+        },
+      ]
+    )
+  }
+
+  const openProfileActions = () => {
+    if (!activeProfile) return
+    const options = ['Share', 'Block', 'Cancel']
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: 2,
+          destructiveButtonIndex: 1,
+          userInterfaceStyle: 'light',
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) handleShare()
+          if (buttonIndex === 1) confirmBlock()
+        }
+      )
+      return
+    }
+    Alert.alert('Profile options', undefined, [
+      { text: 'Share', onPress: handleShare },
+      { text: 'Block', style: 'destructive', onPress: confirmBlock },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
   const getFriendButtonConfig = () => {
     if (statusLoading) {
       return { icon: null, text: 'Loading...', loading: true, style: 'secondary' }
@@ -259,6 +335,15 @@ const YearbookProfileModalContent = ({
       >
         <View style={styles.backButtonCircle}>
           <ArrowLeft size={hp(2)} color="#fff" strokeWidth={2} />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.moreButton}
+        activeOpacity={0.7}
+        onPress={openProfileActions}
+      >
+        <View style={styles.moreButtonCircle}>
+          <MoreHorizontal size={hp(2.2)} color="#fff" strokeWidth={2} />
         </View>
       </TouchableOpacity>
 
@@ -496,6 +581,20 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  moreButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? hp(6) : hp(4),
+    right: wp(4),
+    zIndex: 150,
+  },
+  moreButtonCircle: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fullScrollView: {
     flex: 1,
   },
@@ -719,4 +818,3 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     marginTop: hp(1),
   },
 })
-

@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import React, { useMemo, useRef, useState } from 'react'
-import { Animated, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { useMemo, useRef, useState } from 'react'
+import { Animated, FlatList, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
-import { ArrowLeft, Calendar, MessageCircle, School } from '../components/Icons'
+import { useProfileModal } from '../contexts/ProfileModalContext'
 import { hp, wp } from '../helpers/common'
 import { useClassMatching, useUniversityProfiles } from '../hooks/useClassMatching'
 import { useAppTheme } from './theme'
@@ -18,7 +18,7 @@ export default function Network() {
   const router = useRouter()
   const theme = useAppTheme()
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeProfile, setActiveProfile] = useState(null)
+  const { openProfile } = useProfileModal()
   const scrollY = useRef(new Animated.Value(0)).current
   const lastScrollY = useRef(0)
   const headerTranslateY = useRef(new Animated.Value(0)).current
@@ -73,7 +73,7 @@ export default function Network() {
         style={[styles.cardWrapper, { width: cardWidth }]}
         activeOpacity={0.9}
         onPress={() => {
-          setActiveProfile(item)
+          openProfile(item.id)
         }}
       >
         <AppCard radius="md" padding={false} style={styles.card}>
@@ -126,18 +126,18 @@ export default function Network() {
       listener: (event) => {
         const currentScrollY = event.nativeEvent.contentOffset.y
         const scrollDifference = currentScrollY - lastScrollY.current
-  
+
         // Prevent multiple animations from running
         if (isAnimating.current) {
           lastScrollY.current = currentScrollY
           return
         }
-  
+
         // Ignore small scrolls
         if (Math.abs(scrollDifference) < 3) {
           return
         }
-  
+
         if (currentScrollY <= 0) {
           // At the very top - always show
           isAnimating.current = true
@@ -169,7 +169,7 @@ export default function Network() {
             isAnimating.current = false
           })
         }
-  
+
         lastScrollY.current = currentScrollY
       },
     }
@@ -195,7 +195,7 @@ export default function Network() {
           <AppTopBar
             schoolName="My Network"
             onPressProfile={() => router.push('/profile')}
-            onPressSchool={() => {}}
+            onPressSchool={() => { }}
             onPressNotifications={() => router.push('/notifications')}
           />
 
@@ -272,110 +272,6 @@ export default function Network() {
             }
           />
         )}
-
-        {/* Profile Modal */}
-        <Modal
-          visible={!!activeProfile}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setActiveProfile(null)}
-        >
-          <View style={styles.profileModalContainer}>
-            {activeProfile && (
-              <>
-                {/* Top Bar Overlay */}
-                <View style={styles.profileModalTopBar}>
-                  <TouchableOpacity
-                    style={styles.profileModalTopBarButton}
-                    activeOpacity={0.7}
-                    onPress={() => setActiveProfile(null)}
-                  >
-                    <View style={styles.profileModalTopBarCircle}>
-                      <ArrowLeft size={hp(2)} color={theme.colors.textPrimary} strokeWidth={2} />
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.profileModalTopBarButton}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      router.push(`/messages?userId=${activeProfile.id}`)
-                      setActiveProfile(null)
-                    }}
-                  >
-                    <View style={styles.profileModalTopBarCircle}>
-                      <MessageCircle size={hp(2)} color={theme.colors.textPrimary} strokeWidth={2} />
-                    </View>
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  style={styles.profileModalScroll}
-                  contentContainerStyle={styles.profileModalContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {/* Profile Image */}
-                  <View style={styles.profileModalImageContainer}>
-                    <Image
-                      source={{ uri: activeProfile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activeProfile.full_name || 'User')}&background=random` }}
-                      style={styles.profileModalImage}
-                    />
-                  </View>
-
-                  {/* Profile Info */}
-                  <View style={styles.profileModalInfo}>
-                    <Text style={styles.profileModalName}>{activeProfile.full_name || activeProfile.username}</Text>
-                    <Text style={styles.profileModalMajor}>{activeProfile.major || 'Student'}</Text>
-                    {activeProfile.yearbook_quote && (
-                      <Text style={styles.profileModalQuote}>"{activeProfile.yearbook_quote}"</Text>
-                    )}
-
-                    {/* Shared Classes */}
-                    {activeProfile.sharedClasses?.length > 0 && (
-                      <View style={styles.sharedClassesSection}>
-                        <Text style={styles.sharedClassesTitle}>
-                          {activeProfile.sharedClasses.length} Shared {activeProfile.sharedClasses.length === 1 ? 'Class' : 'Classes'}
-                        </Text>
-                        <View style={styles.sharedClassesList}>
-                          {activeProfile.sharedClasses.slice(0, 5).map((cls, idx) => (
-                            <View key={idx} style={styles.sharedClassChip}>
-                              <Text style={styles.sharedClassChipText}>
-                                {cls.class_code || cls.class_name}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Details */}
-                    <View style={styles.profileModalDetails}>
-                      <View style={styles.profileModalDetailItem}>
-                        <School size={hp(2)} color={theme.colors.textSecondary} />
-                        <Text style={styles.profileModalDetailText}>
-                          {activeProfile.grade || 'Student'}{activeProfile.graduation_year ? ` • ${activeProfile.graduation_year}` : ''}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Interests */}
-                    {activeProfile.interests?.length > 0 && (
-                      <View style={styles.interestsSection}>
-                        <Text style={styles.interestsTitle}>Interests</Text>
-                        <View style={styles.interestsList}>
-                          {activeProfile.interests.slice(0, 6).map((interest, idx) => (
-                            <View key={idx} style={styles.interestChip}>
-                              <Text style={styles.interestChipText}>{interest}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                </ScrollView>
-              </>
-            )}
-          </View>
-        </Modal>
 
         <BottomNav />
       </View>
@@ -687,7 +583,6 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 })
-
 
 
 

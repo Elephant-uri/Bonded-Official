@@ -157,9 +157,27 @@ function extractCourseInfo(row: TextBlock[]): {
 
   const courseCode = `${courseCodeMatch[1]} ${courseCodeMatch[2]}`
 
-  // Extract section ID (e.g., "0002", "001", "P01", "L02", "R03")
-  const sectionMatch = rowText.match(/\b(0\d{3}|P\d{2}|L\d{2}|R\d{2})\b/)
-  const sectionId = sectionMatch ? sectionMatch[1] : '0001'
+  // Extract section ID (e.g., "0002", "001", "A", "B", "P01", "L02", "R03")
+  // Try multiple patterns for different university formats
+  let sectionId = '0001'
+  
+  // 1. Numeric sections (0001, 001, 002, etc.)
+  const numericMatch = rowText.match(/\b(0\d{2,3}|\d{1,3})\b/)
+  if (numericMatch) {
+    sectionId = numericMatch[1].padStart(3, '0')
+  } else {
+    // 2. Letter sections (A, B, C, etc.)
+    const letterMatch = rowText.match(/\b([A-Z])\b/)
+    if (letterMatch) {
+      sectionId = letterMatch[1]
+    } else {
+      // 3. Prefixed sections (P01, L02, R03, etc.)
+      const prefixedMatch = rowText.match(/\b(P\d{2}|L\d{2}|R\d{2}|DIS\d{2})\b/i)
+      if (prefixedMatch) {
+        sectionId = prefixedMatch[1].toUpperCase()
+      }
+    }
+  }
 
   // Determine component type based on section pattern or keywords
   let componentType: ComponentType | null = null
@@ -175,6 +193,9 @@ function extractCourseInfo(row: TextBlock[]): {
     componentType = 'Recitation'
   } else if (/pro|project/i.test(rowText)) {
     componentType = 'PRO'
+  } else if (/^[A-Z]$/.test(sectionId)) {
+    // Letter sections (A, B, C) are typically lectures
+    componentType = 'Lecture'
   } else if (/^0\d{3}$/.test(sectionId)) {
     // 0001, 0002, etc. are typically lectures/sections
     componentType = 'Lecture'

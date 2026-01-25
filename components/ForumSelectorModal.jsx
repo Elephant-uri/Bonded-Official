@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons'
-import React, { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-    FlatList,
-    Image,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAppTheme } from '../app/theme'
@@ -86,15 +86,15 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
     switch (type) {
       case 'main':
       case 'campus':
-        return 'home'
+        return 'globe-outline'
       case 'class':
-        return 'school'
+        return 'school-outline'
       case 'org':
-        return 'people'
+        return 'people-outline'
       case 'private':
-        return 'lock-closed'
+        return 'lock-closed-outline'
       default:
-        return 'chatbubbles'
+        return 'chatbubbles-outline'
     }
   }
 
@@ -117,15 +117,18 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
   const renderForumItem = ({ item }) => {
     const isSelected = item.id === currentForumId
     const iconColor = getForumColor(item.type)
+    const isClass = item.type === 'class'
 
     return (
       <TouchableOpacity
         style={[styles.forumItem, isSelected && styles.forumItemSelected]}
         onPress={() => {
-          onSelectForum(item)
-          onClose()
+          if (!isClass) {
+            onSelectForum(item)
+            onClose()
+          }
         }}
-        activeOpacity={0.7}
+        activeOpacity={isClass ? 1 : 0.7}
       >
         {item.image ? (
           <Image
@@ -165,9 +168,35 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
             )}
           </View>
         </View>
-        {isSelected && (
+        {isClass ? (
+          <View style={styles.classActions}>
+            <TouchableOpacity
+              style={styles.classActionButton}
+              onPress={() => {
+                // Navigate to class chat
+                // TODO: Implement navigation to class chat
+                console.log('Navigate to class chat:', item.id, item.class_section_id)
+                onClose()
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chatbubble-outline" size={hp(2.2)} color={theme.colors.bondedPurple} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.classActionButton}
+              onPress={() => {
+                // Navigate to class forum
+                onSelectForum(item)
+                onClose()
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chatbubbles-outline" size={hp(2.2)} color={theme.colors.bondedPurple} />
+            </TouchableOpacity>
+          </View>
+        ) : isSelected ? (
           <Ionicons name="checkmark-circle" size={hp(2.5)} color={theme.colors.bondedPurple} />
-        )}
+        ) : null}
       </TouchableOpacity>
     )
   }
@@ -282,14 +311,12 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
                 <View>
-                  {renderSection('Main Forum', filteredForums.campus, 'campus', null)}
+                  {/* Campus/Main forum is shown at the top via ForumSwitcher, don't duplicate here */}
                   {renderSection('⭐ Pinned', filteredForums.pinned.filter(f => f.type !== 'campus'), 'pinned', 'star')}
-                  {renderSection('📚 My Classes', filteredForums.classes, 'classes', 'school')}
-                  {renderSection('🏢 My Organizations', filteredForums.orgs, 'orgs', 'people')}
+                  {renderSection('📚 Your classes', filteredForums.classes, 'classes', 'school')}
+                  {renderSection('🎯 Public forums', filteredForums.other.filter(f => f.type !== 'campus'), 'other', 'globe')}
+                  {renderSection(' My Organizations', filteredForums.orgs, 'orgs', 'people')}
                   {renderSection('🔒 Private Forums', filteredForums.private, 'private', 'lock-closed')}
-                  {filteredForums.other.length > 0
-                    ? renderSection('🌐 Other Forums', filteredForums.other, 'other', 'globe')
-                    : null}
                 </View>
               }
             />
@@ -477,6 +504,16 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1),
     fontWeight: '700',
     color: theme.colors.white,
+  },
+  classActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+  },
+  classActionButton: {
+    padding: hp(0.8),
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.bondedPurple + '10',
   },
   footer: {
     paddingHorizontal: wp(4),

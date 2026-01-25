@@ -2,18 +2,21 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Sentry from '@sentry/react-native'
 import { Stack, usePathname, useRouter } from 'expo-router'
 import React, { useEffect, useRef, useState } from 'react'
-import { Dimensions, Image, Platform, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Dimensions, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { DrawerLayout, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Loading from '../components/Loading'
 import { OnboardingNudge } from '../components/OnboardingNudge'
+import ProfileModal from '../components/Profile/ProfileModal'
 import { ClubsProvider, useClubsContext } from '../contexts/ClubsContext'
 import { EventsProvider } from '../contexts/EventsContext'
 import { MessagesProvider } from '../contexts/MessagesContext'
+import { ProfileModalProvider } from '../contexts/ProfileModalContext'
 import { StoriesProvider } from '../contexts/StoriesContext'
+import { UnifiedForumProvider, useUnifiedForum } from '../contexts/UnifiedForumContext'
 import { hp, wp } from '../helpers/common'
-import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useEventsForUser } from '../hooks/events/useEventsForUser'
-import { useForums } from '../hooks/useForums'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { useProfileViewersCount } from '../hooks/useProfileViews'
 import { supabase } from '../lib/supabase'
 import QueryProvider from '../providers/QueryProvider'
 import { useAuthStore } from '../stores/authStore'
@@ -69,60 +72,95 @@ const DrawerItem = ({ icon, label, onPress }: { icon: string; label: string; onP
   )
 }
 
+import { useCalendarData } from '../hooks/useCalendarData'
+
 const EventsPrefetcher = () => {
   const { user } = useAuthStore()
   useEventsForUser(user?.id)
+  useCalendarData(user?.id)
   return null
 }
 
 const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) => {
   const theme = useAppTheme()
   const { user, isAuthenticated } = useAuthStore()
+  const { forums, currentForum, switchToForum } = useUnifiedForum()
 
-  // Only fetch forums if user is authenticated (hook has enabled: !!user, but check here too)
-  const { data: forums = [], isLoading: forumsLoading } = useForums()
-
-  // Early return if not authenticated (after hooks are called)
+  // Early return if not authenticated
   if (!isAuthenticated || !user) {
     return null
   }
 
-  // Get user clubs and admin clubs - wrapped in try-catch in case context isn't available
-  let userClubs: any[] = []
-  let adminClubs: any[] = []
-  let ensureClubForum: ((clubId: string) => Promise<string | null>) | null = null
-  try {
-    const clubsContext = useClubsContext()
-    userClubs = clubsContext.getUserClubs()
-    adminClubs = clubsContext.getAdminClubs()
-    ensureClubForum = clubsContext.ensureClubForum
-  } catch (e) {
-    // Context not available, use empty array
-    console.log('ClubsContext error:', e)
-  }
+  // Get user clubs and admin clubs
+  const clubsContext = useClubsContext()
+  const userClubs = clubsContext.getUserClubs()
+  const adminClubs = clubsContext.getAdminClubs()
+  const ensureClubForum = clubsContext.ensureClubForum
 
   // Organize forums by type
+  const orgForums = forums.filter(f => f.type === 'org') // Use org forums from unified context
   const classForums = forums.filter(f => f.type === 'class')
-  const publicForums = forums.filter(f => f.type === 'campus' || f.type === 'public')
-  const privateForums = forums.filter(f => f.type === 'private')
-  const clubForums = adminClubs.map(club => ({
-    name: `${club.name} Forum`,
-    clubId: club.id,
-    forumId: club.forumId,
-  }))
+  const publicForums = [...forums.filter(f => f.type === 'campus' || f.type === 'public'), ...orgForums.filter(f => f.is_public)]
+  const privateForums = [...forums.filter(f => f.type === 'private'), ...orgForums.filter(f => !f.is_public)]
+
+  // console.log('DrawerContent - User clubs:', userClubs.length, userClubs.map(c => ({ id: c.id, name: c.name })))
+  // console.log('DrawerContent - Admin clubs:', adminClubs.length, adminClubs.map(c => ({ id: c.id, name: c.name })))
+  // console.log('DrawerContent - Forums from unified context:', forums.length, forums.map(f => ({ id: f.id, name: f.name, type: f.type, is_public: f.is_public, avatar: f.avatar })))
+  // console.log('DrawerContent - Org forums:', orgForums.length, orgForums.map(f => ({ id: f.id, name: f.name, type: f.type, is_public: f.is_public, avatar: f.avatar })))
+  // console.log('DrawerContent - Public forums:', publicForums.length, publicForums.map(f => ({ id: f.id, name: f.name, type: f.type, is_public: f.is_public, avatar: f.avatar })))
+  // console.log('DrawerContent - Private forums:', privateForums.length, privateForums.map(f => ({ id: f.id, name: f.name, type: f.type, is_public: f.is_public, avatar: f.avatar })))
 
   const [classesExpanded, setClassesExpanded] = React.useState(true)
   const [publicExpanded, setPublicExpanded] = React.useState(true)
   const [privateExpanded, setPrivateExpanded] = React.useState(true)
 
+  // Helper to get specialized icons for classes based on major/prefix
+  const getModuleIcon = (forum: { code?: string; name?: string }) => {
+    const code = (forum.code || forum.name || '').toUpperCase()
+
+    // Group 1: Technology & Computer Science
+    if (code.startsWith('CSC') || code.startsWith('CIS') || code.startsWith('IST') || code.startsWith('SWE') || code.startsWith('ITE') || code.includes('COMP')) {
+      return { name: 'code-slash-outline', color: '#0EA5E9', label: 'TECH' }
+    }
+
+    // Group 2: Science, Math & Engineering
+    if (code.startsWith('MAT') || code.startsWith('MTH') || code.startsWith('PHY') || code.startsWith('CHM') || code.startsWith('STA') || code.startsWith('ENGR') || code.startsWith('EGR')) {
+      return { name: 'flask-outline', color: '#10B981', label: 'STEM' }
+    }
+
+    // Group 3: Business, Economics & Finance
+    if (code.startsWith('ACC') || code.startsWith('ECN') || code.startsWith('BUS') || code.startsWith('MKT') || code.startsWith('FIN') || code.startsWith('MBA')) {
+      return { name: 'stats-chart-outline', color: '#F59E0B', label: 'BIZ' }
+    }
+
+    // Group 4: Humanities, Arts & Languages
+    if (code.startsWith('ART') || code.startsWith('MUS') || code.startsWith('HIS') || code.startsWith('PHL') || code.startsWith('LAN') || code.startsWith('ENG') || code.startsWith('SPA') || code.startsWith('FRE')) {
+      return { name: 'color-palette-outline', color: '#EC4899', label: 'ARTS' }
+    }
+
+    // Group 5: Biological & Health Sciences
+    if (code.startsWith('BIO') || code.startsWith('NUR') || code.startsWith('KIN') || code.startsWith('HSC') || code.startsWith('MED') || code.startsWith('PHM')) {
+      return { name: 'medical-outline', color: '#EF4444', label: 'BIO' }
+    }
+
+    // Group 6: Social Sciences & Communication
+    if (code.startsWith('PSY') || code.startsWith('SOC') || code.startsWith('POL') || code.startsWith('COM') || code.startsWith('LAW') || code.startsWith('EDU')) {
+      return { name: 'people-outline', color: '#8B5CF6', label: 'SOC' }
+    }
+
+    // Default: General School
+    return { name: 'school-outline', color: theme.colors.textSecondary, label: 'CLASS' }
+  }
+
   // Get user profile data with actual avatar
   const { data: userProfileData } = useCurrentUserProfile()
+  const { data: profileViewersCount = 0 } = useProfileViewersCount(user?.id)
   const userProfile = {
     name: userProfileData?.full_name || userProfileData?.name || user?.email?.split('@')[0] || 'User',
     headline: userProfileData?.email || user?.email || '',
-    location: userProfileData?.university?.name || 'University of Rhode Island',
-    avatar: userProfileData?.avatar_url || null,
-    profileViewers: 0,
+    location: userProfileData?.university?.name || userProfileData?.university || 'University of Rhode Island',
+    avatar: userProfileData?.avatarUrl || null,
+    profileViewers: profileViewersCount,
     socialLinks: null,
   }
 
@@ -410,18 +448,38 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               marginBottom: hp(0.5),
             }}
             activeOpacity={0.7}
-            onPress={() => onNavigate('/forum')}
+            onPress={() => {
+              const mainForum = forums.find(f => f.type === 'main') || forums.find(f => f.type === 'campus')
+              if (mainForum) {
+                switchToForum(mainForum.id)
+              }
+              onNavigate('/forum')
+            }}
           >
-            <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800' }}
+            <View
               style={{
                 width: hp(3.5),
                 height: hp(3.5),
-                borderRadius: hp(1.75),
+                borderRadius: hp(1),
+                backgroundColor: theme.colors.bondedPurple,
                 marginRight: wp(3),
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
               }}
-              resizeMode="cover"
-            />
+            >
+              <Image
+                source={{ uri: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800' }}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                }}
+                resizeMode="cover"
+              />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(107, 70, 193, 0.4)', alignItems: 'center', justifyContent: 'center' }]}>
+                <Ionicons name="planet" size={hp(2.2)} color="#FFF" />
+              </View>
+            </View>
             <Text
               style={{
                 fontSize: hp(1.8),
@@ -498,26 +556,33 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   marginBottom: hp(0.3),
                 }}
               >
-                {/* Class Icon */}
+                {/* Dynamic Class Icon based on Department */}
                 <View
                   style={{
-                    width: hp(3),
-                    height: hp(3),
-                    borderRadius: hp(1.5),
-                    backgroundColor: theme.colors.backgroundSecondary,
+                    width: hp(3.4),
+                    height: hp(3.4),
+                    borderRadius: hp(1.7),
+                    backgroundColor: getModuleIcon(forum).color + '15', // Subtle tinted background
                     marginRight: wp(2),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="school-outline" size={hp(1.5)} color={theme.colors.textSecondary} />
+                  <Ionicons
+                    name={getModuleIcon(forum).name as any}
+                    size={hp(1.8)}
+                    color={getModuleIcon(forum).color}
+                  />
                 </View>
 
                 {/* Class Name - Navigate to Forum */}
                 <TouchableOpacity
                   style={{ flex: 1 }}
                   activeOpacity={0.7}
-                  onPress={() => onNavigate(`/forum?forumId=${forum.id}`)}
+                  onPress={() => {
+                    switchToForum(forum.id)
+                    onNavigate('/forum')
+                  }}
                 >
                   <Text
                     style={{
@@ -540,7 +605,10 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                     marginLeft: wp(1),
                   }}
                   activeOpacity={0.7}
-                  onPress={() => onNavigate(`/forum?forumId=${forum.id}`)}
+                  onPress={() => {
+                    switchToForum(forum.id)
+                    onNavigate('/forum')
+                  }}
                 >
                   <Ionicons name="chatbubbles-outline" size={hp(1.8)} color={theme.colors.bondedPurple} />
                 </TouchableOpacity>
@@ -624,46 +692,74 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   marginBottom: hp(0.3),
                 }}
                 activeOpacity={0.7}
-                onPress={() => onNavigate('/forum')}
+                onPress={() => {
+                  if (forum.type === 'org') {
+                    switchToForum(forum.id)
+                    onNavigate('/forum')
+                  } else {
+                    onNavigate('/forum')
+                  }
+                }}
               >
-                {forum.image ? (
-                  <Image
-                    source={{ uri: forum.image }}
+                {/* Show organization logo, forum image, or generated initial */}
+                {forum.image || forum.logo_url || forum.avatar || forum.avatar_url ? (
+                  <View
                     style={{
-                      width: hp(3),
-                      height: hp(3),
-                      borderRadius: hp(1.5),
+                      width: hp(3.2),
+                      height: hp(3.2),
+                      borderRadius: hp(1),
                       marginRight: wp(2),
+                      overflow: 'hidden',
+                      backgroundColor: theme.colors.backgroundSecondary
                     }}
-                    resizeMode="cover"
-                  />
+                  >
+                    <Image
+                      source={{ uri: forum.image || forum.logo_url || forum.avatar || forum.avatar_url }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </View>
                 ) : (
                   <View
                     style={{
-                      width: hp(3),
-                      height: hp(3),
-                      borderRadius: hp(1.5),
+                      width: hp(3.2),
+                      height: hp(3.2),
+                      borderRadius: hp(1),
                       backgroundColor: theme.colors.backgroundSecondary,
                       marginRight: wp(2),
                       alignItems: 'center',
                       justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: theme.colors.border
                     }}
                   >
-                    <Ionicons name="people-outline" size={hp(1.5)} color={theme.colors.textSecondary} />
+                    <Text
+                      style={{
+                        fontSize: hp(1.6),
+                        color: theme.colors.bondedPurple,
+                        fontFamily: theme.typography.fontFamily.heading,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {forum.name?.charAt(0).toUpperCase() || 'F'}
+                    </Text>
                   </View>
                 )}
                 <Text
                   style={{
                     fontSize: hp(1.6),
-                    color: theme.colors.textSecondary,
+                    color: theme.colors.textPrimary,
                     fontFamily: theme.typography.fontFamily.body,
-                    opacity: 0.85,
+                    fontWeight: '500',
+                    flex: 1,
                   }}
+                  numberOfLines={1}
                 >
                   {forum.name}
                 </Text>
               </TouchableOpacity>
             ))}
+
 
           {/* Private forums (expandable) */}
           <TouchableOpacity
@@ -732,32 +828,54 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                     marginBottom: hp(0.3),
                   }}
                   activeOpacity={0.7}
-                  onPress={() => onNavigate(`/forum?forumId=${forum.id}`)}
+                  onPress={() => {
+                    switchToForum(forum.id)
+                    onNavigate('/forum')
+                  }}
                 >
-                  {forum.image ? (
-                    <Image
-                      source={{ uri: forum.image }}
+                  {/* Show organization logo for org forums, lock icon for others */}
+                  {/* Forum Image with Fallback */}
+                  {forum.image || forum.logo_url || forum.avatar || forum.avatar_url ? (
+                    <View
                       style={{
-                        width: hp(3),
-                        height: hp(3),
-                        borderRadius: hp(1.5),
+                        width: hp(3.2),
+                        height: hp(3.2),
+                        borderRadius: hp(1),
                         marginRight: wp(2),
+                        overflow: 'hidden',
+                        backgroundColor: theme.colors.backgroundSecondary
                       }}
-                      resizeMode="cover"
-                    />
+                    >
+                      <Image
+                        source={{ uri: forum.image || forum.logo_url || forum.avatar || forum.avatar_url }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </View>
                   ) : (
                     <View
                       style={{
-                        width: hp(3),
-                        height: hp(3),
-                        borderRadius: hp(1.5),
+                        width: hp(3.2),
+                        height: hp(3.2),
+                        borderRadius: hp(1),
                         backgroundColor: theme.colors.backgroundSecondary,
                         marginRight: wp(2),
                         alignItems: 'center',
                         justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: theme.colors.border
                       }}
                     >
-                      <Ionicons name="lock-closed-outline" size={hp(1.5)} color={theme.colors.textSecondary} />
+                      <Text
+                        style={{
+                          fontSize: hp(1.6),
+                          color: theme.colors.bondedPurple,
+                          fontFamily: theme.typography.fontFamily.heading,
+                          fontWeight: '700',
+                        }}
+                      >
+                        {forum.name?.charAt(0).toUpperCase() || 'P'}
+                      </Text>
                     </View>
                   )}
                   <Text
@@ -766,124 +884,172 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                       color: theme.colors.textSecondary,
                       fontFamily: theme.typography.fontFamily.body,
                       opacity: 0.85,
+                      flex: 1,
                     }}
                   >
                     {forum.name}
                   </Text>
+                  {/* Action buttons for organization forums */}
+                  {forum.type === 'org' && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {/* Organization page button */}
+                      <TouchableOpacity
+                        style={{
+                          padding: wp(2),
+                          borderRadius: theme.radius.sm,
+                          marginRight: wp(1),
+                          minWidth: hp(4),
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => {
+                          onNavigate(`/clubs/${forum.org_id}`)
+                        }}
+                      >
+                        <Ionicons name="information-circle-outline" size={hp(2)} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                      {/* Message button */}
+                      <TouchableOpacity
+                        style={{
+                          padding: wp(2),
+                          borderRadius: theme.radius.sm,
+                          minWidth: hp(4),
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => {
+                          switchToForum(forum.id)
+                          onNavigate('/forum')
+                        }}
+                      >
+                        <Ionicons name="chatbubble-ellipses-outline" size={hp(2)} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {/* Message button for non-org forums */}
+                  {forum.type !== 'org' && (
+                    <TouchableOpacity
+                      style={{
+                        padding: wp(2),
+                        borderRadius: theme.radius.sm,
+                        minWidth: hp(4),
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onPress={() => {
+                        switchToForum(forum.id)
+                        onNavigate('/forum')
+                      }}
+                    >
+                      <Ionicons name="chatbubble-ellipses-outline" size={hp(2)} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
               ))}
 
-              {/* Club forums (not the clubs themselves) */}
-              {clubForums.map((clubForum) => {
-                const club = adminClubs.find(c => c.id === clubForum.clubId)
-                return (
-                  <React.Fragment key={clubForum.clubId}>
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingLeft: wp(12),
-                        paddingVertical: hp(1),
-                        paddingRight: wp(3),
-                        borderRadius: theme.radius.md,
-                        marginLeft: wp(3),
-                        marginBottom: hp(0.3),
-                      }}
-                      activeOpacity={0.7}
-                      onPress={async () => {
-                        const resolvedForumId = ensureClubForum
-                          ? await ensureClubForum(clubForum.clubId)
-                          : clubForum.forumId
-                        if (resolvedForumId) {
-                          onNavigate(`/forum?forumId=${resolvedForumId}`)
-                        }
-                      }}
-                    >
-                      {club?.avatar ? (
-                        <Image
-                          source={{ uri: club.avatar }}
+              {/* Organization forums - Only show admin organizations here since member orgs are in public/private forums */}
+              {adminClubs.length > 0 && (
+                <>
+                  <View style={{ marginTop: hp(2), marginBottom: hp(1) }}>
+                    <Text style={{
+                      fontSize: hp(1.8),
+                      color: theme.colors.textPrimary,
+                      fontFamily: theme.typography.fontFamily.body,
+                      fontWeight: '500',
+                    }}>
+                      Your Organizations
+                    </Text>
+                  </View>
+                  {adminClubs.map((club) => (
+                    <React.Fragment key={club.id}>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingLeft: wp(12),
+                          paddingVertical: hp(1),
+                          paddingRight: wp(3),
+                          borderRadius: theme.radius.md,
+                          marginLeft: wp(3),
+                          marginBottom: hp(0.3),
+                        }}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          // Navigate to organization page instead of forum
+                          onNavigate(`/clubs/${club.id}`)
+                        }}
+                      >
+                        {/* Organization Logo */}
+                        {club.avatar ? (
+                          <Image
+                            source={{ uri: club.avatar }}
+                            style={{
+                              width: hp(3),
+                              height: hp(3),
+                              borderRadius: hp(1.5),
+                              marginRight: wp(2),
+                            }}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              width: hp(3),
+                              height: hp(3),
+                              borderRadius: hp(1.5),
+                              backgroundColor: theme.colors.backgroundSecondary,
+                              marginRight: wp(2),
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: hp(1.5),
+                                color: theme.colors.accent,
+                                fontFamily: theme.typography.fontFamily.heading,
+                                fontWeight: '700',
+                              }}
+                            >
+                              {club.name?.charAt(0).toUpperCase() || 'O'}
+                            </Text>
+                          </View>
+                        )}
+                        <Text
                           style={{
-                            width: hp(3),
-                            height: hp(3),
-                            borderRadius: hp(1.5),
-                            marginRight: wp(2),
+                            fontSize: hp(1.6),
+                            color: theme.colors.textSecondary,
+                            fontFamily: theme.typography.fontFamily.body,
+                            opacity: 0.85,
+                            flex: 1,
                           }}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View
+                        >
+                          {club.name}
+                        </Text>
+                        {/* Message button */}
+                        <TouchableOpacity
                           style={{
-                            width: hp(3),
-                            height: hp(3),
-                            borderRadius: hp(1.5),
-                            backgroundColor: theme.colors.backgroundSecondary,
-                            marginRight: wp(2),
+                            padding: wp(2),
+                            borderRadius: theme.radius.sm,
+                            minWidth: hp(4),
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
+                          onPress={() => {
+                            const forumId = club.forumId
+                            if (forumId) {
+                              switchToForum(forumId)
+                              onNavigate('/forum')
+                            }
+                          }}
                         >
-                          <Text
-                            style={{
-                              fontSize: hp(1.5),
-                              color: theme.colors.accent,
-                              fontFamily: theme.typography.fontFamily.heading,
-                              fontWeight: '700',
-                            }}
-                          >
-                            {club?.name?.charAt(0).toUpperCase() || 'C'}
-                          </Text>
-                        </View>
-                      )}
-                      <Text
-                        style={{
-                          fontSize: hp(1.6),
-                          color: theme.colors.textSecondary,
-                          fontFamily: theme.typography.fontFamily.body,
-                          opacity: 0.85,
-                        }}
-                      >
-                        {clubForum.name}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingLeft: wp(15),
-                        paddingVertical: hp(0.6),
-                        paddingRight: wp(3),
-                        borderRadius: theme.radius.md,
-                        marginLeft: wp(3),
-                        marginBottom: hp(0.6),
-                      }}
-                      activeOpacity={0.7}
-                      onPress={async () => {
-                        const resolvedForumId = ensureClubForum
-                          ? await ensureClubForum(clubForum.clubId)
-                          : clubForum.forumId
-                        if (resolvedForumId) {
-                          onNavigate(
-                            `/chat?forumId=${resolvedForumId}&forumName=${encodeURIComponent(club?.name || clubForum.name)}&isGroupChat=true`
-                          )
-                        }
-                      }}
-                    >
-                      <Ionicons name="chatbubble-ellipses-outline" size={hp(1.5)} color={theme.colors.textSecondary} />
-                      <Text
-                        style={{
-                          fontSize: hp(1.4),
-                          color: theme.colors.textSecondary,
-                          fontFamily: theme.typography.fontFamily.body,
-                          marginLeft: wp(1.5),
-                          opacity: 0.8,
-                        }}
-                      >
-                        Open chat
-                      </Text>
-                    </TouchableOpacity>
-                  </React.Fragment>
-                )
-              })}
+                          <Ionicons name="chatbubble-ellipses-outline" size={hp(2)} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    </React.Fragment>
+                  ))}
+                </>
+              )}
             </>
           )}
         </View>
@@ -1117,8 +1283,8 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </Pressable>
+      </ScrollView >
+    </Pressable >
   )
 }
 
@@ -1288,6 +1454,7 @@ const RootLayout = () => {
           <Loading
             size={80}
             duration={1200}
+            style={{ flex: 1 }}
             fadeOut={!isLoading && !isCheckingSession}
             onFadeComplete={() => {
               if (!isCheckingSession) {
@@ -1328,13 +1495,16 @@ const RootLayout = () => {
       <View style={{ flex: 1 }}>
         <ThemeProvider>
           <QueryProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                gestureEnabled: false,
-                animation: 'none',
-              }}
-            />
+            <ProfileModalProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  gestureEnabled: false,
+                  animation: 'none',
+                }}
+              />
+              <ProfileModal />
+            </ProfileModalProvider>
           </QueryProvider>
         </ThemeProvider>
       </View>
@@ -1355,13 +1525,16 @@ const RootLayout = () => {
       <View style={{ flex: 1 }}>
         <ThemeProvider>
           <QueryProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                gestureEnabled: false,
-                animation: 'none',
-              }}
-            />
+            <ProfileModalProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  gestureEnabled: false,
+                  animation: 'none',
+                }}
+              />
+              <ProfileModal />
+            </ProfileModalProvider>
           </QueryProvider>
         </ThemeProvider>
       </View>
@@ -1376,27 +1549,32 @@ const RootLayout = () => {
           <StoriesProvider>
             <EventsProvider>
               <ClubsProvider>
-                <MessagesProvider>
-                  <DrawerLayout
-                    ref={drawerRef}
-                    drawerWidth={SCREEN_WIDTH * 0.75}
-                    drawerPosition="left"
-                    drawerType="front"
-                    edgeWidth={SCREEN_WIDTH * 0.4}
-                    drawerLockMode="unlocked"
-                    renderNavigationView={() => <DrawerContent onNavigate={navigateAndClose} />}
-                  >
-                    <Stack
-                      screenOptions={{
-                        headerShown: false,
-                        gestureEnabled: false,
-                        animation: 'none',
-                      }}
-                    />
-                  </DrawerLayout>
-                  {/* Global onboarding nudge */}
-                  <OnboardingNudge />
-                </MessagesProvider>
+                <UnifiedForumProvider>
+                  <MessagesProvider>
+                    <ProfileModalProvider>
+                      <DrawerLayout
+                        ref={drawerRef}
+                        drawerWidth={SCREEN_WIDTH * 0.75}
+                        drawerPosition="left"
+                        drawerType="front"
+                        edgeWidth={SCREEN_WIDTH * 0.4}
+                        drawerLockMode="unlocked"
+                        renderNavigationView={() => <DrawerContent onNavigate={navigateAndClose} />}
+                      >
+                        <Stack
+                          screenOptions={{
+                            headerShown: false,
+                            gestureEnabled: false,
+                            animation: 'none',
+                          }}
+                        />
+                      </DrawerLayout>
+                      {/* Global components */}
+                      <OnboardingNudge />
+                      <ProfileModal />
+                    </ProfileModalProvider>
+                  </MessagesProvider>
+                </UnifiedForumProvider>
               </ClubsProvider>
             </EventsProvider>
           </StoriesProvider>

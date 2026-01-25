@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
-import React, { useMemo, useRef, useState } from 'react'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
@@ -12,22 +12,65 @@ import { hp, wp } from '../helpers/common'
 import { createSignedUrlForPath, uploadImageToBondedMedia } from '../helpers/mediaStorage'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useFriends } from '../hooks/useFriends'
+import { useProfile, useProfilePhotos } from '../hooks/useProfiles'
 import { useUpdateProfile } from '../hooks/useUpdateProfile'
 import { useAuthStore } from '../stores/authStore'
 import { useAppTheme } from './theme'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const STABLE_EMPTY_ARRAY = []
 
 export default function Profile() {
   const router = useRouter()
+  const params = useLocalSearchParams()
   const theme = useAppTheme()
   const { user } = useAuthStore()
-  
-  // Fetch current user's profile from Supabase
-  const { data: userProfile, isLoading: profileLoading, error: profileError } = useCurrentUserProfile()
-  const { data: friends = [], isLoading: friendsLoading } = useFriends()
+
+  const targetUserId = params.userId || params.profileId || user?.id
+  const isMe = targetUserId === user?.id
+
+  // Fetch profile based on whether it's "me" or another user
+  const { data: myProfile, isLoading: myLoading, error: myError } = useCurrentUserProfile()
+  const { data: otherProfile, isLoading: otherLoading, error: otherError } = useProfile(isMe ? null : targetUserId)
+
+  // Normalized profile data
+  const userProfileRaw = isMe ? myProfile : otherProfile
+  const profileLoading = isMe ? myLoading : otherLoading
+  const profileError = isMe ? myError : otherError
+
+  // Fetch gallery photos for "other" profile (lazy loading)
+  const { data: otherPhotosData } = useProfilePhotos(isMe ? null : targetUserId)
+  const otherPhotos = otherPhotosData || STABLE_EMPTY_ARRAY
+
+  // Standardize the userProfile object for UI consistency
+  const userProfile = useMemo(() => {
+    if (!userProfileRaw) return null
+    if (isMe) return userProfileRaw
+
+    // Normalize "other" profile to match the structure from useCurrentUserProfile
+    const profile = userProfileRaw
+    const displayName = profile.full_name || profile.username || profile.email?.split('@')[0] || 'User'
+    const avatarUrl = profile.avatar_url
+    const allPhotos = [avatarUrl, ...otherPhotos].filter(Boolean).filter((url, index, self) => self.indexOf(url) === index)
+
+    return {
+      ...profile,
+      name: displayName,
+      handle: profile.username ? `@${profile.username}` : `@${profile.email?.split('@')[0] || 'user'}`,
+      location: profile.university?.name || 'University',
+      major: profile.major,
+      grade: profile.grade,
+      graduationYear: profile.graduation_year,
+      avatarUrl: avatarUrl,
+      photos: allPhotos,
+      yearbook_quote: profile.yearbook_quote || null,
+      interests: Array.isArray(profile.interests) ? profile.interests : [],
+    }
+  }, [userProfileRaw, isMe, otherPhotos])
+
+  const { data: friends = [], isLoading: friendsLoading } = useFriends(isMe ? undefined : targetUserId)
   const updateProfile = useUpdateProfile()
-  
+
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editName, setEditName] = useState('')
@@ -41,14 +84,18 @@ export default function Profile() {
   const [galleryPhotos, setGalleryPhotos] = useState([])
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
   const quoteInputRef = useRef(null)
-  
+
+  // Keep track of the last synced profile ID to prevent infinite loops
+  const lastSyncedIdRef = useRef(null)
+
   // Update edit fields when userProfile loads
-  React.useEffect(() => {
-    if (userProfile) {
+  useEffect(() => {
+    if (userProfile && userProfile.id !== lastSyncedIdRef.current) {
       setEditName(userProfile.full_name || userProfile.name || '')
       setEditQuote(userProfile.yearbook_quote || userProfile.yearbookQuote || '')
       const photos = Array.isArray(userProfile.photos) ? userProfile.photos : []
       setGalleryPhotos(photos.map((url, index) => ({ url, id: `existing-${index}` })))
+      lastSyncedIdRef.current = userProfile.id
     }
   }, [userProfile])
 
@@ -325,14 +372,16 @@ export default function Profile() {
         </View>
       </TouchableOpacity>
 
-      {/* More Options Button - Fixed */}
-      <TouchableOpacity
-        style={styles.moreButton}
-        activeOpacity={0.7}
-        onPress={() => setShowEditModal(true)}
-      >
-        <Ionicons name="ellipsis-horizontal" size={hp(2.5)} color="#fff" />
-      </TouchableOpacity>
+      {/* More Options Button - Fixed (Only for "me") */}
+      {isMe && (
+        <TouchableOpacity
+          style={styles.moreButton}
+          activeOpacity={0.7}
+          onPress={() => setShowEditModal(true)}
+        >
+          <Ionicons name="ellipsis-horizontal" size={hp(2.5)} color="#fff" />
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         style={styles.scrollView}
@@ -361,9 +410,9 @@ export default function Profile() {
                 setActivePhotoIndex(newIndex)
               }}
               renderItem={({ item }) => (
-                <Image 
-                  source={{ uri: item }} 
-                  style={styles.heroImage} 
+                <Image
+                  source={{ uri: item }}
+                  style={styles.heroImage}
                 />
               )}
             />
@@ -424,16 +473,18 @@ export default function Profile() {
           <View style={styles.quoteSection}>
             <View style={styles.quoteHeader}>
               <Text style={styles.quoteTitle}>Yearbook Quote</Text>
-              <TouchableOpacity
-                style={styles.quoteEditButton}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setShowEditModal(true)
-                  setFocusQuoteInput(true)
-                }}
-              >
-                <Text style={styles.quoteEditText}>{displayQuote ? 'Edit' : 'Add'}</Text>
-              </TouchableOpacity>
+              {isMe && (
+                <TouchableOpacity
+                  style={styles.quoteEditButton}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setShowEditModal(true)
+                    setFocusQuoteInput(true)
+                  }}
+                >
+                  <Text style={styles.quoteEditText}>{displayQuote ? 'Edit' : 'Add'}</Text>
+                </TouchableOpacity>
+              )}
             </View>
             {displayQuote ? (
               <Text style={styles.quote}>"{displayQuote}"</Text>

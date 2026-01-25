@@ -10,11 +10,9 @@
  * - id, conversation_id, sender_id, content, created_at
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { Alert } from 'react-native'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
-import { moderateMessage as moderateMessageService } from '../services/messageModeration'
 
 const MessagesContext = createContext()
 
@@ -33,6 +31,7 @@ export const MessagesProvider = ({ children }) => {
   const typingTimeoutsRef = useRef({})
   const subscriptionTimeoutsRef = useRef({})
   const presenceChannelRef = useRef(null)
+  const senderProfilesRef = useRef({})
 
   // Check if string is a valid UUID
   const isValidUUID = (str) => {
@@ -42,10 +41,10 @@ export const MessagesProvider = ({ children }) => {
 
   // Check if Supabase table exists (for graceful fallback)
   const isTableNotFoundError = (error) => {
-    return error?.code === 'PGRST205' || 
-           error?.code === '42P01' ||
-           error?.message?.includes('Could not find the table') ||
-           error?.message?.includes('relation') && error?.message?.includes('does not exist')
+    return error?.code === 'PGRST205' ||
+      error?.code === '42P01' ||
+      error?.message?.includes('Could not find the table') ||
+      error?.message?.includes('relation') && error?.message?.includes('does not exist')
   }
 
   const isPolicyRecursionError = (error) => {
@@ -68,6 +67,7 @@ export const MessagesProvider = ({ children }) => {
         .from('conversation_participants')
         .select(`
           conversation_id,
+          last_read_at,
           conversation:conversations (
             id,
             name,
@@ -95,57 +95,100 @@ export const MessagesProvider = ({ children }) => {
         throw error
       }
 
+      const conversationIds = (data || []).map(item => item.conversation_id).filter(Boolean)
+
+      let participantsByConversation = {}
+      if (conversationIds.length) {
+        const { data: participantsData, error: participantsError } = await supabase
+          .from('conversation_participants')
+          .select(`
+            conversation_id,
+            user_id,
+            profile:profiles (
+              id,
+              full_name,
+              username,
+              avatar_url
+            )
+          `)
+          .in('conversation_id', conversationIds)
+          .neq('user_id', user.id)
+
+        if (participantsError) {
+          console.warn('Error loading conversation participants:', participantsError)
+        } else {
+          participantsByConversation = (participantsData || []).reduce((acc, row) => {
+            if (!acc[row.conversation_id]) acc[row.conversation_id] = []
+            if (row.profile) acc[row.conversation_id].push(row.profile)
+            return acc
+          }, {})
+        }
+      }
+
+      let lastMessageByConversation = {}
+      if (conversationIds.length) {
+        const limit = Math.max(conversationIds.length * 3, 20)
+        const { data: recentMessages, error: recentMessagesError } = await supabase
+          .from('messages')
+          .select('conversation_id, content, created_at, sender_id')
+          .in('conversation_id', conversationIds)
+          .order('created_at', { ascending: false })
+          .limit(limit)
+
+        if (recentMessagesError) {
+          console.warn('Error loading recent messages:', recentMessagesError)
+        } else {
+          (recentMessages || []).forEach((msg) => {
+            if (!lastMessageByConversation[msg.conversation_id]) {
+              lastMessageByConversation[msg.conversation_id] = msg
+            }
+          })
+        }
+      }
+
       // Get last message and other participants for each conversation
       const conversationsWithDetails = await Promise.all(
         (data || []).map(async (item) => {
           const conv = item.conversation
 
-          // Get last message
-          const { data: lastMsg } = await supabase
-            .from('messages')
-            .select('content, created_at, sender_id')
-            .eq('conversation_id', conv.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
+          let lastMsg = lastMessageByConversation[conv.id]
+          if (!lastMsg) {
+            const { data: fallbackLastMsg } = await supabase
+              .from('messages')
+              .select('content, created_at, sender_id')
+              .eq('conversation_id', conv.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            lastMsg = fallbackLastMsg
+          }
 
-          // Get other participants
-          const { data: participants } = await supabase
-            .from('conversation_participants')
-            .select(`
-              user_id,
-              profile:profiles (
-                id,
-                full_name,
-                username,
-                avatar_url
-              )
-            `)
-            .eq('conversation_id', conv.id)
-            .neq('user_id', user.id)
+          const participants = participantsByConversation[conv.id] || []
 
           // Get unread count
+          const lastReadAt = item.last_read_at || '1970-01-01'
           const { count: unreadCount } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
             .eq('conversation_id', conv.id)
             .neq('sender_id', user.id)
-            .gt('created_at', item.last_read_at || '1970-01-01')
+            .gt('created_at', lastReadAt)
 
           return {
             ...conv,
-            lastMessage: lastMsg?.content || null,
-            lastMessageAt: lastMsg?.created_at || conv.created_at,
-            lastMessageSenderId: lastMsg?.sender_id || null,
-            participants: (participants || []).map(p => p.profile),
-            unreadCount: unreadCount || 0,
+            last_message: lastMsg?.content || null,
+            last_message_at: lastMsg?.created_at || conv.created_at,
+            last_message_sender_id: lastMsg?.sender_id || null,
+            participants,
+            other_participant: conv.type === 'direct' ? (participants.find(p => p.id !== user.id) || participants[0]) : null,
+            unread_count: unreadCount || 0,
           }
         })
       )
 
       // Sort by last message time
-      conversationsWithDetails.sort((a, b) => 
-        new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
+      conversationsWithDetails.sort((a, b) =>
+        new Date(b.last_message_at) - new Date(a.last_message_at)
       )
 
       setConversations(conversationsWithDetails)
@@ -157,7 +200,7 @@ export const MessagesProvider = ({ children }) => {
   }, [user?.id])
 
   // Get or create 1-on-1 conversation
-  const getOrCreateConversation = async (otherUserId) => {
+  const getOrCreateConversation = useCallback(async (otherUserId) => {
     if (!user?.id) throw new Error('User must be authenticated')
     if (!otherUserId) throw new Error('Other user ID is required')
 
@@ -195,13 +238,13 @@ export const MessagesProvider = ({ children }) => {
 
       if (participantError) throw participantError
 
-      // Reload conversations
-      await loadConversations()
+      // Reload conversations in background
+      loadConversations()
 
       return newConv.id
     } catch (error) {
       console.error('Error getting/creating conversation:', error)
-      
+
       // Fallback for when tables don't exist
       if (isTableNotFoundError(error)) {
         return `local-conv-${user.id}-${otherUserId}`
@@ -210,13 +253,13 @@ export const MessagesProvider = ({ children }) => {
       if (isPolicyRecursionError(error)) {
         return `local-conv-${user.id}-${otherUserId}`
       }
-      
+
       throw error
     }
-  }
+  }, [user?.id, loadConversations])
 
   // Create group conversation
-  const createGroupConversation = async (participantIds, name) => {
+  const createGroupConversation = useCallback(async (participantIds, name) => {
     if (!user?.id) throw new Error('User must be authenticated')
     if (!participantIds?.length) throw new Error('Participant IDs are required')
 
@@ -255,7 +298,7 @@ export const MessagesProvider = ({ children }) => {
       console.error('Error creating group conversation:', error)
       throw error
     }
-  }
+  }, [user?.id, loadConversations])
 
   // ============================================================================
   // MESSAGES
@@ -304,9 +347,6 @@ export const MessagesProvider = ({ children }) => {
         ...prev,
         [conversationId]: sortedMessages,
       }))
-
-      // Subscribe to real-time updates for this conversation
-      subscribeToMessages(conversationId)
     } catch (error) {
       console.error('Error loading messages:', error)
       setMessages(prev => ({
@@ -351,36 +391,25 @@ export const MessagesProvider = ({ children }) => {
       ...prev,
       [conversationId]: sortedMessages,
     }))
-  }, [realtimeDisabled, startPollingMessages])
+  }, [])
 
   const startPollingMessages = useCallback((conversationId) => {
     if (pollingIntervalsRef.current[conversationId]) return
     fetchMessagesSnapshot(conversationId)
     pollingIntervalsRef.current[conversationId] = setInterval(() => {
       fetchMessagesSnapshot(conversationId)
-    }, 4000)
+    }, 6000) // Slightly slower polling to save bandwidth
   }, [fetchMessagesSnapshot])
 
   // Send a message
-  const sendMessage = async (conversationId, content, metadata = null) => {
+  const sendMessage = useCallback(async (conversationId, content, metadata = null) => {
     if (!user?.id) throw new Error('User must be authenticated')
     if (!conversationId) throw new Error('Conversation ID is required')
     // Allow empty content if metadata contains image
     if (!content?.trim() && !metadata?.imageUrl) throw new Error('Message content or image is required')
 
     try {
-      // AI Moderation check (if enabled)
-      try {
-        const moderationResult = await moderateMessageService(content)
-        if (!moderationResult.allowed) {
-          Alert.alert('Message Blocked', moderationResult.reason || 'Your message contains inappropriate content.')
-          return null
-        }
-      } catch (modError) {
-        console.warn('Moderation check failed, proceeding:', modError)
-      }
-
-      // Handle local/fallback conversations
+      // Handle local/fallback conversations (non-UUIDs)
       if (!isValidUUID(conversationId)) {
         const localMessage = {
           id: `msg-${Date.now()}`,
@@ -401,7 +430,7 @@ export const MessagesProvider = ({ children }) => {
         return localMessage
       }
 
-      // Insert message to Supabase
+      // Insertion into Supabase
       const messageData = {
         conversation_id: conversationId,
         sender_id: user.id,
@@ -437,24 +466,34 @@ export const MessagesProvider = ({ children }) => {
         throw error
       }
 
-      console.log('✅ Message sent:', data.id)
+      // console.log('✅ Message sent:', data.id)
 
-      // Don't add to local state here - let real-time subscription handle it
-      // This prevents duplicates when message is sent and then received via real-time
-      // The real-time subscription will add it immediately anyway
+      // Add to local state immediately to ensure smooth UX
+      // The real-time listener will also try to add it, but we handle duplicates there
+      setMessages(prev => {
+        const existing = prev[conversationId] || []
+        if (existing.find(m => m.id === data.id)) return prev
+        return {
+          ...prev,
+          [conversationId]: [...existing, data],
+        }
+      })
 
-      // Update conversation's updated_at
-      await supabase
+      // Update conversation's updated_at (failure here is non-critical)
+      supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', conversationId)
+        .then(({ error }) => {
+          if (error) console.warn('Non-critical: Failed to update conversation timestamp:', error)
+        })
 
       return data
     } catch (error) {
       console.error('Error sending message:', error)
       throw error
     }
-  }
+  }, [user?.id, user?.user_metadata])
 
   // ============================================================================
   // REAL-TIME SUBSCRIPTIONS (Postgres Changes)
@@ -474,7 +513,7 @@ export const MessagesProvider = ({ children }) => {
 
     // Unsubscribe if already subscribed
     if (subscriptionsRef.current[conversationId]) {
-      console.log('🧹 Unsubscribing from existing channel for:', conversationId)
+      // console.log('🧹 Unsubscribing from existing channel for:', conversationId)
       subscriptionsRef.current[conversationId].unsubscribe()
       delete subscriptionsRef.current[conversationId]
     }
@@ -483,7 +522,7 @@ export const MessagesProvider = ({ children }) => {
       delete pollingIntervalsRef.current[conversationId]
     }
 
-    console.log('📡 Setting up real-time subscription for conversation:', conversationId)
+    // console.log('📡 Setting up real-time subscription for conversation:', conversationId)
 
     let isSubscribed = false
     const timeoutId = setTimeout(() => {
@@ -519,7 +558,7 @@ export const MessagesProvider = ({ children }) => {
             return
           }
 
-          console.log('📬 Real-time message change:', payload.eventType, newMessage.id)
+          // console.log('📬 Real-time message change:', payload.eventType, newMessage.id)
 
           // Parse metadata if it's a string (JSONB from database)
           let parsedMetadata = newMessage.metadata
@@ -534,14 +573,22 @@ export const MessagesProvider = ({ children }) => {
 
           if (payload.eventType === 'INSERT') {
             // Fetch sender details for new messages
-            const { data: sender, error: senderError } = await supabase
-              .from('profiles')
-              .select('id, full_name, username, avatar_url')
-              .eq('id', newMessage.sender_id)
-              .single()
+            let sender = senderProfilesRef.current[newMessage.sender_id]
+            if (!sender) {
+              const { data: senderData, error: senderError } = await supabase
+                .from('profiles')
+                .select('id, full_name, username, avatar_url')
+                .eq('id', newMessage.sender_id)
+                .single()
 
-            if (senderError) {
-              console.error('Error fetching sender:', senderError)
+              if (senderError) {
+                console.error('Error fetching sender:', senderError)
+              } else {
+                sender = senderData
+                if (sender) {
+                  senderProfilesRef.current[newMessage.sender_id] = sender
+                }
+              }
             }
 
             const messageWithSender = {
@@ -554,13 +601,13 @@ export const MessagesProvider = ({ children }) => {
                 avatar_url: null,
               },
             }
-            
-            console.log('📬 Real-time message with metadata:', {
-              id: messageWithSender.id,
-              hasImage: parsedMetadata?.type === 'image',
-              imageUrl: parsedMetadata?.imageUrl,
-              imagePath: parsedMetadata?.imagePath,
-            })
+
+            // console.log('📬 Real-time message with metadata:', {
+            //   id: messageWithSender.id,
+            //   hasImage: parsedMetadata?.type === 'image',
+            //   imageUrl: parsedMetadata?.imageUrl,
+            //   imagePath: parsedMetadata?.imagePath,
+            // })
 
             setMessages(prev => {
               const existing = prev[conversationId] || []
@@ -569,7 +616,7 @@ export const MessagesProvider = ({ children }) => {
                 console.log('⚠️ Duplicate message ignored:', newMessage.id)
                 return prev
               }
-              console.log('✅ Adding new message to state:', newMessage.id)
+              // console.log('✅ Adding new message to state:', newMessage.id)
               return {
                 ...prev,
                 [conversationId]: [...existing, messageWithSender],
@@ -599,7 +646,7 @@ export const MessagesProvider = ({ children }) => {
               const updatedArray = [...existing]
               updatedArray[index] = updatedMessage
 
-              console.log('🔄 Updated message in state (e.g., unsent):', newMessage.id)
+              // console.log('🔄 Updated message in state (e.g., unsent):', newMessage.id)
 
               return {
                 ...prev,
@@ -610,14 +657,14 @@ export const MessagesProvider = ({ children }) => {
         }
       )
       .subscribe((status, err) => {
-        console.log('📡 Message subscription status:', status, 'for conversation:', conversationId)
+        // console.log('📡 Message subscription status:', status, 'for conversation:', conversationId)
         if (status === 'SUBSCRIBED') {
           isSubscribed = true
           if (subscriptionTimeoutsRef.current[conversationId]) {
             clearTimeout(subscriptionTimeoutsRef.current[conversationId])
             delete subscriptionTimeoutsRef.current[conversationId]
           }
-          console.log('✅ Successfully subscribed to messages for conversation:', conversationId)
+          // console.log('✅ Successfully subscribed to messages for conversation:', conversationId)
         } else if (status === 'CHANNEL_ERROR') {
           if (subscriptionTimeoutsRef.current[conversationId]) {
             clearTimeout(subscriptionTimeoutsRef.current[conversationId])
@@ -650,12 +697,12 @@ export const MessagesProvider = ({ children }) => {
           setRealtimeDisabled(true)
           startPollingMessages(conversationId)
         } else if (status === 'CLOSED') {
-          console.log('🔒 Message subscription closed for conversation:', conversationId)
+          // console.log('🔒 Message subscription closed for conversation:', conversationId)
         }
       })
 
     subscriptionsRef.current[conversationId] = channel
-    console.log('📡 Subscribed to messages for conversation:', conversationId)
+    // console.log('📡 Subscribed to messages for conversation:', conversationId)
   }, [startPollingMessages])
 
   const unsubscribeFromMessages = useCallback((conversationId) => {
@@ -683,7 +730,7 @@ export const MessagesProvider = ({ children }) => {
     if (!user?.id || !isValidUUID(conversationId)) return
 
     const channel = supabase.channel(`typing:${conversationId}`)
-    
+
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         channel.send({
@@ -706,7 +753,7 @@ export const MessagesProvider = ({ children }) => {
     if (!user?.id || !isValidUUID(conversationId)) return
 
     const channelName = `typing:${conversationId}`
-    
+
     // Avoid duplicate subscriptions
     if (subscriptionsRef.current[`typing-${conversationId}`]) {
       return
@@ -748,7 +795,7 @@ export const MessagesProvider = ({ children }) => {
       .subscribe()
 
     subscriptionsRef.current[`typing-${conversationId}`] = channel
-    console.log('📡 Subscribed to typing for conversation:', conversationId)
+    // console.log('📡 Subscribed to typing for conversation:', conversationId)
   }, [user?.id])
 
   // Check if someone is typing in a conversation
@@ -819,7 +866,7 @@ export const MessagesProvider = ({ children }) => {
   // MARK AS READ
   // ============================================================================
 
-  const markAsRead = async (conversationId) => {
+  const markAsRead = useCallback(async (conversationId) => {
     if (!user?.id || !isValidUUID(conversationId)) return
 
     try {
@@ -830,23 +877,23 @@ export const MessagesProvider = ({ children }) => {
         .eq('user_id', user.id)
 
       // Update local unread count
-      setConversations(prev => 
-        prev.map(conv => 
-          conv.id === conversationId 
-            ? { ...conv, unreadCount: 0 }
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === conversationId
+            ? { ...conv, unread_count: 0 }
             : conv
         )
       )
     } catch (error) {
       console.error('Error marking as read:', error)
     }
-  }
+  }, [user?.id])
 
   // ============================================================================
   // UNSEND MESSAGE (Instagram-style: delete for everyone)
   // ============================================================================
 
-  const unsendMessage = async (messageId) => {
+  const unsendMessage = useCallback(async (messageId) => {
     if (!user?.id || !messageId) {
       throw new Error('User must be authenticated and message ID is required')
     }
@@ -883,18 +930,18 @@ export const MessagesProvider = ({ children }) => {
         const convId = data.conversation_id
         const convMessages = updated[convId] || []
 
-        updated[convId] = convMessages.map(msg => 
+        updated[convId] = convMessages.map(msg =>
           msg.id === data.id
             ? {
-                ...msg,
-                content: '',
-                metadata: {
-                  ...(msg.metadata || {}),
-                  unsent: true,
-                  unsent_by: user.id,
-                  unsent_at: unsentAt,
-                },
-              }
+              ...msg,
+              content: '',
+              metadata: {
+                ...(msg.metadata || {}),
+                unsent: true,
+                unsent_by: user.id,
+                unsent_at: unsentAt,
+              },
+            }
             : msg
         )
 
@@ -909,7 +956,7 @@ export const MessagesProvider = ({ children }) => {
       console.error('Error unsending message:', error)
       throw error
     }
-  }
+  }, [user?.id, loadConversations])
 
   // ============================================================================
   // CLEANUP
@@ -923,10 +970,10 @@ export const MessagesProvider = ({ children }) => {
       })
 
       Object.values(pollingIntervalsRef.current).forEach(clearInterval)
-      
+
       // Cleanup typing timeouts
       Object.values(typingTimeoutsRef.current).forEach(clearTimeout)
-      
+
       // Cleanup presence
       if (presenceChannelRef.current?.unsubscribe) {
         presenceChannelRef.current.unsubscribe()
@@ -941,38 +988,44 @@ export const MessagesProvider = ({ children }) => {
     }
   }, [user?.id, loadConversations])
 
+  const contextValue = useMemo(() => ({
+    // State
+    conversations,
+    messages,
+    isLoading,
+
+    // Conversations
+    loadConversations,
+    getOrCreateConversation,
+    createGroupConversation,
+
+    // Messages
+    loadMessages,
+    sendMessage,
+    unsendMessage,
+    markAsRead,
+
+    // Real-time
+    subscribeToMessages,
+    unsubscribeFromMessages,
+    subscribeToTyping,
+    sendTypingIndicator,
+
+    // Status
+    isTyping,
+    getTypingUsers,
+    isUserOnline,
+    realtimeDisabled,
+  }), [
+    conversations, messages, isLoading,
+    loadConversations, getOrCreateConversation, createGroupConversation,
+    loadMessages, sendMessage, unsendMessage, markAsRead,
+    subscribeToMessages, unsubscribeFromMessages, subscribeToTyping, sendTypingIndicator,
+    isTyping, getTypingUsers, isUserOnline, realtimeDisabled
+  ])
+
   return (
-    <MessagesContext.Provider
-      value={{
-        // State
-        conversations,
-        messages,
-        isLoading,
-        
-        // Conversations
-        loadConversations,
-        getOrCreateConversation,
-        createGroupConversation,
-        
-        // Messages
-        loadMessages,
-        sendMessage,
-        unsendMessage,
-        markAsRead,
-        
-        // Real-time
-        subscribeToMessages,
-        unsubscribeFromMessages,
-        subscribeToTyping,
-        sendTypingIndicator,
-        
-        // Status
-        isTyping,
-        getTypingUsers,
-        isUserOnline,
-        realtimeDisabled,
-      }}
-    >
+    <MessagesContext.Provider value={contextValue}>
       {children}
     </MessagesContext.Provider>
   )

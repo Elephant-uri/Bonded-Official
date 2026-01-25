@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -28,8 +27,8 @@ import BottomNav from '../components/BottomNav'
 import AnonymousMessageButton from '../components/Forum/AnonymousMessageButton'
 import ForumPostDetail from '../components/Forum/ForumPostDetail'
 import PollRenderer from '../components/Forum/PollRenderer'
-import PostTags from '../components/Forum/PostTags'
-import RepostModal from '../components/Forum/RepostModal'
+// import PostTags from '../components/Forum/PostTags' // Removed for V1 - add back later
+// import RepostModal from '../components/Forum/RepostModal' // Removed for V1 - will add back later
 import ForumSelectorModal from '../components/ForumSelectorModal'
 import ForumSwitcher from '../components/ForumSwitcher'
 import {
@@ -42,25 +41,25 @@ import {
   MessageCircle,
   MoreHorizontal,
   Person,
-  Repeat,
+  // Repeat, // Removed for V1
   Share2,
-  Video,
+  // Video, // Removed for V1
   X
 } from '../components/Icons'
 import ShareModal from '../components/ShareModal'
 import { ForumFeedSkeleton } from '../components/SkeletonLoader'
 import StoryFlow from '../components/Stories/StoryFlow'
 import StoryViewer from '../components/Stories/StoryViewer'
-import YearbookProfileModalContent from '../components/YearbookProfileModalContent'
+import { useClubsContext } from '../contexts/ClubsContext'
+import { useProfileModal } from '../contexts/ProfileModalContext'
 import { useStoriesContext } from '../contexts/StoriesContext'
+import { useUnifiedForum } from '../contexts/UnifiedForumContext'
 import { hp, wp } from '../helpers/common'
 import { resolveMediaUrls, uploadImageToBondedMedia } from '../helpers/mediaStorage'
 import { useComments } from '../hooks/useComments'
 import { useCreatePost } from '../hooks/useCreatePost'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
-import { useForums } from '../hooks/useForums'
 import { usePost, usePosts } from '../hooks/usePosts'
-import { useProfile } from '../hooks/useProfiles'
 import { useUniversities } from '../hooks/useUniversities'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
@@ -73,136 +72,7 @@ const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const DISMISS_THRESHOLD = 150
 
-// Profile Modal with swipe-to-dismiss
-const ProfileModalWrapper = ({ activeProfile, activeProfileId, setActiveProfileId, theme, router, currentUserInterests, isLoading = false }) => {
-  const translateY = useRef(new Animated.Value(0)).current
-  const [isVisible, setIsVisible] = useState(false)
-
-  React.useEffect(() => {
-    if (activeProfileId) {
-      setIsVisible(true)
-      translateY.setValue(SCREEN_HEIGHT)
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start()
-    }
-  }, [activeProfileId])
-
-  const handleClose = useCallback(() => {
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsVisible(false)
-      setActiveProfileId(null)
-    })
-  }, [setActiveProfileId, translateY])
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only claim if clearly vertical AND downward
-        const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5
-        const isDownward = gestureState.dy > 10
-        return isVertical && isDownward
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          translateY.setValue(gestureState.dy)
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
-          handleClose()
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 65,
-            friction: 11,
-          }).start()
-        }
-      },
-    })
-  ).current
-
-  if (!activeProfileId && !isVisible) return null
-
-  const backdropOpacity = translateY.interpolate({
-    inputRange: [0, SCREEN_HEIGHT],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  })
-
-  return (
-    <Modal
-      visible={isVisible}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={handleClose}
-      presentationStyle="overFullScreen"
-    >
-      <View style={{ flex: 1 }}>
-        {/* Semi-transparent backdrop */}
-        <Animated.View
-          style={{
-            ...StyleSheet.absoluteFillObject,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            opacity: backdropOpacity,
-          }}
-        >
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={handleClose}
-          />
-        </Animated.View>
-
-        {/* Modal content container */}
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: Platform.OS === 'ios' ? hp(5) : hp(2),
-            left: 0,
-            right: 0,
-            bottom: 0,
-            transform: [{ translateY }],
-          }}
-        >
-          {isLoading || !activeProfile ? (
-            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-              <View style={{ 
-                paddingTop: hp(8), 
-                paddingHorizontal: wp(4),
-                alignItems: 'center',
-                gap: hp(2)
-              }}>
-                <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
-                <Text style={{ color: theme.colors.textSecondary, fontSize: hp(1.6) }}>Loading profile...</Text>
-              </View>
-            </View>
-          ) : (
-            <YearbookProfileModalContent
-              activeProfile={activeProfile}
-              setActiveProfile={handleClose}
-              theme={theme}
-              router={router}
-              currentUserInterests={currentUserInterests}
-              onClose={handleClose}
-              panResponder={panResponder}
-            />
-          )}
-        </Animated.View>
-      </View>
-    </Modal>
-  )
-}
+// Redundant ProfileModalWrapper removed
 
 // Instagram-style Comments Bottom Sheet
 const CommentsSheet = ({ post, onClose, theme, comments, commentSort, setCommentSort, handleCommentVote, userVotes, handleAddComment }) => {
@@ -818,34 +688,32 @@ export default function Forum() {
   const queryClient = useQueryClient()
   // Posts are now fetched from usePosts hook
   const [activePost, setActivePost] = useState(null)
-  const [commentsPost, setCommentsPost] = useState(null) // For Instagram-style comments sheet
+  const { openProfile } = useProfileModal()
   const [activeAuthorPost, setActiveAuthorPost] = useState(null)
-  const [activeProfileId, setActiveProfileId] = useState(null)
+  const [postOptionsPost, setPostOptionsPost] = useState(null)
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false)
-  const [postOptionsPost, setPostOptionsPost] = useState(null) // Post for which options menu is shown
-  const [draftTitle, setDraftTitle] = useState('')
-  const [draftBody, setDraftBody] = useState('')
-  const [draftIsAnon, setDraftIsAnon] = useState(true)
-  const [draftMedia, setDraftMedia] = useState([])
-  const [showTagSelector, setShowTagSelector] = useState(false)
-  const [showPostAsModal, setShowPostAsModal] = useState(false)
-  const [selectedTag, setSelectedTag] = useState(null)
-  // Mock: Check if user is admin (in real app, this would come from auth context)
-  const isAdmin = false
-  const [draftTags, setDraftTags] = useState([])
+  const [isRepostModalVisible, setIsRepostModalVisible] = useState(false)
+  const [repostPost, setRepostPost] = useState(null)
+  const [isCampusSelectorVisible, setIsCampusSelectorVisible] = useState(false)
   const [draftPoll, setDraftPoll] = useState(null)
   const [showPollBuilder, setShowPollBuilder] = useState(false)
   const [currentSchool, setCurrentSchool] = useState(params.schoolName || 'University of Rhode Island')
-  const [currentForum, setCurrentForum] = useState(null) // Will be set from useForums
-  // Filter state removed - no longer needed
   const [tagFilter, setTagFilter] = useState(null) // Filter by specific tag
   const [isForumSelectorVisible, setIsForumSelectorVisible] = useState(false)
-  const [showRepostModal, setShowRepostModal] = useState(false)
-  const [repostPost, setRepostPost] = useState(null)
   const [commentSort, setCommentSort] = useState('best') // 'best', 'new', 'old'
   const [polls, setPolls] = useState({}) // { postId: poll }
   const [pollVotes, setPollVotes] = useState({}) // { pollId: { userId: optionIndex } }
   const [pollResults, setPollResults] = useState({}) // { pollId: { totalVotes, voteCounts } }
+
+  // Create post draft state
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draftBody, setDraftBody] = useState('')
+  const [draftIsAnon, setDraftIsAnon] = useState(true)
+  const [draftMedia, setDraftMedia] = useState([])
+  const [draftTags, setDraftTags] = useState([])
+  const [selectedTag, setSelectedTag] = useState(null)
+  const [showPostAsModal, setShowPostAsModal] = useState(false)
+  const [showTagSelector, setShowTagSelector] = useState(false)
 
   // Story state
   const [isStoryFlowVisible, setIsStoryFlowVisible] = useState(false)
@@ -854,20 +722,33 @@ export default function Forum() {
   const [viewerStories, setViewerStories] = useState([])
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareContent, setShareContent] = useState(null)
-  const [isCampusSelectorVisible, setIsCampusSelectorVisible] = useState(false)
   const openedPostRef = useRef(null) // Track which post was opened via deep link to avoid re-opening
   const [selectedUniversityId, setSelectedUniversityId] = useState(null)
 
   const { getForumStories } = useStoriesContext()
   const { user } = useAuthStore()
+  const { isUserAdmin } = useClubsContext()
   const isSuperAdmin = isSuperAdminEmail(user?.email)
-  const { data: userProfile } = useCurrentUserProfile() // For onboarding check
-  const { data: activeProfileRaw, isLoading: profileLoading } = useProfile(activeProfileId)
-  const currentUserInterests = useMemo(() => new Set(userProfile?.interests || []), [userProfile])
 
-  // Fetch forums
-  const { data: forums = [], isLoading: forumsLoading } = useForums()
+  // Define isAdmin for the "Post As" logic
+  const isAdmin = useMemo(() => {
+    if (isSuperAdmin) return true
+    if (currentForum?.type === 'org' && currentForum?.org_id) {
+      return isUserAdmin(currentForum.org_id)
+    }
+    return false
+  }, [isSuperAdmin, currentForum, isUserAdmin])
+  const { data: userProfile } = useCurrentUserProfile() // For onboarding check
+  const currentUserInterests = useMemo(() => new Set(userProfile?.interests || []), [userProfile])
+  const headerAvatarUrl = userProfile?.avatarUrl || userProfile?.avatar_url || null
+  const headerAvatarInitial = (userProfile?.full_name || userProfile?.name || user?.email || 'U')
+    .trim()
+    .charAt(0)
+    .toUpperCase()
+
+  // Fetch universities (forums are now handled by useUnifiedForum)
   const { data: universities = [], isLoading: universitiesLoading } = useUniversities()
+  const { forums, currentForum, switchToForum, loading: forumsLoading } = useUnifiedForum()
 
   const selectedUniversity = useMemo(
     () => universities.find((u) => u.id === selectedUniversityId) || null,
@@ -876,36 +757,18 @@ export default function Forum() {
 
   const visibleForums = useMemo(() => {
     if (!isSuperAdmin || !selectedUniversityId) return forums
-    return forums.filter((forum) => forum.universityId === selectedUniversityId)
+    return forums.filter((forum) => forum.university_id === selectedUniversityId)
   }, [forums, isSuperAdmin, selectedUniversityId])
 
-  // Set default forum when forums load (only once when forums first become available)
+  // Handle forum selection from URL params
   React.useEffect(() => {
-    if (visibleForums.length > 0 && !currentForum) {
-      // Find main campus forum or use first forum
-      const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
-      if (mainForum) {
-        console.log('Setting default forum:', mainForum.name, mainForum.id)
-        setCurrentForum(mainForum)
+    if (requestedForumId && forums.length > 0) {
+      const forum = forums.find(f => f.id === requestedForumId)
+      if (forum && (!currentForum || currentForum.id !== requestedForumId)) {
+        switchToForum(requestedForumId)
       }
     }
-  }, [visibleForums]) // Removed currentForum from deps to avoid infinite loops
-
-  React.useEffect(() => {
-    if (!requestedForumId || visibleForums.length === 0) return
-    const match = visibleForums.find((forum) => forum.id === requestedForumId)
-    if (match && match.id !== currentForum?.id) {
-      setCurrentForum(match)
-    }
-  }, [requestedForumId, visibleForums, currentForum])
-
-  React.useEffect(() => {
-    if (!requestedPostRaw?.forum_id || requestedForumId || visibleForums.length === 0) return
-    const match = visibleForums.find((forum) => forum.id === requestedPostRaw.forum_id)
-    if (match && match.id !== currentForum?.id) {
-      setCurrentForum(match)
-    }
-  }, [requestedPostRaw, requestedForumId, visibleForums, currentForum])
+  }, [requestedForumId, forums, currentForum, switchToForum])
 
   // Also ensure forum is set if it becomes null (safety check)
   // Use ref to avoid infinite loop
@@ -917,7 +780,7 @@ export default function Forum() {
       const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
       if (mainForum) {
         console.log('Re-setting forum (was null):', mainForum.name, mainForum.id)
-        setCurrentForum(mainForum)
+        switchToForum(mainForum.id)
       }
     }
   }, [visibleForums])
@@ -936,11 +799,9 @@ export default function Forum() {
     const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0] || null
     const currentId = currentForumRef.current?.id
     if (mainForum && mainForum.id !== currentId) {
-      setCurrentForum(mainForum)
+      switchToForum(mainForum.id)
     }
-    if (!mainForum && currentForumRef.current) {
-      setCurrentForum(null)
-    }
+    // Note: We can't set forum to null with switchToForum, so we skip that logic
   }, [isSuperAdmin, selectedUniversityId, visibleForums])
 
   // Fetch posts for current forum with pagination
@@ -1063,28 +924,7 @@ export default function Forum() {
 
   const currentForumId = currentForum?.id || null
 
-  const activeProfile = useMemo(() => {
-    if (!activeProfileRaw) return null
-    return {
-      id: activeProfileRaw.id,
-      name: activeProfileRaw.full_name || activeProfileRaw.username || 'Anonymous',
-      email: activeProfileRaw.email,
-      age: activeProfileRaw.age,
-      grade: activeProfileRaw.grade,
-      gender: activeProfileRaw.gender,
-      major: activeProfileRaw.major || 'Undeclared',
-      year: activeProfileRaw.graduation_year?.toString() || '2025',
-      bio: activeProfileRaw.bio,
-      avatar: activeProfileRaw.avatar_url,
-      photoUrl: activeProfileRaw.avatar_url,
-      interests: Array.isArray(activeProfileRaw.interests) ? activeProfileRaw.interests : [],
-      personalityTags: Array.isArray(activeProfileRaw.personality_tags) ? activeProfileRaw.personality_tags : [],
-      university: activeProfileRaw.university?.name || 'University',
-      location: activeProfileRaw.university?.name || null,
-      quote: activeProfileRaw.bio || 'No bio yet',
-      photos: activeProfileRaw.avatar_url ? [activeProfileRaw.avatar_url] : [],
-    }
-  }, [activeProfileRaw])
+
 
   // Delete post mutation
   const deletePostMutation = useMutation({
@@ -2054,7 +1894,7 @@ export default function Forum() {
                   setActiveAuthorPost(item)
                   return
                 }
-                setActiveProfileId(item.userId)
+                openProfile(item.userId)
               }}
             >
               {item.isAnon ? (
@@ -2112,12 +1952,7 @@ export default function Forum() {
               {item.body}
             </Text>
 
-            {/* Tags */}
-            {item.tags && item.tags.length > 0 && (
-              <View style={styles.postTagsContainer}>
-                <PostTags tags={item.tags} maxDisplay={2} />
-              </View>
-            )}
+            {/* Tags - Removed for V1, will add back later */}
 
             {/* Poll */}
             {polls[item.id] && (
@@ -2237,23 +2072,7 @@ export default function Forum() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.postActionButton}
-            activeOpacity={0.7}
-            onPress={() => {
-              setRepostPost(item)
-              setShowRepostModal(true)
-            }}
-          >
-            <Repeat
-              size={hp(2)}
-              color={theme.colors.textSecondary}
-              strokeWidth={2}
-            />
-            {item.repostsCount > 0 && (
-              <Text style={styles.postActionText}>{item.repostsCount}</Text>
-            )}
-          </TouchableOpacity>
+          {/* Repost button removed for V1 - will add back later */}
 
           <TouchableOpacity
             style={styles.postActionButton}
@@ -2291,7 +2110,13 @@ export default function Forum() {
           onPress={() => router.push('/profile')}
           activeOpacity={0.6}
         >
-          <Person size={hp(2.8)} color={theme.colors.textPrimary} strokeWidth={2} />
+          {headerAvatarUrl ? (
+            <Image source={{ uri: headerAvatarUrl }} style={styles.headerAvatarImage} />
+          ) : (
+            <View style={styles.headerAvatarFallback}>
+              <Text style={styles.headerAvatarFallbackText}>{headerAvatarInitial}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
@@ -2414,7 +2239,6 @@ export default function Forum() {
             commentSort={commentSort}
             onClose={() => {
               setActivePost(null)
-              setActiveProfileId(null) // Clear profile when closing post detail
             }}
             onPostVote={handlePostReaction}
             onCommentVote={handleCommentVote}
@@ -2434,37 +2258,22 @@ export default function Forum() {
             }}
             onRepost={() => {
               setRepostPost(activePost)
-              setShowRepostModal(true)
+              setIsRepostModalVisible(true)
             }}
             onPressProfile={(userId, isAnon) => {
               if (isAnon) {
                 // Handle anonymous profile view if needed
                 return
               }
-              setActiveProfileId(userId)
+              openProfile(userId)
             }}
             theme={theme}
-            activeProfile={activeProfile}
-            activeProfileId={activeProfileId}
-            setActiveProfileId={setActiveProfileId}
             router={router}
-            currentUserInterests={currentUserInterests}
-            profileLoading={profileLoading}
           />
         </Modal>
 
         {/* Yearbook Profile Modal with swipe-to-dismiss - only show when ForumPostDetail is not open */}
-        {!activePost && (
-          <ProfileModalWrapper
-            activeProfile={activeProfile}
-            activeProfileId={activeProfileId}
-            setActiveProfileId={setActiveProfileId}
-            theme={theme}
-            router={router}
-            currentUserInterests={currentUserInterests}
-            isLoading={profileLoading}
-          />
-        )}
+
 
         {/* Author Profile Modal */}
         <Modal
@@ -2922,7 +2731,15 @@ export default function Forum() {
                 </View>
 
                 {/* Selected Tag Display - Moved above action bar */}
-                {selectedTag && (() => {
+                {!selectedTag ? (
+                  <TouchableOpacity
+                    style={styles.fizzAddTagButton}
+                    onPress={() => setShowTagSelector(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.fizzAddTagButtonText}>+ Add Tag</Text>
+                  </TouchableOpacity>
+                ) : (() => {
                   const tagColors = {
                     'QUESTION': '#5B8DEF',
                     'CONFESSION': '#FF7A8A',
@@ -2961,13 +2778,7 @@ export default function Forum() {
                     >
                       <ImageIcon size={hp(2.8)} color={theme.colors.textPrimary} strokeWidth={2} />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.fizzMediaIcon}
-                      onPress={() => handlePickMedia('video')}
-                      activeOpacity={0.7}
-                    >
-                      <Video size={hp(2.8)} color={theme.colors.textPrimary} strokeWidth={2} />
-                    </TouchableOpacity>
+                    {/* Video picker removed for V1 - will add back with proper video support later */}
                   </View>
                 </View>
                 {selectedTag && (() => {
@@ -3194,7 +3005,7 @@ export default function Forum() {
               const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
               if (mainForum) {
                 console.log('Setting forum before opening modal:', mainForum.name, mainForum.id)
-                setCurrentForum(mainForum)
+                switchToForum(mainForum.id)
               }
             }
             setIsCreateModalVisible(true)
@@ -3287,31 +3098,15 @@ export default function Forum() {
           forums={visibleForums}
           currentForumId={currentForumId}
           onSelectForum={(forum) => {
-            setCurrentForum(forum)
+            switchToForum(forum.id)
             // Filter posts by forum if needed
           }}
           onClose={() => setIsForumSelectorVisible(false)}
         />
 
-        {/* Repost Modal */}
-        <RepostModal
-          visible={showRepostModal}
-          post={repostPost}
-          onClose={() => {
-            setShowRepostModal(false)
-            setRepostPost(null)
-          }}
-          onRepost={async (repostData) => {
-            // TODO: Save repost to Supabase
-            // For now, refetch to get updated repost count
-            await refetchPosts()
-            // TODO: Save repost to backend
-            console.log('Reposting:', repostData)
-          }}
-          groups={[]} // TODO: Get user's groups
-        />
-      </View >
-    </SafeAreaView >
+        {/* Repost Modal removed for V1 - will add back later */}
+      </View>
+    </SafeAreaView>
   )
 }
 
@@ -3373,6 +3168,24 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(4.5),
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerAvatarImage: {
+    width: hp(3.8),
+    height: hp(3.8),
+    borderRadius: hp(1.9),
+  },
+  headerAvatarFallback: {
+    width: hp(3.8),
+    height: hp(3.8),
+    borderRadius: hp(1.9),
+    backgroundColor: theme.colors.bondedPurple + '33',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarFallbackText: {
+    color: theme.colors.bondedPurple,
+    fontSize: hp(1.8),
+    fontWeight: '600',
   },
   headerCenter: {
     flex: 1,

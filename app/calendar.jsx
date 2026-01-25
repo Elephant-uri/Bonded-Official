@@ -1,13 +1,15 @@
 import DateTimePicker from '@react-native-community/datetimepicker'
+import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import React, { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
+    ActivityIndicator,
     Alert,
+    Image,
     Modal,
     Platform,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -19,12 +21,17 @@ import BottomNav from '../components/BottomNav'
 import Chip from '../components/Chip'
 import ColorPicker from '../components/ColorPicker'
 import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, MapPin, Plus, Users } from '../components/Icons'
+import { useClubsContext } from '../contexts/ClubsContext'
 import { hp, wp } from '../helpers/common'
 import { getEventColor as getEventColorFromTheme } from '../helpers/themeHelpers'
-import { useEventsForUser } from '../hooks/events/useEventsForUser'
+import { useCreateEvent } from '../hooks/events/useCreateEvent'
+import { useDeleteEvent } from '../hooks/events/useDeleteEvent'
+import { useCalendarData } from '../hooks/useCalendarData'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { useFriends } from '../hooks/useFriends'
 import { useAuthStore } from '../stores/authStore'
+import { formatDate, formatDateShort, formatTime } from '../utils/dateFormatters'
 import { useAppTheme } from './theme'
-import { formatDate, formatDateShort, formatTime, formatTimeForDisplay } from '../utils/dateFormatters'
 
 const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -51,7 +58,7 @@ const MONTHS = [
 const getDaySticker = (date) => {
   const month = date.getMonth() + 1 // 1-12
   const day = date.getDate()
-  
+
   // Thanksgiving (4th Thursday of November)
   if (month === 11) {
     const firstThursday = new Date(date.getFullYear(), 10, 1)
@@ -64,31 +71,31 @@ const getDaySticker = (date) => {
       return '🦃' // Turkey for Thanksgiving
     }
   }
-  
+
   // New Year's Day
   if (month === 1 && day === 1) return '🎉'
-  
+
   // Valentine's Day
   if (month === 2 && day === 14) return '❤️'
-  
+
   // St. Patrick's Day
   if (month === 3 && day === 17) return '☘️'
-  
+
   // Easter (simplified - first Sunday after first full moon after March 21)
   // For demo, using April 9 as placeholder
-  
+
   // Independence Day
   if (month === 7 && day === 4) return '🇺🇸'
-  
+
   // Halloween
   if (month === 10 && day === 31) return '🎃'
-  
+
   // Christmas
   if (month === 12 && day === 25) return '🎄'
-  
+
   // New Year's Eve
   if (month === 12 && day === 31) return '🎊'
-  
+
   return null
 }
 
@@ -117,17 +124,29 @@ export default function Calendar() {
     personal: true,
     org: true,
     campus: true,
+    social: true, // New category for social/party events
   })
   const { user } = useAuthStore()
-  const { data: eventsData } = useEventsForUser(user?.id)
+  const { data: userProfile } = useCurrentUserProfile()
+  const { getAdminClubs } = useClubsContext()
+  const { data: friends } = useFriends()
+  const { data: calendarData, isLoading: calendarLoading } = useCalendarData(user?.id)
+
+  // Get user organizations for event creation
+  const userOrgs = getAdminClubs()
 
   const currentUserId = user?.id || 'anonymous'
 
-  // Flatten paginated data into a single array
+  // Flatten data from unified hook
   const allEvents = useMemo(() => {
-    if (!eventsData?.pages) return []
-    return eventsData.pages.flatMap((page) => page.events || [])
-  }, [eventsData])
+    if (!calendarData) return []
+    return [
+      ...(calendarData.events || []),
+      ...(calendarData.tasks || [])
+    ]
+  }, [calendarData])
+
+  const recurringClassEvents = calendarData?.recurringClassEvents || []
 
   // Filter events that should appear in calendar based on type
   const calendarEvents = useMemo(() => {
@@ -136,9 +155,9 @@ export default function Calendar() {
       console.warn('⚠️ allEvents is not an array:', allEvents)
       return []
     }
-    
+
     let filtered = allEvents
-    
+
     // Filter by visibility toggle
     filtered = filtered.filter((event) => {
       const isTask = event.type === 'task'
@@ -146,29 +165,35 @@ export default function Calendar() {
       const isPersonal = !event.org_id && event.visibility === 'invite_only'
       const isOrg = event.visibility === 'org_only' && event.org_id
       const isCampus = event.visibility === 'school' || event.visibility === 'public'
-      
+      const isSocial = event.type === 'event' && event.visibility === 'public' && !event.org_id // Social/party events
+
       if (isTask && !showEventTypes.tasks) return false
       if (isEvent && !showEventTypes.events) return false
       if (isPersonal && !showEventTypes.personal) return false
       if (isOrg && !showEventTypes.org) return false
       if (isCampus && !showEventTypes.campus) return false
-      
+      if (isSocial && !showEventTypes.social) return false
+
       return true
     })
-    
+
     // Filter by event type (if specific filter selected)
     if (eventTypeFilter === 'personal') {
-      filtered = filtered.filter((event) => 
-        event.visibility === 'invite_only' || 
+      filtered = filtered.filter((event) =>
+        event.visibility === 'invite_only' ||
         event.organizer_id === currentUserId ||
         !event.org_id // Personal events don't have org_id
       )
+    } else if (eventTypeFilter === 'social') {
+      filtered = filtered.filter((event) =>
+        event.type === 'event' && event.visibility === 'public' && !event.org_id // Social/party events only
+      )
     } else if (eventTypeFilter === 'org') {
-      filtered = filtered.filter((event) => 
+      filtered = filtered.filter((event) =>
         event.visibility === 'org_only' && event.org_id
       )
     } else if (eventTypeFilter === 'campus') {
-      filtered = filtered.filter((event) => 
+      filtered = filtered.filter((event) =>
         event.visibility === 'school' || event.visibility === 'public'
       )
     } else if (eventTypeFilter === 'tasks') {
@@ -176,13 +201,16 @@ export default function Calendar() {
     } else if (eventTypeFilter === 'events') {
       filtered = filtered.filter((event) => event.type !== 'task')
     }
-    
+
     return filtered
   }, [allEvents, eventTypeFilter, currentUserId, showEventTypes])
 
+  const getUriSemesterStartDate = (date) => new Date(date.getFullYear(), 0, 20, 0, 0, 0)
+  const getUriSemesterEndDate = (date) => new Date(date.getFullYear(), 4, 10, 23, 59, 59)
+
   // Get events for a specific date
   const getEventsForDate = (date) => {
-    return calendarEvents.filter((event) => {
+    const staticEvents = calendarEvents.filter((event) => {
       const eventDate = new Date(event.start_at)
       return (
         eventDate.getDate() === date.getDate() &&
@@ -190,6 +218,40 @@ export default function Calendar() {
         eventDate.getFullYear() === date.getFullYear()
       )
     })
+
+    const semesterStart = getUriSemesterStartDate(date)
+    const semesterEnd = getUriSemesterEndDate(date)
+    if (date < semesterStart || date > semesterEnd) {
+      return staticEvents
+    }
+
+    // Add recurring classes for this day of week
+    const dayOfWeek = date.getDay() // 0-6
+    const classesForDay = recurringClassEvents.filter(c => {
+      // dayOfWeek in JS: 0 (Sun) - 6 (Sat)
+      // We need to match what's in sections.days_of_week
+      // Let's assume days_of_week stores strings like "Monday" or indices.
+      // Typical structure in this codebase seems to be indices or full names.
+      // Based on useSaveSchedule.js: lectureComponent?.days || []
+      return c.dayOfWeek === dayOfWeek || c.dayOfWeek === DAYS_FULL[dayOfWeek]
+    }).map(c => {
+      // Inflate the recurring event with the actual date
+      const eventDate = new Date(date)
+      const [hours, minutes] = (c.start_at || '09:00').split(':').map(Number)
+      eventDate.setHours(hours, minutes, 0)
+
+      const endEventDate = new Date(date)
+      const [endHours, endMinutes] = (c.end_at || '10:00').split(':').map(Number)
+      endEventDate.setHours(endHours, endMinutes, 0)
+
+      return {
+        ...c,
+        start_at: eventDate.toISOString(),
+        end_at: endEventDate.toISOString()
+      }
+    })
+
+    return [...staticEvents, ...classesForDay]
   }
 
   // Get events for current month
@@ -306,7 +368,7 @@ export default function Calendar() {
     const selectedDayEvents = getEventsForDate(selectedDate)
 
     return (
-      <ScrollView 
+      <ScrollView
         style={styles.monthContainer}
         contentContainerStyle={styles.monthContainerContent}
         showsVerticalScrollIndicator={false}
@@ -334,33 +396,33 @@ export default function Calendar() {
                 onPress={() => setSelectedDate(date)}
                 activeOpacity={0.7}
               >
-              <View style={styles.monthDayNumberContainer}>
-                <Text
-                  style={[
-                    styles.monthDayNumber,
-                    !isCurrentMonth && styles.monthDayNumberOtherMonth,
-                    dayIsSelected && styles.monthDayNumberSelected,
-                  ]}
-                >
-                  {day}
-                </Text>
-                {/* Sticker for special days (holidays) */}
-                {(() => {
-                  const holidaySticker = getDaySticker(date)
-                  return holidaySticker ? (
-                    <Text style={styles.monthDaySticker}>{holidaySticker}</Text>
-                  ) : null
-                })()}
-                {/* Sticker from events/tasks on this day */}
-                {(() => {
-                  const dayEvents = getEventsForDate(date)
-                  const eventWithSticker = dayEvents.find(e => e.sticker)
-                  return eventWithSticker ? (
-                    <Text style={styles.monthDaySticker}>{eventWithSticker.sticker}</Text>
-                  ) : null
-                })()}
-              </View>
-              {dayEvents.length > 0 && !dayIsSelected && (
+                <View style={styles.monthDayNumberContainer}>
+                  <Text
+                    style={[
+                      styles.monthDayNumber,
+                      !isCurrentMonth && styles.monthDayNumberOtherMonth,
+                      dayIsSelected && styles.monthDayNumberSelected,
+                    ]}
+                  >
+                    {day}
+                  </Text>
+                  {/* Sticker for special days (holidays) */}
+                  {(() => {
+                    const holidaySticker = getDaySticker(date)
+                    return holidaySticker ? (
+                      <Text style={styles.monthDaySticker}>{holidaySticker}</Text>
+                    ) : null
+                  })()}
+                  {/* Sticker from events/tasks on this day */}
+                  {(() => {
+                    const dayEvents = getEventsForDate(date)
+                    const eventWithSticker = dayEvents.find(e => e.sticker)
+                    return eventWithSticker ? (
+                      <Text style={styles.monthDaySticker}>{eventWithSticker.sticker}</Text>
+                    ) : null
+                  })()}
+                </View>
+                {dayEvents.length > 0 && !dayIsSelected && (
                   <View style={styles.monthEventDots}>
                     {dayEvents.slice(0, 3).map((event, i) => (
                       <View
@@ -369,6 +431,7 @@ export default function Calendar() {
                           styles.monthEventDot,
                           { backgroundColor: getEventColorFromTheme(event, theme) },
                         ]}
+                        onLongPress={() => handleDeleteEvent(event.id, event.title || 'Event')}
                       />
                     ))}
                     {dayEvents.length > 3 && (
@@ -399,7 +462,7 @@ export default function Calendar() {
                 />
                 <View style={styles.monthEventContent}>
                   <View style={styles.monthEventHeader}>
-                  <Text style={styles.monthEventTitle}>{event.title}</Text>
+                    <Text style={styles.monthEventTitle}>{event.title}</Text>
                     <Text style={[styles.monthEventTypeBadge, { color: getEventColor(event) }]}>
                       {getEventTypeLabel(event)}
                     </Text>
@@ -475,8 +538,8 @@ export default function Calendar() {
         </View>
 
         {/* Week Timeline */}
-        <ScrollView 
-          style={styles.weekTimeline} 
+        <ScrollView
+          style={styles.weekTimeline}
           contentContainerStyle={styles.weekTimelineContent}
           showsVerticalScrollIndicator={false}
         >
@@ -550,8 +613,8 @@ export default function Calendar() {
         </View>
 
         {/* Day Timeline */}
-        <ScrollView 
-          style={styles.dayTimeline} 
+        <ScrollView
+          style={styles.dayTimeline}
           contentContainerStyle={styles.dayTimelineContent}
           showsVerticalScrollIndicator={false}
         >
@@ -572,15 +635,15 @@ export default function Calendar() {
                   {hourEvents.map((event) => {
                     const isTask = event.type === 'task'
                     return (
-                    <TouchableOpacity
-                      key={event.id}
+                      <TouchableOpacity
+                        key={event.id}
                         style={[
                           styles.dayEventItem,
                           isTask && styles.dayTaskItem,
                         ]}
-                      onPress={() => router.push(`/events/${event.id}`)}
-                      activeOpacity={0.7}
-                    >
+                        onPress={() => router.push(`/events/${event.id}`)}
+                        activeOpacity={0.7}
+                      >
                         {isTask ? (
                           <View style={styles.taskCheckbox}>
                             <View style={[
@@ -593,28 +656,28 @@ export default function Calendar() {
                             </View>
                           </View>
                         ) : (
-                      <View
-                        style={[
-                          styles.dayEventDot,
-                          { backgroundColor: getEventColorFromTheme(event, theme) },
-                        ]}
-                      />
+                          <View
+                            style={[
+                              styles.dayEventDot,
+                              { backgroundColor: getEventColorFromTheme(event, theme) },
+                            ]}
+                          />
                         )}
-                      <View style={styles.dayEventContent}>
+                        <View style={styles.dayEventContent}>
                           <Text style={[
                             styles.dayEventTitle,
                             isTask && event.completed && styles.dayTaskTitleCompleted
                           ]}>
                             {event.title}
                           </Text>
-                        <Text style={styles.dayEventTime}>
-                          {formatTime(event.start_at)}
-                        </Text>
-                      </View>
+                          <Text style={styles.dayEventTime}>
+                            {formatTime(event.start_at)}
+                          </Text>
+                        </View>
                         {event.sticker && (
                           <Text style={styles.dayEventSticker}>{event.sticker}</Text>
                         )}
-                    </TouchableOpacity>
+                      </TouchableOpacity>
                     )
                   })}
                   {hourEvents.length === 0 && <View style={styles.dayHourLine} />}
@@ -631,7 +694,7 @@ export default function Calendar() {
     // Separate tasks and events
     const events = scheduleEvents.filter(e => e.type !== 'task')
     const tasks = scheduleEvents.filter(e => e.type === 'task')
-    
+
     // Group events by date
     const eventsByDate = {}
     events.forEach(event => {
@@ -644,7 +707,7 @@ export default function Calendar() {
     })
 
     return (
-      <ScrollView 
+      <ScrollView
         style={styles.scheduleContainer}
         contentContainerStyle={styles.scheduleContent}
         showsVerticalScrollIndicator={false}
@@ -661,6 +724,7 @@ export default function Calendar() {
                 key={task.id}
                 style={styles.scheduleTaskItem}
                 onPress={() => router.push(`/events/${task.id}`)}
+                onLongPress={() => handleDeleteEvent(task.id, task.title || 'Task')}
                 activeOpacity={0.7}
               >
                 <View style={styles.taskCheckbox}>
@@ -699,7 +763,7 @@ export default function Calendar() {
           const [year, month, day] = dateKey.split('-').map(Number)
           const date = new Date(year, month, day)
           const dateEvents = eventsByDate[dateKey]
-          
+
           return (
             <View key={dateKey} style={styles.scheduleDateSection}>
               <View style={styles.scheduleDateHeader}>
@@ -710,14 +774,14 @@ export default function Calendar() {
                   {dateEvents.length} {dateEvents.length === 1 ? 'event' : 'events'}
                 </Text>
               </View>
-              
+
               {dateEvents.map((event) => {
                 const eventStart = new Date(event.start_at)
                 const eventEnd = event.end_at ? new Date(event.end_at) : null
-                const duration = eventEnd 
+                const duration = eventEnd
                   ? Math.round((eventEnd - eventStart) / (1000 * 60)) // minutes
                   : 60 // default 1 hour
-                
+
                 return (
                   <TouchableOpacity
                     key={event.id}
@@ -726,6 +790,7 @@ export default function Calendar() {
                       { borderLeftColor: getEventColor(event) }
                     ]}
                     onPress={() => router.push(`/events/${event.id}`)}
+                    onLongPress={() => handleDeleteEvent(event.id, event.title || 'Event')}
                     activeOpacity={0.8}
                   >
                     <View style={styles.scheduleEventTimeColumn}>
@@ -811,7 +876,7 @@ export default function Calendar() {
         <AppTopBar
           schoolName="University of Rhode Island"
           onPressProfile={() => router.push('/profile')}
-          onPressSchool={() => {}}
+          onPressSchool={() => { }}
           onPressNotifications={() => router.push('/notifications')}
         />
 
@@ -923,6 +988,23 @@ export default function Calendar() {
             <TouchableOpacity
               style={[
                 styles.filterChip,
+                eventTypeFilter === 'social' && styles.filterChipActive,
+              ]}
+              onPress={() => setEventTypeFilter('social')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  eventTypeFilter === 'social' && styles.filterChipTextActive,
+                ]}
+              >
+                Social
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
                 eventTypeFilter === 'org' && styles.filterChipActive,
               ]}
               onPress={() => setEventTypeFilter('org')}
@@ -959,52 +1041,52 @@ export default function Calendar() {
           {/* Month Navigation (only for month view) - Integrated */}
           {viewMode === 'month' && (
             <View style={styles.monthNavigationCompact}>
-            <TouchableOpacity
-              onPress={() => navigateMonth(-1)}
-              style={styles.navButton}
-              activeOpacity={0.7}
-            >
-              <ChevronLeft size={hp(1.8)} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <Text style={styles.monthTitle}>
-              {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
-            </Text>
-            <TouchableOpacity
-              onPress={() => navigateMonth(1)}
-              style={styles.navButton}
-              activeOpacity={0.7}
-            >
-              <ChevronRight size={hp(1.8)} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigateMonth(-1)}
+                style={styles.navButton}
+                activeOpacity={0.7}
+              >
+                <ChevronLeft size={hp(1.8)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={styles.monthTitle}>
+                {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+              </Text>
+              <TouchableOpacity
+                onPress={() => navigateMonth(1)}
+                style={styles.navButton}
+                activeOpacity={0.7}
+              >
+                <ChevronRight size={hp(1.8)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           )}
 
           {/* Week Navigation (only for week view) - Integrated */}
           {viewMode === 'week' && (
             <View style={styles.weekNavigationCompact}>
-            <TouchableOpacity
-              onPress={() => navigateWeek(-1)}
-              style={styles.navButton}
-              activeOpacity={0.7}
-            >
-              <ChevronLeft size={hp(1.8)} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <Text style={styles.weekTitle}>
-              {(() => {
-                const startOfWeek = new Date(selectedDate)
-                startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay())
-                const endOfWeek = new Date(startOfWeek)
-                endOfWeek.setDate(startOfWeek.getDate() + 6)
-                return `${MONTHS[startOfWeek.getMonth()].substring(0, 3)} ${startOfWeek.getDate()} - ${MONTHS[endOfWeek.getMonth()].substring(0, 3)} ${endOfWeek.getDate()}`
-              })()}
-            </Text>
-            <TouchableOpacity
-              onPress={() => navigateWeek(1)}
-              style={styles.navButton}
-              activeOpacity={0.7}
-            >
-              <ChevronRight size={hp(1.8)} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigateWeek(-1)}
+                style={styles.navButton}
+                activeOpacity={0.7}
+              >
+                <ChevronLeft size={hp(1.8)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={styles.weekTitle}>
+                {(() => {
+                  const startOfWeek = new Date(selectedDate)
+                  startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay())
+                  const endOfWeek = new Date(startOfWeek)
+                  endOfWeek.setDate(startOfWeek.getDate() + 6)
+                  return `${MONTHS[startOfWeek.getMonth()].substring(0, 3)} ${startOfWeek.getDate()} - ${MONTHS[endOfWeek.getMonth()].substring(0, 3)} ${endOfWeek.getDate()}`
+                })()}
+              </Text>
+              <TouchableOpacity
+                onPress={() => navigateWeek(1)}
+                style={styles.navButton}
+                activeOpacity={0.7}
+              >
+                <ChevronRight size={hp(1.8)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           )}
 
@@ -1050,6 +1132,7 @@ export default function Calendar() {
             visible={showCreateEventModal}
             onClose={() => setShowCreateEventModal(false)}
             selectedDate={selectedDate}
+            userOrgs={userOrgs}
             onEventCreated={() => {
               setShowCreateEventModal(false)
             }}
@@ -1063,7 +1146,7 @@ export default function Calendar() {
 }
 
 // Create Calendar Event Modal Component
-function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreated }) {
+function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, onEventCreated }) {
   const router = useRouter()
   const theme = useAppTheme()
   const [title, setTitle] = useState('')
@@ -1091,21 +1174,42 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
   const [showRecurringEndDatePicker, setShowRecurringEndDatePicker] = useState(false)
   const [selectedSticker, setSelectedSticker] = useState(null) // Emoji sticker
   const [showStickerPicker, setShowStickerPicker] = useState(false)
-  
+  const [isCreating, setIsCreating] = useState(false)
+
   const styles = createStyles(theme)
+  const { user } = useAuthStore()
+  const { data: userProfile } = useCurrentUserProfile()
+  const { getAdminClubs } = useClubsContext()
+  const { data: friends } = useFriends()
+  const createEventMutation = useCreateEvent()
+  const deleteEventMutation = useDeleteEvent()
+  const { showDelete, showSuccess, showError, AlertComponent } = useCustomAlert()
 
-  // Mock user orgs (in real app, fetch from API)
-  const userOrgs = [
-    { id: 'org-cs-club', name: 'CS Club', isAdmin: true },
-    { id: 'org-music-society', name: 'Music Society', isAdmin: false },
-  ]
+  const adminClubs = getAdminClubs()
+  const [selectedOrgId, setSelectedOrgId] = useState(null)
 
-  // Mock connections
-  // TODO: Fetch connections from Supabase
-  const connections: any[] = []
+  // Initialize selectedOrgId when userOrgs loads
+  useEffect(() => {
+    if (userOrgs && userOrgs.length > 0 && !selectedOrgId) {
+      setSelectedOrgId(userOrgs[0].id)
+    }
+  }, [userOrgs])
+
+  // Handle event deletion
+  const handleDeleteEvent = (eventId, eventTitle) => {
+    showDelete(
+      `Delete ${eventTitle.includes('Task') ? 'Task' : 'Event'}`,
+      `Are you sure you want to delete "${eventTitle}"? This action cannot be undone.`,
+      () => {
+        deleteEventMutation.mutateAsync(eventId)
+      }
+    )
+  }
 
 
   const handleCreate = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    if (isCreating) return
     // Check onboarding completion
     if (!userProfile?.onboarding_complete) {
       Alert.alert(
@@ -1118,9 +1222,20 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
       )
       return
     }
-    
+
     if (!title.trim()) {
       Alert.alert('Required', 'Please enter an event title')
+      return
+    }
+
+    // Validate admin permissions for org events
+    if (eventType === 'org' && userOrgs.length === 0) {
+      Alert.alert('Access Denied', 'Only organization admins can create organization events')
+      return
+    }
+
+    if (eventType === 'org' && !selectedOrgId) {
+      Alert.alert('Required', 'Please select an organization for this event')
       return
     }
 
@@ -1144,8 +1259,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
       ).toISOString(),
       location_name: location || null,
       location_coords: locationCoords,
-      color: customColor || getEventColorFromTheme({ type: itemType, visibility: eventType === 'personal' ? 'invite_only' : 'org_only' }, theme),
-      visibility: eventType === 'personal' ? 'invite_only' : 'org_only',
+      color: customColor || getEventColorFromTheme({ type: itemType, visibility: eventType === 'personal' ? 'invite_only' : eventType === 'social' ? 'public' : 'org_only' }, theme),
+      visibility: eventType === 'personal' ? 'invite_only' : eventType === 'social' ? 'public' : 'org_only',
       sticker: selectedSticker || null,
       is_recurring: isRecurring,
       recurring_frequency: isRecurring ? recurringFrequency : null,
@@ -1155,33 +1270,45 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
 
     // Create event in database
     try {
+      setIsCreating(true)
       console.log('Creating event:', newEvent)
-      
+
       // Map to database schema
       const eventData = {
+        organizer_id: eventType === 'org' ? selectedOrgId : user.id,
+        organizer_type: eventType === 'org' ? 'org' : 'user',
         title: newEvent.title,
-        description: null, // Calendar events don't have description field in UI
+        description: null,
         start_at: newEvent.start_at,
         end_at: newEvent.end_at,
         location_name: newEvent.location_name,
-        location_address: newEvent.location_name, // Use same for address
+        location_address: newEvent.location_name,
         visibility: newEvent.visibility,
-        org_id: eventType === 'org' && userOrgs.length > 0 ? (userOrgs.find(o => o.isAdmin)?.id || userOrgs[0]?.id || null) : null,
-        requires_approval: false,
-        hide_guest_list: false,
-        allow_sharing: true,
-        is_paid: false,
+        org_id: eventType === 'org' ? selectedOrgId : null,
+        type: eventType, // 'personal', 'social', 'org', 'event', 'task'
+        university_id: userProfile?.university_id,
+        ticket_types: [],
+        invites: selectedInvitees.map(id => ({ user_id: id })),
+        sticker: selectedSticker || null,
+        is_recurring: isRecurring,
+        recurring_frequency: isRecurring ? recurringFrequency : null,
+        recurring_days: isRecurring ? recurringDays : [],
+        recurring_end_date: isRecurring && recurringEndDate ? recurringEndDate.toISOString() : null,
       }
 
       console.log('Creating event with data:', eventData)
       await createEventMutation.mutateAsync(eventData)
-      
-      Alert.alert('Success', 'Event created successfully!')
+
+      showSuccess('Success!', 'Event created successfully!')
       onEventCreated()
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       onClose()
     } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       console.error('Error creating event:', error)
-      Alert.alert('Error', error.message || 'Failed to create event. Please try again.')
+      showError('Error', error.message || 'Failed to create event. Please try again.')
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -1205,8 +1332,16 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.createEventModalTitle}>New Event</Text>
-            <TouchableOpacity onPress={handleCreate} activeOpacity={0.7}>
-              <Text style={[styles.modalCancelText, styles.modalCreateText]}>Create</Text>
+            <TouchableOpacity
+              onPress={handleCreate}
+              activeOpacity={0.7}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <ActivityIndicator size="small" color={theme.colors.accent} />
+              ) : (
+                <Text style={[styles.modalCancelText, styles.modalCreateText]}>Create</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -1237,7 +1372,10 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                     styles.eventTypeOption,
                     itemType === 'task' && styles.eventTypeOptionActive,
                   ]}
-                  onPress={() => setItemType('task')}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                    setItemType('task')
+                  }}
                   activeOpacity={0.7}
                 >
                   <Text
@@ -1262,7 +1400,10 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                       styles.eventTypeOption,
                       eventType === 'personal' && styles.eventTypeOptionActive,
                     ]}
-                    onPress={() => setEventType('personal')}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                      setEventType('personal')
+                    }}
                     activeOpacity={0.7}
                   >
                     <Text
@@ -1277,20 +1418,46 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                   <TouchableOpacity
                     style={[
                       styles.eventTypeOption,
-                      eventType === 'org' && styles.eventTypeOptionActive,
+                      eventType === 'social' && styles.eventTypeOptionActive,
                     ]}
-                    onPress={() => setEventType('org')}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                      setEventType('social')
+                    }}
                     activeOpacity={0.7}
                   >
                     <Text
                       style={[
                         styles.eventTypeOptionText,
-                        eventType === 'org' && styles.eventTypeOptionTextActive,
+                        eventType === 'social' && styles.eventTypeOptionTextActive,
                       ]}
                     >
-                      Org Event
+                      Social
                     </Text>
                   </TouchableOpacity>
+                  {/* Only show Org Event option for admins */}
+                  {userOrgs.length > 0 && (
+                    <TouchableOpacity
+                      style={[
+                        styles.eventTypeOption,
+                        eventType === 'org' && styles.eventTypeOptionActive,
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                        setEventType('org')
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.eventTypeOptionText,
+                          eventType === 'org' && styles.eventTypeOptionTextActive,
+                        ]}
+                      >
+                        Org Event
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             )}
@@ -1322,12 +1489,27 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
               <Text style={styles.createEventLabel}>Date</Text>
               <TouchableOpacity
                 style={styles.createEventSelectField}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  setShowDatePicker(true)
+                }}
                 activeOpacity={0.7}
               >
                 <CalendarIcon size={hp(2)} color={theme.colors.textSecondary} />
                 <Text style={styles.createEventSelectText}>{formatDate(eventDate)}</Text>
               </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={eventDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => {
+                    setShowDatePicker(false)
+                    if (date) setEventDate(date)
+                  }}
+                  textColor={theme.colors.textPrimary}
+                />
+              )}
             </View>
 
             {/* Time */}
@@ -1352,32 +1534,44 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                   <Text style={styles.createEventSelectText}>{formatTime(endTime)}</Text>
                 </TouchableOpacity>
               </View>
+              {showStartTimePicker && (
+                <DateTimePicker
+                  value={startTime}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => {
+                    setShowStartTimePicker(false)
+                    if (date) setStartTime(date)
+                  }}
+                  textColor={theme.colors.textPrimary}
+                />
+              )}
+              {showEndTimePicker && (
+                <DateTimePicker
+                  value={endTime}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => {
+                    setShowEndTimePicker(false)
+                    if (date) setEndTime(date)
+                  }}
+                  textColor={theme.colors.textPrimary}
+                />
+              )}
             </View>
 
-            {/* Location */}
             <View style={styles.createEventField}>
-              <Text style={styles.createEventLabel}>Location</Text>
-              <TouchableOpacity
-                style={styles.createEventSelectField}
-                onPress={() => setShowLocationPicker(true)}
-                activeOpacity={0.7}
-              >
+              <Text style={styles.createEventLabel}>Location (Optional)</Text>
+              <View style={styles.createEventSelectField}>
                 <MapPin size={hp(2)} color={theme.colors.textSecondary} />
-                <Text
-                  style={[
-                    styles.createEventSelectText,
-                    !location && { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {location || 'Select Location'}
-                </Text>
-                <ChevronRight size={hp(1.8)} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-              {location && (
-                <Text style={styles.createEventHint}>
-                  📍 {location}
-                </Text>
-              )}
+                <TextInput
+                  style={[styles.createEventSelectText, { flex: 1, paddingVertical: 0 }]}
+                  placeholder="Enter location"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  value={location}
+                  onChangeText={setLocation}
+                />
+              </View>
             </View>
 
             {/* Recurring */}
@@ -1391,7 +1585,7 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                   thumbColor={theme.colors.white}
                 />
               </View>
-              
+
               {/* Recurring Options - Always visible */}
               <View style={styles.recurringOptions}>
                 {/* Frequency */}
@@ -1432,8 +1626,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                         Bi-weekly
                       </Text>
                     </TouchableOpacity>
-              </View>
-            </View>
+                  </View>
+                </View>
 
                 {/* Days of Week */}
                 <View style={styles.recurringOptionRow}>
@@ -1530,35 +1724,35 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
             {eventType === 'personal' && (
               <View style={styles.createEventField}>
                 <Text style={styles.createEventLabel}>Invite People (Optional)</Text>
-              <TouchableOpacity
-                style={styles.createEventSelectField}
-                onPress={() => setShowInviteesModal(true)}
-                activeOpacity={0.7}
-              >
-                <Users size={hp(2)} color={theme.colors.textSecondary} />
-                <Text style={styles.createEventSelectText}>
+                <TouchableOpacity
+                  style={styles.createEventSelectField}
+                  onPress={() => setShowInviteesModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <Users size={hp(2)} color={theme.colors.textSecondary} />
+                  <Text style={styles.createEventSelectText}>
                     {selectedInvitees.length === 0 ? 'Add people' : `${selectedInvitees.length} people`}
-                </Text>
-                <ChevronDown size={hp(2)} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+                  </Text>
+                  <ChevronDown size={hp(2)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Org Selection - Only for org events */}
             {eventType === 'org' && userOrgs.length > 0 && (
-            <View style={styles.createEventField}>
+              <View style={styles.createEventField}>
                 <Text style={styles.createEventLabel}>Organization</Text>
-              <TouchableOpacity
-                style={styles.createEventSelectField}
-                onPress={() => setShowVisibilityModal(true)}
-                activeOpacity={0.7}
-              >
+                <TouchableOpacity
+                  style={styles.createEventSelectField}
+                  onPress={() => setShowVisibilityModal(true)}
+                  activeOpacity={0.7}
+                >
                   <Users size={hp(2)} color={theme.colors.textSecondary} />
-                <Text style={styles.createEventSelectText}>
+                  <Text style={styles.createEventSelectText}>
                     {userOrgs.find(o => o.isAdmin)?.name || 'Select org'}
-                </Text>
-                <ChevronDown size={hp(2)} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
+                  </Text>
+                  <ChevronDown size={hp(2)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
                 <Text style={styles.createEventHint}>
                   This event will appear on all org members' calendars
                 </Text>
@@ -1735,6 +1929,48 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
             </>
           )}
 
+          {/* Recurring End Date Picker Modal */}
+          {showRecurringEndDatePicker && (
+            <Modal
+              visible={showRecurringEndDatePicker}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setShowRecurringEndDatePicker(false)}
+            >
+              <View style={styles.pickerModalOverlay}>
+                <View style={styles.pickerModalContent}>
+                  <View style={styles.pickerModalHeader}>
+                    <TouchableOpacity onPress={() => setShowRecurringEndDatePicker(false)}>
+                      <Text style={styles.pickerModalButton}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.pickerModalTitle}>End Date</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowRecurringEndDatePicker(false)
+                      }}
+                    >
+                      <Text style={[styles.pickerModalButton, styles.pickerModalButtonDone]}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={recurringEndDate || new Date()}
+                    mode="date"
+                    display="spinner"
+                    onChange={(event, selectedDate) => {
+                      if (event.type === 'set' && selectedDate) {
+                        setRecurringEndDate(selectedDate)
+                      }
+                      if (event.type === 'dismissed') {
+                        setShowRecurringEndDatePicker(false)
+                      }
+                    }}
+                    minimumDate={new Date()}
+                  />
+                </View>
+              </View>
+            </Modal>
+          )}
+
           {/* Invitees Modal */}
           <Modal
             visible={showInviteesModal}
@@ -1766,24 +2002,30 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                     )}
                   </TouchableOpacity>
 
-                  {/* Individual Connections */}
-                  {connections.map((connection) => (
+                  {/* Individual Connections - Friends */}
+                  {(friends || []).map((friend) => (
                     <TouchableOpacity
-                      key={connection.id}
+                      key={friend.id}
                       style={[
                         styles.inviteeRow,
-                        selectedInvitees.includes(connection.id) && styles.inviteeRowSelected,
+                        selectedInvitees.includes(friend.id) && styles.inviteeRowSelected,
                       ]}
-                      onPress={() => toggleInvitee(connection.id)}
+                      onPress={() => toggleInvitee(friend.id)}
                       activeOpacity={0.7}
                     >
                       <View style={styles.inviteeLeft}>
-                        <View style={styles.inviteeAvatar}>
-                          <Text style={styles.inviteeAvatarText}>{connection.avatar}</Text>
-                        </View>
-                        <Text style={styles.inviteeName}>{connection.name}</Text>
+                        {friend.avatar_url ? (
+                          <Image source={{ uri: friend.avatar_url }} style={styles.inviteeAvatarImage} />
+                        ) : (
+                          <View style={styles.inviteeAvatar}>
+                            <Text style={styles.inviteeAvatarText}>
+                              {friend.full_name?.charAt(0) || friend.username?.charAt(0) || '?'}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.inviteeName}>{friend.full_name || friend.username}</Text>
                       </View>
-                      {selectedInvitees.includes(connection.id) && (
+                      {selectedInvitees.includes(friend.id) && (
                         <Text style={styles.checkmark}>✓</Text>
                       )}
                     </TouchableOpacity>
@@ -1868,21 +2110,21 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
                   </TouchableOpacity>
                 </View>
                 <ScrollView style={styles.modalBody}>
-                  {userOrgs.filter(org => org.isAdmin).map((org) => (
+                  {userOrgs.map((org) => (
                     <TouchableOpacity
                       key={org.id}
                       style={[
                         styles.optionRow,
-                        visibility === `org_${org.id}` && styles.optionRowSelected,
+                        selectedOrgId === org.id && styles.optionRowSelected,
                       ]}
                       onPress={() => {
-                        setVisibility(`org_${org.id}`)
+                        setSelectedOrgId(org.id)
                         setShowVisibilityModal(false)
                       }}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.optionText}>Only {org.name}</Text>
-                      {visibility === `org_${org.id}` && (
+                      <Text style={styles.optionText}>{org.name}</Text>
+                      {selectedOrgId === org.id && (
                         <Text style={styles.checkmark}>✓</Text>
                       )}
                     </TouchableOpacity>
@@ -1924,6 +2166,7 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, onEventCreat
             </View>
           </Modal>
         </View>
+        <AlertComponent />
       </View>
     </Modal>
   )
@@ -3111,6 +3354,12 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: wp(3),
+  },
+  inviteeAvatarImage: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
     marginRight: wp(3),
   },
   inviteeAvatarText: {

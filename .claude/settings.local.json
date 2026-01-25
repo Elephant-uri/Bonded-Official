@@ -8,7 +8,13 @@
       "Bash(grep:*)",
       "mcp__ide__getDiagnostics",
       "Bash(npx eslint:*)",
-      "Bash(npx expo export:*)"
+      "Bash(npx expo export:*)",
+      "mcp__supabase__get_logs",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__list_tables",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Complete 17/39 pre-launch tasks - onboarding, orgs, forums \\(44% complete\\)\n\n## Database & Backend\n- Add auto-add/remove org members to chats/forums via triggers\n- Fix class matching to use only class + section \\(not time/date\\)\n- Clean up org joining workflow with database automation\n\n## Onboarding Improvements  \n- Split full name into separate first/last name fields\n- Make onboarding buttons idempotent \\(prevent double-clicks\\)\n- Improve course search to handle \"CSC 110\" multi-word format\n- Verify photo upload deduplication already in place\n\n## UI/UX Fixes\n- Remove duplicate Main forum from sidebar Public Forums section\n- Add UI for separate class chat/forum icons in sidebar\n- Remove forum tags, video picker, repost for V1 \\(to tech debt\\)\n- Verify forum sharing works via ShareModal\n\n## Organizations\n- Enable org sharing in messages\n- Simplify joining workflow with triggers\n- Auto-manage forum/chat memberships\n\n## Design\n- Unify ShareModal across events, forums, clubs\n\nProgress: 17/39 tasks completed \\(44%\\)\nRemaining: 22 tasks \\(messaging features, events, profiles, admin\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []

@@ -4,7 +4,7 @@
  */
 
 import { useRouter } from 'expo-router'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Alert, StyleSheet, View } from 'react-native'
 import { useCurrentUserProfile } from '../../../hooks/useCurrentUserProfile'
 import { useSaveSchedule } from '../../../hooks/useSaveSchedule'
@@ -22,7 +22,7 @@ const SCHEDULE_STEPS = {
 export default function ClassScheduleStep({ formData, updateFormData, onScroll }) {
   const [currentStep, setCurrentStep] = useState(SCHEDULE_STEPS.UPLOAD)
   const [parsedSchedule, setParsedSchedule] = useState(
-    formData.parsedSchedule || null
+    formData.classSchedule?.parsedSchedule || null
   )
   const [editedCourses, setEditedCourses] = useState([])
 
@@ -38,8 +38,7 @@ export default function ClassScheduleStep({ formData, updateFormData, onScroll }
     } else {
       // User skipped - mark step as complete and continue
       updateFormData(ONBOARDING_STEPS.CLASS_SCHEDULE, {
-        scheduleImageUri: null,
-        parsedSchedule: null,
+        classSchedule: null,
       })
     }
   }
@@ -55,6 +54,10 @@ export default function ClassScheduleStep({ formData, updateFormData, onScroll }
       return
     }
 
+    if (isSaving) {
+      return
+    }
+
     saveSchedule(
       {
         courses: editedCourses,
@@ -65,10 +68,13 @@ export default function ClassScheduleStep({ formData, updateFormData, onScroll }
         onSuccess: () => {
           // Update form data
           updateFormData(ONBOARDING_STEPS.CLASS_SCHEDULE, {
-            scheduleImageUri: formData.scheduleImageUri,
-            parsedSchedule: parsedSchedule,
-            courses: editedCourses,
-            selectedSections: Array.from(selectedSections),
+            classSchedule: {
+              scheduleImageUri: formData.classSchedule?.scheduleImageUri || null,
+              parsedSchedule,
+              courses: editedCourses,
+              selectedSections: Array.from(selectedSections),
+              rawText: parsedSchedule?.rawText || '',
+            },
           })
 
           Alert.alert('Success', 'Your schedule has been saved!', [
@@ -89,6 +95,10 @@ export default function ClassScheduleStep({ formData, updateFormData, onScroll }
         },
       }
     )
+  }
+
+  const handleEdit = () => {
+    setCurrentStep(SCHEDULE_STEPS.EDIT)
   }
 
   const renderCurrentStep = () => {
@@ -113,6 +123,8 @@ export default function ClassScheduleStep({ formData, updateFormData, onScroll }
           <ScheduleConfirmStep
             courses={editedCourses}
             onConfirm={handleConfirm}
+            onEdit={handleEdit}
+            isSaving={isSaving}
             onScroll={onScroll}
           />
         )

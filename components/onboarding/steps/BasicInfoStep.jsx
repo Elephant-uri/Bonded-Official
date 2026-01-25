@@ -12,7 +12,8 @@ import Picker from '../../Picker'
 const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
   const styles = createStyles(ONBOARDING_THEME)
   const [localData, setLocalData] = useState({
-    fullName: formData.fullName || '',
+    firstName: formData.firstName || '',
+    lastName: formData.lastName || '',
     username: formData.username || '',
     school: formData.school || null,
     age: formData.age || null,
@@ -128,7 +129,8 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
 
     // Update store
     updateFormData(ONBOARDING_STEPS.BASIC_INFO, {
-      fullName: newData.fullName,
+      firstName: newData.firstName,
+      lastName: newData.lastName,
       username: newData.username,
       school: newData.school,
       age: newData.age,
@@ -215,10 +217,19 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
       <Text style={styles.subtitle}>Tell us a bit about yourself</Text>
 
       <Input
-        label="Full name"
-        placeholder="Enter your full name"
-        value={localData.fullName}
-        onChangeText={(value) => handleChange('fullName', value)}
+        label="First name"
+        placeholder="Enter your first name"
+        value={localData.firstName}
+        onChangeText={(value) => handleChange('firstName', value)}
+        autoCapitalize="words"
+        containerStyle={styles.inputGroup}
+      />
+
+      <Input
+        label="Last name"
+        placeholder="Enter your last name"
+        value={localData.lastName}
+        onChangeText={(value) => handleChange('lastName', value)}
         autoCapitalize="words"
         containerStyle={styles.inputGroup}
       />

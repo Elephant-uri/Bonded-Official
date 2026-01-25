@@ -28,7 +28,7 @@ export function useConversations() {
     queryFn: async () => {
       if (!user?.id) return []
 
-      console.log('📬 Fetching conversations for user:', user.id)
+      // console.log('📬 Fetching conversations for user:', user.id)
 
       // Fetch conversations where user is a participant
       const { data: participations, error: partError } = await supabase
@@ -43,7 +43,9 @@ export function useConversations() {
             type,
             created_by,
             created_at,
-            updated_at
+            updated_at,
+            org_id,
+            class_section_id
           )
         `)
         .eq('user_id', user.id)
@@ -103,31 +105,52 @@ export function useConversations() {
             .neq('sender_id', user.id)
             .gt('created_at', lastReadAt)
 
+          const unread_count = unreadCount || 0
+
+          // Find the other participant (exclude current user)
+          let other_participant = null
+          if (conv.type === 'direct' && participants.length > 0) {
+            // Filter out current user first
+            const others = participants.filter(p => p.id !== user.id)
+            if (others.length > 0) {
+              other_participant = others[0]
+            } else {
+              // Fallback: if somehow only current user is in participants, use first one
+              // This shouldn't happen for direct chats but handles edge cases
+              console.warn('⚠️ No other participant found for direct chat:', conv.id, 'participants:', participants.map(p => ({ id: p.id, name: p.full_name })))
+              other_participant = participants[0]
+            }
+          }
+
+          // console.log('📬 Conversation:', conv.id, 'type:', conv.type, 'other_participant:', other_participant?.id, other_participant?.full_name)
+
           return {
             ...conv,
-            lastMessage: lastMsg?.content || null,
-            lastMessageAt: lastMsg?.created_at || conv.created_at,
-            lastMessageSenderId: lastMsg?.sender_id || null,
+            last_message: lastMsg?.content || null,
+            last_message_at: lastMsg?.created_at || conv.created_at,
+            last_message_sender_id: lastMsg?.sender_id || null,
             participants,
-            unreadCount: unreadCount || 0,
-            isMuted: false,
+            other_participant,
+            unread_count: unread_count,
+            is_muted: false, // Added for future use
           }
         })
       )
 
-      // Filter out nulls and empty conversations (unless user created it)
-      // Industry standard: only show conversation to recipient after first message
+      // Filter out nulls and conversations that shouldn't be shown
       const sorted = conversationsWithDetails
         .filter(Boolean)
         .filter(conv => {
           // Always show conversations the user created
           if (conv.created_by === user.id) return true
-          // Only show to others if there's at least one message
-          return conv.lastMessage !== null
+          // Always show group chats (forums/orgs)
+          if (conv.type === 'group' || conv.type === 'org') return true
+          // For direct chats, only show if there's at least one message or it's new
+          return conv.last_message !== null || conv.created_at > new Date(Date.now() - 3600000).toISOString()
         })
-        .sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
+        .sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at))
 
-      console.log(`✅ Fetched ${sorted.length} conversations`)
+      // console.log(`✅ Fetched ${sorted.length} conversations`)
       return sorted
     },
     enabled: !!user?.id,
@@ -160,15 +183,22 @@ export function useMessages(conversationId) {
 
       console.log(`📨 Fetching messages for conversation: ${conversationId}, page: ${pageParam}`)
 
-      const { data, error } = await supabase
+      const startTime = Date.now()
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Query timeout after 10 seconds')), 10000)
+      })
+
+      const queryPromise = supabase
         .from('messages')
         .select(`
           id,
           conversation_id,
           sender_id,
           content,
-          created_at,
           metadata,
+          created_at,
           sender:profiles!messages_sender_id_fkey (
             id,
             full_name,
@@ -180,6 +210,10 @@ export function useMessages(conversationId) {
         .order('created_at', { ascending: false })
         .range(pageParam, pageParam + MESSAGES_PER_PAGE - 1)
 
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+
+      console.log(`⏱️ Fetch completed in ${Date.now() - startTime}ms. Error: ${error?.message}, Data length: ${data?.length}`)
+
       if (error) {
         if (isNetworkError(error)) {
           console.warn('⚠️ Network error fetching messages, returning empty:', error.message || 'Connection timeout')
@@ -189,11 +223,11 @@ export function useMessages(conversationId) {
         throw error
       }
 
-      console.log(`✅ Fetched ${data?.length || 0} messages`)
+      // console.log(`✅ Fetched ${data?.length || 0} messages`)
 
-      const orderedMessages = (data || []).slice().reverse() // Avoid mutating Supabase data
+      // Don't reverse - inverted FlatList expects newest first (descending order)
       return {
-        messages: orderedMessages,
+        messages: data || [],
         hasMore: data?.length === MESSAGES_PER_PAGE,
       }
     },
@@ -204,7 +238,7 @@ export function useMessages(conversationId) {
     },
     enabled: !!conversationId && !!user?.id,
     staleTime: 0, // Always refetch for real-time feel
-    refetchInterval: 2500, // Poll every 2.5 seconds as fallback (industry standard)
+    refetchInterval: 5000, // Poll every 5 seconds as fallback
     refetchIntervalInBackground: true, // Continue polling when app is in background
     retry: (failureCount, error) => {
       // Don't retry on network errors - they'll resolve when connection is restored
@@ -239,95 +273,128 @@ export function useMessages(conversationId) {
         .on(
           'postgres_changes',
           {
-            event: 'INSERT',
+            event: '*',
             schema: 'public',
             table: 'messages',
             filter: `conversation_id=eq.${conversationId}`,
           },
           async (payload) => {
-            console.log('📬 Real-time message received via useMessages:', payload.new.id)
+            // console.log(`📬 Real-time message ${payload.eventType} received via useMessages:`, payload.new?.id || payload.old?.id)
 
-            // Fetch sender details
-            const { data: sender, error: senderError } = await supabase
-              .from('profiles')
-              .select('id, full_name, username, avatar_url')
-              .eq('id', payload.new.sender_id)
-              .single()
+            if (payload.eventType === 'INSERT') {
 
-            if (senderError) {
-              console.error('Error fetching sender in useMessages:', senderError)
+              // Fetch sender details
+              const { data: sender, error: senderError } = await supabase
+                .from('profiles')
+                .select('id, full_name, username, avatar_url')
+                .eq('id', payload.new.sender_id)
+                .single()
+
+              if (senderError) {
+                console.error('Error fetching sender in useMessages:', senderError)
+              }
+
+              // Parse metadata if it's a string (JSONB from database)
+              let parsedMetadata = payload.new.metadata
+              if (typeof payload.new.metadata === 'string') {
+                try {
+                  parsedMetadata = JSON.parse(payload.new.metadata)
+                } catch (e) {
+                  console.warn('Failed to parse message metadata in useMessages:', e)
+                  parsedMetadata = {}
+                }
+              }
+
+              const newMessage = {
+                ...payload.new,
+                metadata: parsedMetadata || {},
+                sender: sender || {
+                  id: payload.new.sender_id,
+                  full_name: 'Unknown',
+                  username: 'unknown',
+                  avatar_url: null,
+                },
+              }
+
+              // console.log('📬 useMessages: New message with metadata:', {
+              //   id: newMessage.id,
+              //   hasImage: parsedMetadata?.type === 'image',
+              //   imageUrl: parsedMetadata?.imageUrl,
+              //   imagePath: parsedMetadata?.imagePath,
+              // })
+
+              // Add to cache
+              queryClient.setQueryData(['messages', conversationId], (old) => {
+                if (!old) {
+                  // console.log('✅ Creating new messages cache')
+                  return { pages: [{ messages: [newMessage], hasMore: false }], pageParams: [0] }
+                }
+
+                const firstPage = old.pages[0]
+                const existingIds = firstPage.messages.map(m => m.id)
+
+                // Avoid duplicates
+                if (existingIds.includes(newMessage.id)) {
+                  console.log('⚠️ Duplicate message ignored in useMessages:', newMessage.id)
+                  return old
+                }
+
+                // console.log('✅ Adding message to cache:', newMessage.id)
+                // Add new message to BEGINNING of array (newest first for inverted FlatList)
+                return {
+                  ...old,
+                  pages: [
+                    {
+                      ...firstPage,
+                      messages: [newMessage, ...firstPage.messages],
+                    },
+                    ...old.pages.slice(1),
+                  ],
+                }
+              })
+
+              // Also update conversations list
+              queryClient.invalidateQueries({ queryKey: ['conversations'] })
+            } else if (payload.eventType === 'UPDATE') {
+              // Update existing message in cache
+              queryClient.setQueryData(['messages', conversationId], (old) => {
+                if (!old) return old
+
+                return {
+                  ...old,
+                  pages: old.pages.map(page => ({
+                    ...page,
+                    messages: page.messages.map(msg =>
+                      msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
+                    ),
+                  })),
+                }
+              })
+            } else if (payload.eventType === 'DELETE') {
+              // Remove message from cache
+              queryClient.setQueryData(['messages', conversationId], (old) => {
+                if (!old) return old
+
+                return {
+                  ...old,
+                  pages: old.pages.map(page => ({
+                    ...page,
+                    messages: page.messages.filter(msg => msg.id !== payload.old.id),
+                  })),
+                }
+              })
             }
-
-            // Parse metadata if it's a string (JSONB from database)
-            let parsedMetadata = payload.new.metadata
-            if (typeof payload.new.metadata === 'string') {
-              try {
-                parsedMetadata = JSON.parse(payload.new.metadata)
-              } catch (e) {
-                console.warn('Failed to parse message metadata in useMessages:', e)
-                parsedMetadata = {}
-              }
-            }
-
-            const newMessage = {
-              ...payload.new,
-              metadata: parsedMetadata || {},
-              sender: sender || {
-                id: payload.new.sender_id,
-                full_name: 'Unknown',
-                username: 'unknown',
-                avatar_url: null,
-              },
-            }
-            
-            console.log('📬 useMessages: New message with metadata:', {
-              id: newMessage.id,
-              hasImage: parsedMetadata?.type === 'image',
-              imageUrl: parsedMetadata?.imageUrl,
-              imagePath: parsedMetadata?.imagePath,
-            })
-
-            // Add to cache
-            queryClient.setQueryData(['messages', conversationId], (old) => {
-              if (!old) {
-                console.log('✅ Creating new messages cache')
-                return { pages: [{ messages: [newMessage], hasMore: false }], pageParams: [0] }
-              }
-
-              const firstPage = old.pages[0]
-              const existingIds = firstPage.messages.map(m => m.id)
-
-              // Avoid duplicates
-              if (existingIds.includes(newMessage.id)) {
-                console.log('⚠️ Duplicate message ignored in useMessages:', newMessage.id)
-                return old
-              }
-
-              console.log('✅ Adding message to cache:', newMessage.id)
-              return {
-                ...old,
-                pages: [
-                  {
-                    ...firstPage,
-                    messages: [...firstPage.messages, newMessage],
-                  },
-                  ...old.pages.slice(1),
-                ],
-              }
-            })
-
-            // Also update conversations list
-            queryClient.invalidateQueries({ queryKey: ['conversations'] })
           }
         )
-        .subscribe((status) => {
-          console.log('📡 useMessages subscription status:', status, 'for conversation:', conversationId)
+        .subscribe((status, err) => {
+          // console.log('📡 useMessages subscription status:', status, 'for conversation:', conversationId)
           if (status === 'SUBSCRIBED') {
-            console.log('✅ Successfully subscribed to messages via useMessages for:', conversationId)
+            console.log('✅ Successfully subscribed to realtime messages for:', conversationId)
           } else if (status === 'CLOSED') {
-            console.log('🔒 useMessages subscription closed for:', conversationId)
+            // console.log('🔒 useMessages subscription closed for:', conversationId)
           } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Channel subscription error in useMessages for:', conversationId)
+            console.error('❌ Channel subscription error in useMessages for:', conversationId, 'Error:', err)
+            // Realtime may not be available, but polling will continue as fallback
           } else if (status === 'TIMED_OUT') {
             console.warn('⏱️ Channel subscription timed out in useMessages for:', conversationId)
           }
@@ -337,7 +404,7 @@ export function useMessages(conversationId) {
     setupSubscription()
 
     return () => {
-      console.log('🧹 Unsubscribing from messages channel:', conversationId)
+      // console.log('🧹 Unsubscribing from messages channel:', conversationId)
       if (channel) {
         channel.unsubscribe()
         channel = null
@@ -359,6 +426,7 @@ export function useSendMessage() {
     mutationFn: async ({ conversationId, content, metadata = null }) => {
       if (!user?.id) throw new Error('User must be authenticated')
       if (!conversationId) throw new Error('Conversation ID is required')
+      // Allow empty content for rich message types
       if (!content?.trim()) throw new Error('Message content is required')
 
       const messageData = {
@@ -380,6 +448,7 @@ export function useSendMessage() {
           conversation_id,
           sender_id,
           content,
+          metadata,
           created_at,
           sender:profiles!messages_sender_id_fkey (
             id,
@@ -391,12 +460,41 @@ export function useSendMessage() {
         .single()
 
       if (error) throw error
-
-      console.log('✅ Message sent:', data.id)
+      // console.log('✅ Message sent:', data.id)
       return data
     },
-    onSuccess: (data) => {
-      // Invalidate conversations to update last message
+    onSuccess: (data, variables) => {
+      const { conversationId } = variables
+
+      // Manually update the messages cache to confirm the message immediately
+      // This prevents the "lag" waiting for the real-time subscription event
+      queryClient.setQueryData(['messages', conversationId], (old) => {
+        if (!old) {
+          // If no cache exists, create one with the new message
+          return { pages: [{ messages: [data], hasMore: false }], pageParams: [0] }
+        }
+
+        // Prepend to the first page (newest messages at beginning for inverted FlatList)
+        const newPages = old.pages.map((page, index) => {
+          if (index === 0) {
+            // Check if already exists to avoid duplicate from race condition
+            if (page.messages.some(m => m.id === data.id)) return page
+
+            return {
+              ...page,
+              messages: [data, ...page.messages]
+            }
+          }
+          return page
+        })
+
+        return {
+          ...old,
+          pages: newPages
+        }
+      })
+
+      // Invalidate conversations to update last message preview in list
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
   })
@@ -431,7 +529,7 @@ export function useCreateConversation() {
           }
 
           if (existing) {
-            console.log('📬 Found existing conversation:', existing)
+            // console.log('📬 Found existing conversation:', existing)
             return existing
           }
         } catch (error) {
@@ -473,7 +571,7 @@ export function useCreateConversation() {
           throw partError
         }
 
-        console.log('✅ Created direct conversation:', newConv.id)
+        // console.log('✅ Created direct conversation:', newConv.id)
         return newConv.id
       }
 
@@ -514,7 +612,7 @@ export function useCreateConversation() {
           throw partError
         }
 
-        console.log('✅ Created group conversation:', newConv.id)
+        // console.log('✅ Created group conversation:', newConv.id)
         return newConv.id
       }
 

@@ -1,17 +1,40 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useQueryClient } from '@tanstack/react-query'
 import { createSignedUrlForPath, uploadImageToBondedMedia } from '../helpers/mediaStorage'
+import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 
 const ClubsContext = createContext()
 
 export function ClubsProvider({ children }) {
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
   const [clubs, setClubs] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [orgsAvailable, setOrgsAvailable] = useState(true)
   const [membershipsAvailable, setMembershipsAvailable] = useState(false)
+
+  // Listen for auth state changes to refresh data
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          // User signed in, refresh clubs data
+          console.log('Auth state changed: SIGNED_IN, refreshing clubs')
+          fetchClubs()
+        } else if (event === 'SIGNED_OUT') {
+          // User signed out, clear clubs data
+          console.log('Auth state changed: SIGNED_OUT, clearing clubs')
+          setClubs({})
+          setLoading(false)
+          setError(null)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   const normalizeMeetingTimes = (meetingTimeValue) => {
     if (!meetingTimeValue) return []
@@ -27,21 +50,21 @@ export function ClubsProvider({ children }) {
     return []
   }
 
-  const notifyAdminsOfRequest = async (clubId, requesterId, clubName) => {
+  const notifyAdminsOfRequest = async (clubId, requesterId, clubName, fallbackAdminIds = []) => {
     if (!clubId || !requesterId) return
     try {
       const { data: admins, error } = await supabase
         .from('org_members')
         .select('user_id')
         .eq('organization_id', clubId)
-        .eq('role', 'admin')
+        .in('role', ['admin', 'owner'])
 
+      let adminIds = (admins || []).map((row) => row.user_id).filter((id) => id && id !== requesterId)
       if (error) {
         console.warn('Failed to fetch org admins for notifications:', error)
-        return
+        adminIds = (fallbackAdminIds || []).filter((id) => id && id !== requesterId)
       }
 
-      const adminIds = (admins || []).map((row) => row.user_id).filter((id) => id && id !== requesterId)
       if (adminIds.length === 0) return
 
       const baseNotifications = adminIds.map((adminId) => ({
@@ -72,61 +95,23 @@ export function ClubsProvider({ children }) {
   }
 
   const insertOrgForum = async (org, universityId, isPublicOverride) => {
-    if (!org?.id || !universityId) return { forumId: null, error: null }
-    const isPublic =
-      isPublicOverride !== undefined
-        ? isPublicOverride
-        : org.is_public !== undefined
-          ? org.is_public
-          : org.isPublic !== undefined
-            ? org.isPublic
-            : true
+    // Forum creation is now handled by database trigger
+    // Just fetch the forum that should have been created
+    try {
+      const { data: forum, error } = await supabase
+        .rpc('get_org_forum_by_org_id', { p_org_id: org.id })
+        .single()
 
-    const basePayload = {
-      name: org.name,
-      type: 'org',
-      description: org.mission_statement || 'Organization forum',
-      university_id: universityId,
-    }
-
-    let newForum = null
-    let forumError = null
-
-    ;({ data: newForum, error: forumError } = await supabase
-      .from('forums')
-      .insert({
-        ...basePayload,
-        org_id: org.id,
-        is_public: isPublic,
-      })
-      .select()
-      .single())
-
-    if (forumError?.code === 'PGRST204' || forumError?.message?.includes('org_id') || forumError?.message?.includes('is_public')) {
-      ;({ data: newForum, error: forumError } = await supabase
-        .from('forums')
-        .insert(basePayload)
-        .select()
-        .single())
-    }
-
-    if (forumError) {
-      console.warn('Failed to create org forum:', forumError)
-      return { forumId: null, error: forumError }
-    }
-
-    if (newForum?.id && currentUserId) {
-      try {
-        await supabase.from('forum_members').insert({
-          forum_id: newForum.id,
-          user_id: currentUserId,
-        })
-      } catch (memberError) {
-        console.warn('Failed to add forum member:', memberError)
+      if (error) {
+        console.warn('Failed to fetch org forum:', error)
+        return { forumId: null, error }
       }
-    }
 
-    return { forumId: newForum?.id || null, error: null }
+      return { forumId: forum?.id || null, error: null }
+    } catch (err) {
+      console.error('Error in insertOrgForum:', err)
+      return { forumId: null, error: err }
+    }
   }
 
   // Fetch all clubs from Supabase
@@ -159,7 +144,7 @@ export function ClubsProvider({ children }) {
 
       // Fetch organizations
       // Handle case where organizations table might not exist yet (graceful degradation)
-      const { data: orgsData, error: orgsError } = await supabase
+      let { data: orgsData, error: orgsError } = await supabase
         .from('organizations')
         .select('*')
         .eq('university_id', userProfile.university_id)
@@ -182,6 +167,15 @@ export function ClubsProvider({ children }) {
       }
       setOrgsAvailable(true)
 
+      // Fetch user's org memberships using security definer function
+      let { data: userMemberships, error: membershipError } = await supabase
+        .rpc('get_user_org_memberships', { p_user_id: user.id })
+
+      if (membershipError) {
+        console.warn('Failed to fetch user memberships:', membershipError)
+        userMemberships = []
+      }
+
       let membersData = []
       let membersError = null
       if ((orgsData || []).length > 0) {
@@ -190,6 +184,22 @@ export function ClubsProvider({ children }) {
           .from('org_members')
           .select('organization_id, user_id, role, joined_at')
           .in('organization_id', orgIds))
+      } else if (userMemberships?.length > 0) {
+        // Fallback: fetch orgs where user is a member
+        const memberOrgIds = userMemberships.map(m => m.organization_id)
+        const { data: memberOrgs, error: memberOrgError } = await supabase
+          .from('organizations')
+          .select('*')
+          .in('id', memberOrgIds)
+
+        if (!memberOrgError && memberOrgs?.length) {
+          orgsData = memberOrgs
+          // Re-fetch members for these orgs
+          ;({ data: membersData, error: membersError } = await supabase
+            .from('org_members')
+            .select('organization_id, user_id, role, joined_at')
+            .in('organization_id', memberOrgIds))
+        }
       } else {
         ;({ data: membersData, error: membersError } = await supabase
           .from('org_members')
@@ -197,6 +207,7 @@ export function ClubsProvider({ children }) {
           .limit(1))
       }
 
+      let fallbackMemberRoles = {}
       if (membersError) {
         if (membersError.code === 'PGRST205') {
           console.warn('⚠️ org_members table not found - membership features disabled')
@@ -204,12 +215,28 @@ export function ClubsProvider({ children }) {
           membersData = []
         } else {
           console.warn('⚠️ org_members unavailable for reads:', membersError)
-          // Allow joins even if reads are blocked by RLS.
           setMembershipsAvailable(true)
           membersData = []
         }
       } else {
         setMembershipsAvailable(true)
+      }
+
+      try {
+        const { data: selfMemberships, error: selfError } = await supabase
+          .from('org_members')
+          .select('organization_id, role')
+          .eq('user_id', user.id)
+        if (!selfError) {
+          fallbackMemberRoles = (selfMemberships || []).reduce((acc, row) => {
+            if (row.organization_id) {
+              acc[row.organization_id] = row.role || 'member'
+            }
+            return acc
+          }, {})
+        }
+      } catch (selfError) {
+        // Non-blocking.
       }
 
       let forumsByOrg = {}
@@ -236,6 +263,35 @@ export function ClubsProvider({ children }) {
           }
           return acc
         }, {})
+      }
+
+      let orgMedia = { logo: {}, cover: {} }
+      if ((orgsData || []).length > 0) {
+        const orgIds = orgsData.map((org) => org.id)
+        const { data: mediaData, error: mediaError } = await supabase
+          .from('media')
+          .select('owner_id, path, media_type, created_at')
+          .eq('owner_type', 'org')
+          .in('owner_id', orgIds)
+          .in('media_type', ['org_logo', 'org_cover'])
+          .order('created_at', { ascending: false })
+
+        if (mediaError) {
+          console.warn('⚠️ Failed to fetch org media:', mediaError)
+        } else {
+          orgMedia = (mediaData || []).reduce(
+            (acc, row) => {
+              if (row.media_type === 'org_logo' && !acc.logo[row.owner_id]) {
+                acc.logo[row.owner_id] = row.path
+              }
+              if (row.media_type === 'org_cover' && !acc.cover[row.owner_id]) {
+                acc.cover[row.owner_id] = row.path
+              }
+              return acc
+            },
+            { logo: {}, cover: {} }
+          )
+        }
       }
 
       // Transform to indexed object with expected fields
@@ -268,7 +324,9 @@ export function ClubsProvider({ children }) {
       for (const org of orgsData || []) {
         const members = (membersData || []).filter((member) => member.organization_id === org.id)
         const memberIds = members.map((member) => member.user_id)
-        const admins = members.filter((member) => member.role === 'admin').map((member) => member.user_id)
+        const admins = members
+          .filter((member) => member.role === 'admin' || member.role === 'owner')
+          .map((member) => member.user_id)
         const pendingRequests = members.filter((member) => member.role === 'pending').map((member) => member.user_id)
         const creatorId = org.created_by || org.owner_id || org.admin_id || null
 
@@ -279,8 +337,36 @@ export function ClubsProvider({ children }) {
           admins.push(creatorId)
         }
 
-        const avatarUrl = await resolveMediaUrl(org.logo_url)
-        const coverUrl = await resolveMediaUrl(org.cover_url)
+        const selfRole = fallbackMemberRoles[org.id]
+        if (selfRole) {
+          if (selfRole === 'pending' && !pendingRequests.includes(user.id)) {
+            pendingRequests.push(user.id)
+          }
+          if (selfRole !== 'pending' && !memberIds.includes(user.id)) {
+            memberIds.push(user.id)
+          }
+          if ((selfRole === 'admin' || selfRole === 'owner') && !admins.includes(user.id)) {
+            admins.push(user.id)
+          }
+        }
+
+        let avatarUrl = await resolveMediaUrl(org.logo_url)
+        if (!avatarUrl && orgMedia.logo[org.id]) {
+          try {
+            avatarUrl = await createSignedUrlForPath(orgMedia.logo[org.id])
+          } catch (error) {
+            console.warn('Failed to sign fallback org logo:', error?.message || error)
+          }
+        }
+
+        let coverUrl = await resolveMediaUrl(org.cover_url)
+        if (!coverUrl && orgMedia.cover[org.id]) {
+          try {
+            coverUrl = await createSignedUrlForPath(orgMedia.cover[org.id])
+          } catch (error) {
+            console.warn('Failed to sign fallback org cover:', error?.message || error)
+          }
+        }
 
         clubsMap[org.id] = {
           id: org.id,
@@ -366,40 +452,52 @@ export function ClubsProvider({ children }) {
       const needsApproval = club.requiresApproval || club.isPublic === false
       const role = needsApproval ? 'pending' : 'member'
 
-      try {
-        const { data: existingMembership, error: existingError } = await supabase
-          .from('org_members')
-          .select('role')
-          .eq('organization_id', clubId)
-          .eq('user_id', userId)
-          .maybeSingle()
+      // Check existing membership using security definer function
+      const { data: existingMembership, error: existingError } = await supabase
+        .rpc('is_user_org_admin', { p_user_id: userId, p_org_id: clubId })
 
-        if (!existingError && existingMembership?.role) {
-          return { ok: true, pending: existingMembership.role === 'pending' }
-        }
-      } catch (error) {
-        // If read is blocked by RLS, we still attempt insert below.
+      if (!existingError && existingMembership) {
+        return { ok: true, pending: false } // Already a member/admin
       }
 
+      // Check for pending request
+      const { data: pendingMembership, error: pendingError } = await supabase
+        .from('org_members')
+        .select('role')
+        .eq('organization_id', clubId)
+        .eq('user_id', userId)
+        .eq('role', 'pending')
+        .maybeSingle()
+
+      if (!pendingError && pendingMembership) {
+        return { ok: true, pending: true }
+      }
+
+      // Insert new membership request
       const { error } = await supabase
-          .from('org_members')
-          .insert({
-            organization_id: clubId,
-            user_id: userId,
-            role,
-            joined_at: new Date().toISOString(),
-          })
+        .from('org_members')
+        .insert({
+          organization_id: clubId,
+          user_id: userId,
+          role,
+          joined_at: new Date().toISOString(),
+        })
 
       if (error) {
+        // Handle specific error cases
         if (error.code === '23505') {
+          // Duplicate - user already has some membership, this is expected behavior
+          console.log('User already has membership, treating as success')
+          // Forum/conversation membership is handled by database triggers
           return { ok: true, pending: needsApproval }
+        } else if (error.code === 'PGRST301' || error.message?.includes('permission')) {
+          console.error('Permission denied joining club:', error)
+          return { ok: false, error: 'You do not have permission to join this organization.' }
+        } else {
+          console.error('Error joining club:', error)
         }
-        console.error('Error joining club:', error)
+        
         return { ok: false, error: error.message || 'Failed to join organization.' }
-      }
-
-      if (needsApproval) {
-        await notifyAdminsOfRequest(clubId, userId, club.name)
       }
 
       // Update local state
@@ -408,10 +506,24 @@ export function ClubsProvider({ children }) {
         if (needsApproval) {
           updatedClub.requests = [...(updatedClub.requests || []), userId]
         } else {
-          updatedClub.members = [...updatedClub.members, userId]
+          updatedClub.members = [...(updatedClub.members || []), userId]
         }
         return { ...prev, [clubId]: updatedClub }
       })
+
+      // Notify admins if approval needed
+      if (needsApproval) {
+        await notifyAdminsOfRequest(clubId, userId, club.name, club.admins || [])
+      }
+
+      // Forum and conversation membership is now handled automatically by database triggers
+      // when the org_members record is inserted above
+
+      // Refresh data to ensure consistency
+      console.log('About to refresh clubs data after join...')
+      await fetchClubs()
+      console.log('Clubs data refreshed after join')
+      queryClient.invalidateQueries({ queryKey: ['forums'] })
 
       return { ok: true, pending: needsApproval }
     } catch (err) {
@@ -467,6 +579,9 @@ export function ClubsProvider({ children }) {
           members: [...prev[clubId].members, userId],
         },
       }))
+
+      // Forum/conversation membership is handled automatically by database triggers
+      queryClient.invalidateQueries({ queryKey: ['forums'] })
 
       return true
     } catch (err) {
@@ -531,6 +646,7 @@ export function ClubsProvider({ children }) {
           members: (prev[clubId].members || []).filter((id) => id !== userId),
         },
       }))
+      queryClient.invalidateQueries({ queryKey: ['forums'] })
 
       return true
     } catch (err) {
@@ -608,27 +724,27 @@ export function ClubsProvider({ children }) {
     if (!universityId) return null
 
     // Check for an existing forum first
-    try {
+      try {
         const { data: existingForum, error: existingError } = await supabase
-        .from('forums')
-        .select('id, org_id, type')
-        .eq('type', 'org')
-        .eq('org_id', clubId)
-        .maybeSingle()
+          .from('forums')
+          .select('id, org_id, type')
+          .eq('type', 'org')
+          .eq('org_id', clubId)
+          .maybeSingle()
 
-      if (!existingError && existingForum?.id) {
-        setClubs((prev) => ({
-          ...prev,
-          [clubId]: {
-            ...prev[clubId],
-            forumId: existingForum.id,
-          },
-        }))
-        return existingForum.id
+        if (!existingError && existingForum?.id) {
+          setClubs((prev) => ({
+            ...prev,
+            [clubId]: {
+              ...prev[clubId],
+              forumId: existingForum.id,
+            },
+          }))
+          return existingForum.id
+        }
+      } catch (error) {
+        // If org_id column is missing, we'll fall back to creating a forum
       }
-    } catch (error) {
-      // If org_id column is missing, we'll fall back to creating a forum
-    }
 
     try {
       const { data: namedForum, error: namedError } = await supabase
@@ -640,6 +756,14 @@ export function ClubsProvider({ children }) {
         .maybeSingle()
 
       if (!namedError && namedForum?.id) {
+        try {
+          await supabase
+            .from('forums')
+            .update({ org_id: clubId })
+            .eq('id', namedForum.id)
+        } catch (updateError) {
+          console.warn('Failed to attach org to existing forum:', updateError)
+        }
         setClubs((prev) => ({
           ...prev,
           [clubId]: {
@@ -757,7 +881,7 @@ export function ClubsProvider({ children }) {
   }
 
   const createClub = async (clubData) => {
-    if (!currentUserId) return null
+    if (!currentUserId) return { id: null, error: 'You must be logged in to create an organization.' }
     if (!orgsAvailable) {
       return { id: null, error: 'Organizations are not available yet. Please try again later.' }
     }
@@ -773,7 +897,7 @@ export function ClubsProvider({ children }) {
 
       if (profileError) {
         console.error('Error fetching university for org:', profileError)
-        return { id: null, error: 'Failed to create organization.' }
+        return { id: null, error: 'Failed to fetch your university information. Please try again.' }
       }
       if (!userProfile?.university_id) {
         return { id: null, error: 'Please select a university before creating an organization.' }
@@ -829,6 +953,7 @@ export function ClubsProvider({ children }) {
         return { id: null, error: orgError.message || 'Failed to create organization.' }
       }
 
+      // Handle media uploads
       let logoPath = newOrg.logo_url
       let coverPath = newOrg.cover_url
       let logoDisplayUrl = newOrg.logo_url
@@ -849,6 +974,7 @@ export function ClubsProvider({ children }) {
           logoDisplayUrl = await createSignedUrlForPath(uploadResult.path)
         } catch (uploadError) {
           console.warn('Failed to upload org logo:', uploadError?.message || uploadError)
+          // Don't fail the whole creation for logo upload issues
         }
       }
 
@@ -867,9 +993,11 @@ export function ClubsProvider({ children }) {
           coverDisplayUrl = await createSignedUrlForPath(uploadResult.path)
         } catch (uploadError) {
           console.warn('Failed to upload org cover:', uploadError?.message || uploadError)
+          // Don't fail the whole creation for cover upload issues
         }
       }
 
+      // Update org with media URLs if uploads succeeded
       if (logoPath || coverPath) {
         const updates = {}
         if (logoPath) updates.logo_url = logoPath
@@ -883,6 +1011,7 @@ export function ClubsProvider({ children }) {
         }
       }
 
+      // Add creator as admin
       let memberInsertSuccess = false
       const { error: memberError } = await supabase
         .from('org_members')
@@ -898,18 +1027,30 @@ export function ClubsProvider({ children }) {
           console.warn('org_members table not found - skipping membership insert')
         } else {
           console.warn('Error adding creator as admin:', memberError)
+          // Continue with creation but warn about membership issue
         }
       } else {
         memberInsertSuccess = true
       }
 
-      // Update local state
+      // Forum is now created automatically by database trigger
+      // Just fetch the forum that should have been created
       let forumId = null
-      if (userProfile?.university_id) {
-        const forumResult = await insertOrgForum(newOrg, userProfile.university_id, isPublic)
-        forumId = forumResult.forumId
+      try {
+        const { data: forum, error: forumError } = await supabase
+          .rpc('get_org_forum_by_org_id', { p_org_id: newOrg.id })
+          .single()
+
+        if (!forumError && forum?.id) {
+          forumId = forum.id
+        } else {
+          console.warn('Forum not found after org creation:', forumError)
+        }
+      } catch (forumErr) {
+        console.warn('Error fetching org forum:', forumErr)
       }
 
+      // Update local state
       const creatorMembers = [currentUserId]
       const newClub = {
         id: newOrg.id,
@@ -940,10 +1081,13 @@ export function ClubsProvider({ children }) {
         [newOrg.id]: newClub,
       }))
 
+      // Refresh data to ensure consistency
+      await fetchClubs()
+
       return { id: newOrg.id, error: null }
     } catch (err) {
       console.error('Error in createClub:', err)
-      return { id: null, error: err.message || 'Failed to create organization.' }
+      return { id: null, error: err.message || 'An unexpected error occurred while creating the organization.' }
     }
   }
 

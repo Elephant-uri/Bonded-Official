@@ -1,30 +1,36 @@
-import React from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useAppTheme } from '../app/theme'
+import { useUnifiedForum } from '../contexts/UnifiedForumContext'
 import { hp, wp } from '../helpers/common'
 
 const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
   const theme = useAppTheme()
   const styles = createStyles(theme)
+  const { forums } = useUnifiedForum()
+
+  // Use currentForum from props or fallback to unified context
+  const forum = currentForum || forums[0]
   const getForumIcon = (type) => {
     switch (type) {
       case 'main':
-        return 'home'
+      case 'campus':
+        return 'globe-outline' // Changed to globe/earth as requested
       case 'class':
-        return 'school'
+        return 'school-outline'
       case 'org':
-        return 'people'
+        return 'people-outline'
       case 'private':
-        return 'lock-closed'
+        return 'lock-closed-outline'
       default:
-        return 'chatbubbles'
+        return 'chatbubbles-outline'
     }
   }
 
   const getForumColor = (type) => {
     switch (type) {
       case 'main':
+      case 'campus':
         return theme.colors.bondedPurple
       case 'class':
         return '#4ECDC4'
@@ -36,7 +42,7 @@ const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
         return theme.colors.bondedPurple
     }
   }
-  const hasMemberCount = currentForum?.memberCount !== undefined && currentForum?.memberCount !== null
+  const hasMemberCount = forum?.memberCount !== undefined && forum?.memberCount !== null
 
   return (
     <TouchableOpacity
@@ -44,20 +50,28 @@ const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={[styles.iconContainer, { backgroundColor: getForumColor(currentForum?.type || 'main') + '15' }]}>
-        <Ionicons
-          name={getForumIcon(currentForum?.type || 'main')}
-          size={hp(1.8)}
-          color={getForumColor(currentForum?.type || 'main')}
-        />
+      <View style={[styles.iconContainer, { backgroundColor: forum?.image ? 'transparent' : getForumColor(forum?.type || 'main') + '15' }]}>
+        {forum?.image ? (
+          <Image
+            source={{ uri: forum.image }}
+            style={styles.forumIconImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <Ionicons
+            name={getForumIcon(forum?.type || 'main')}
+            size={hp(1.8)}
+            color={getForumColor(forum?.type || 'main')}
+          />
+        )}
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.forumName} numberOfLines={1}>
-          {currentForum?.name || 'Main Forum'}
+          {forum?.name || 'Main Forum'}
         </Text>
         {hasMemberCount ? (
           <Text style={styles.memberCount}>
-            {currentForum.memberCount} members
+            {forum.memberCount} members
           </Text>
         ) : null}
       </View>
@@ -111,6 +125,12 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(2),
+    overflow: 'hidden', // Added for image
+  },
+  forumIconImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: hp(1.75),
   },
   textContainer: {
     flex: 1,

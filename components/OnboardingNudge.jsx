@@ -22,7 +22,7 @@ function OnboardingNudge() {
 
     // Check if user has basic profile data (username, full_name, etc.)
     // If they do, they're an existing user and shouldn't be forced to onboarding
-    const hasBasicProfileData = profile.username && profile.full_name && 
+    const hasBasicProfileData = profile.username && profile.full_name &&
       (profile.avatar_url || profile.major || profile.graduation_year)
 
     // Show nudge only if:
@@ -52,8 +52,7 @@ function OnboardingNudge() {
   }
 
   // Check if user has basic profile data
-  const hasBasicProfileData = profile?.username && profile?.full_name && 
-    (profile?.avatar_url || profile?.major || profile?.graduation_year)
+  const hasBasicProfileData = profile?.username && profile?.full_name
 
   if (!showNudge || !profile || profile.onboarding_complete || hasBasicProfileData) {
     return null
@@ -67,7 +66,7 @@ function OnboardingNudge() {
       transparent={true}
       animationType="fade"
       onRequestClose={handleDismiss}
-      // Prevent closing by tapping outside
+    // Prevent closing by tapping outside
     >
       <View style={styles.overlay}>
         <View style={[styles.nudgeCard, { backgroundColor: theme.colors.background }]}>

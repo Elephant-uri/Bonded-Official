@@ -4,6 +4,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import React, { useState } from 'react'
 import {
   KeyboardAvoidingView,
@@ -16,7 +17,10 @@ import {
   View,
 } from 'react-native'
 import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
+import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
 import { hp, wp } from '../../../helpers/common'
+import { parseScheduleImage } from '../../../services/scheduleParser'
+import { pickScheduleImage, takeSchedulePhoto } from '../../../utils/ocr/extractText'
 
 interface ScheduleUploadStepProps {
   formData: any
@@ -77,6 +81,55 @@ export default function ScheduleUploadStep({
 
   const [classes, setClasses] = useState<ClassEntry[]>(initialClasses)
   const [expandedId, setExpandedId] = useState<string | null>(classes[0]?.id || null)
+  const [isScanning, setIsScanning] = useState(false)
+
+  const handleScan = async (useCamera = false) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      const uri = useCamera ? await takeSchedulePhoto() : await pickScheduleImage()
+
+      if (!uri) return
+
+      setIsScanning(true)
+      const parsedClasses = await parseScheduleImage(uri)
+
+      if (parsedClasses && parsedClasses.length > 0) {
+        const dayMap: Record<string, string> = {
+          'Monday': 'M',
+          'Tuesday': 'T',
+          'Wednesday': 'W',
+          'Thursday': 'R',
+          'Friday': 'F',
+        }
+
+        const newClasses: ClassEntry[] = parsedClasses.map((c: any, index: number) => ({
+          id: `scanned-${Date.now()}-${index}`,
+          courseCode: c.class_code || '',
+          courseName: c.class_name || '',
+          professor: c.professor || '',
+          days: c.days_of_week.map((d: string) => dayMap[d] || d.charAt(0)) || [],
+          startTime: c.start_time || '',
+          endTime: c.end_time || '',
+          location: c.location || '',
+        }))
+
+        const finalClasses = [...classes.filter(c => c.courseCode), ...newClasses]
+        setClasses(finalClasses.length > 0 ? finalClasses : [createEmptyClass()])
+        saveSchedule(finalClasses.length > 0 ? finalClasses : [createEmptyClass()])
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+
+        if (newClasses.length > 0) {
+          setExpandedId(newClasses[0].id)
+        }
+      }
+    } catch (error: any) {
+      console.error('Scan failed:', error)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      Alert.alert('Scan Failed', error.message || 'Could not parse schedule. Please try a clearer photo.')
+    } finally {
+      setIsScanning(false)
+    }
+  }
 
   const updateClass = (id: string, field: keyof ClassEntry, value: any) => {
     const updatedClasses = classes.map(c =>
@@ -135,7 +188,13 @@ export default function ScheduleUploadStep({
       rawText: '',
     }
 
-    updateFormData('class_schedule', { parsedSchedule })
+    updateFormData(ONBOARDING_STEPS.CLASS_SCHEDULE, {
+      classSchedule: {
+        parsedSchedule,
+        courses: parsedSchedule.courses,
+        rawText: parsedSchedule.rawText || '',
+      },
+    })
     onScheduleParsed(parsedSchedule)
   }
 
@@ -170,7 +229,7 @@ export default function ScheduleUploadStep({
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <View style={styles.iconBackground}>
-              <Ionicons name="book-outline" size={hp(4)} color={ONBOARDING_THEME.colors.primary} />
+              <Ionicons name="book-outline" size={hp(4)} color={ONBOARDING_THEME.colors.bondedPurple} />
             </View>
           </View>
 
@@ -183,6 +242,39 @@ export default function ScheduleUploadStep({
               <Text style={styles.progressText}>{completedCount} class{completedCount !== 1 ? 'es' : ''} added</Text>
             </View>
           )}
+        </View>
+
+        {/* OCR Scan Options */}
+        <View style={styles.scanContainer}>
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={() => handleScan(false)}
+            disabled={isScanning}
+            activeOpacity={0.8}
+          >
+            <View style={styles.scanIconContainer}>
+              <Ionicons name="image-outline" size={hp(2.5)} color="#FFFFFF" />
+            </View>
+            <Text style={styles.scanButtonText}>
+              {isScanning ? 'Scanning...' : 'Upload Photo'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.scanButton, styles.scanButtonOutline]}
+            onPress={() => handleScan(true)}
+            disabled={isScanning}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="camera-outline" size={hp(2.5)} color={ONBOARDING_THEME.colors.bondedPurple} />
+            <Text style={[styles.scanButtonText, styles.scanButtonTextOutline]}>Take Photo</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR ENTER MANUALLY</Text>
+          <View style={styles.dividerLine} />
         </View>
 
         {/* Class Cards */}
@@ -342,7 +434,7 @@ export default function ScheduleUploadStep({
           activeOpacity={0.7}
         >
           <View style={styles.addClassIconContainer}>
-            <Ionicons name="add" size={hp(2.5)} color={ONBOARDING_THEME.colors.primary} />
+            <Ionicons name="add" size={hp(2.5)} color={ONBOARDING_THEME.colors.bondedPurple} />
           </View>
           <Text style={styles.addClassText}>Add Another Class</Text>
         </TouchableOpacity>
@@ -384,7 +476,7 @@ const createStyles = (theme: any) =>
       width: hp(8),
       height: hp(8),
       borderRadius: hp(4),
-      backgroundColor: `${theme.colors.primary}15`,
+      backgroundColor: `${theme.colors.bondedPurple}15`,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -431,6 +523,63 @@ const createStyles = (theme: any) =>
       elevation: 2,
       borderWidth: 1,
       borderColor: 'rgba(0,0,0,0.04)',
+    },
+    scanContainer: {
+      flexDirection: 'row',
+      gap: wp(3),
+      marginBottom: hp(3),
+    },
+    scanButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: ONBOARDING_THEME.colors.bondedPurple,
+      paddingVertical: hp(1.8),
+      borderRadius: 14,
+      gap: wp(2),
+      shadowColor: ONBOARDING_THEME.colors.bondedPurple,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    scanButtonOutline: {
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderColor: ONBOARDING_THEME.colors.bondedPurple,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    scanIconContainer: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      padding: wp(1),
+      borderRadius: 8,
+    },
+    scanButtonText: {
+      color: '#FFFFFF',
+      fontSize: hp(1.7),
+      fontWeight: '700',
+    },
+    scanButtonTextOutline: {
+      color: ONBOARDING_THEME.colors.bondedPurple,
+    },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: hp(3),
+      gap: wp(3),
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: '#E0E0E0',
+    },
+    dividerText: {
+      fontSize: hp(1.2),
+      fontWeight: '700',
+      color: '#BDBDBD',
+      letterSpacing: 1,
     },
     cardHeader: {
       flexDirection: 'row',
@@ -515,8 +664,8 @@ const createStyles = (theme: any) =>
       borderColor: 'transparent',
     },
     dayButtonActive: {
-      backgroundColor: `${theme.colors.primary}15`,
-      borderColor: theme.colors.primary,
+      backgroundColor: `${theme.colors.bondedPurple}15`,
+      borderColor: theme.colors.bondedPurple,
     },
     dayButtonText: {
       fontSize: hp(1.5),
@@ -524,7 +673,7 @@ const createStyles = (theme: any) =>
       color: '#8E8E8E',
     },
     dayButtonTextActive: {
-      color: theme.colors.primary,
+      color: theme.colors.bondedPurple,
     },
     timeRow: {
       flexDirection: 'row',
@@ -541,15 +690,15 @@ const createStyles = (theme: any) =>
       marginTop: hp(2),
       borderRadius: 14,
       borderWidth: 2,
-      borderColor: theme.colors.primary,
+      borderColor: theme.colors.bondedPurple,
       borderStyle: 'dashed',
-      backgroundColor: `${theme.colors.primary}08`,
+      backgroundColor: `${theme.colors.bondedPurple}08`,
     },
     addClassIconContainer: {
       width: hp(3.5),
       height: hp(3.5),
       borderRadius: hp(1.75),
-      backgroundColor: `${theme.colors.primary}20`,
+      backgroundColor: `${theme.colors.bondedPurple}20`,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: wp(2.5),
@@ -557,7 +706,7 @@ const createStyles = (theme: any) =>
     addClassText: {
       fontSize: hp(1.7),
       fontWeight: '600',
-      color: theme.colors.primary,
+      color: theme.colors.bondedPurple,
     },
     helperContainer: {
       flexDirection: 'row',

@@ -57,6 +57,9 @@ export const useSaveOnboarding = () => {
               const uploadedCount = uploadedPhotos.filter(p => p.uploadedUrl).length
               console.log(`✅ Successfully uploaded ${uploadedCount} photo(s)`)
 
+              // Update formData with uploaded photos to prevent re-upload
+              formData.photos = uploadedPhotos
+
               // Check if some photos failed to upload
               const failedCount = formData.photos.length - uploadedCount
               if (failedCount > 0) {
@@ -101,7 +104,17 @@ export const useSaveOnboarding = () => {
       if (universityId) {
         updateData.university_id = universityId
       }
-      if (formData.fullName) updateData.full_name = formData.fullName.trim()
+      // Combine first and last name into full_name
+      if (formData.firstName && formData.lastName) {
+        updateData.full_name = `${formData.firstName.trim()} ${formData.lastName.trim()}`
+      } else if (formData.firstName) {
+        updateData.full_name = formData.firstName.trim()
+      } else if (formData.lastName) {
+        updateData.full_name = formData.lastName.trim()
+      } else if (formData.fullName) {
+        // Fallback for old data format
+        updateData.full_name = formData.fullName.trim()
+      }
       if (formData.username) updateData.username = formData.username.toLowerCase().trim()
       if (formData.age) updateData.age = formData.age
       if (formData.grade) updateData.grade = formData.grade
@@ -134,8 +147,12 @@ export const useSaveOnboarding = () => {
         updateData.onboarding_step = completedSteps[completedSteps.length - 1]
       }
 
-      // Mark onboarding as complete if 100%
-      if (completionPercentage >= 100) {
+      // Mark onboarding as complete if all REQUIRED steps are done
+      // Note: We use the same metadata logic as the store
+      const mandatorySteps = ['basic_info', 'photos'] // Standard required steps
+      const isComplete = mandatorySteps.every(step => completedSteps.includes(step))
+
+      if (isComplete) {
         updateData.onboarding_complete = true
       }
 

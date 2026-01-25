@@ -1,28 +1,27 @@
-import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowLeft, ArrowDownCircle, Heart, HeartFill, MessageCircle, MoreHorizontal, Repeat, Share2, X } from '../../components/Icons'
+import { ArrowLeft, Heart, HeartFill, MessageCircle, MoreHorizontal, Repeat, Share2, X } from '../../components/Icons'
 import { hp, wp } from '../../helpers/common'
 import { useComments } from '../../hooks/useComments'
 import { usePosts } from '../../hooks/usePosts'
-import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../stores/authStore'
 import { useAppTheme } from '../theme'
 
 export default function SharedPostScreen() {
@@ -33,8 +32,13 @@ export default function SharedPostScreen() {
   const { user } = useAuthStore()
   const styles = createStyles(theme)
   
-  const postId = params.postId || params.id
+  // Debug: Log what parameters we receive
+  console.log('🔍 Forum page received params:', params)
+  
+  const postId = params.post || params.postId || params.id
   const forumId = params.forumId
+  
+  console.log('🔍 Extracted IDs:', { postId, forumId })
   
   // Fetch the specific post
   const { data: postsData, isLoading: postsLoading } = usePosts(forumId, {})
@@ -44,7 +48,9 @@ export default function SharedPostScreen() {
   }, [postsData])
   
   const post = useMemo(() => {
-    return posts.find((p) => p.id === postId)
+    const foundPost = posts.find((p) => p.id === postId)
+    console.log('🔍 Looking for post:', { postId, totalPosts: posts.length, foundPost })
+    return foundPost
   }, [posts, postId])
   
   const {

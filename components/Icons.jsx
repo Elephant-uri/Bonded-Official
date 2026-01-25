@@ -4,8 +4,8 @@
  * Falls back to Expo icons if lucide-react-native has issues
  */
 
-import React from 'react'
 import { Ionicons } from '@expo/vector-icons'
+import React from 'react'
 
 // Icon mapping: lucide name -> Ionicons name
 const ICON_MAP = {
@@ -32,7 +32,7 @@ const ICON_MAP = {
   'Video': 'videocam-outline',
   'EyeOff': 'eye-off-outline',
   'Person': 'person-outline',
-  'Repeat': 'repeat-outline',
+  'Repeat': 'refresh-outline',
   'Share2': 'share-outline',
   'Heart': 'heart-outline',
   'HeartFill': 'heart',
@@ -50,6 +50,9 @@ const ICON_MAP = {
   'MoreVertical': 'ellipsis-vertical',
   'Clock': 'time-outline',
   'Settings': 'settings-outline',
+  'Camera': 'camera-outline',
+  'Send': 'send-outline',
+  'FileText': 'document-text-outline',
 }
 
 /**
@@ -112,4 +115,5 @@ export const CheckCircle = createIcon('CheckCircle')
 export const MoreVertical = createIcon('MoreVertical')
 export const Clock = createIcon('Clock')
 export const Settings = createIcon('Settings')
+export const FileText = createIcon('FileText')
 

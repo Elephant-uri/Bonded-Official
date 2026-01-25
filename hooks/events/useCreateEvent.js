@@ -32,8 +32,8 @@ export function useCreateEvent() {
 
       // Map calendar event data to database schema
       const eventInput = {
-        organizer_id: user.id,
-        organizer_type: eventData.org_id ? 'org' : 'user',
+        organizer_id: eventData.organizer_id || user.id,
+        organizer_type: eventData.organizer_type || (eventData.org_id ? 'org' : 'user'),
         title: eventData.title,
         description: eventData.description || null,
         image_url: eventData.image_url || null,
@@ -49,9 +49,15 @@ export function useCreateEvent() {
         is_paid: eventData.is_paid || false,
         created_by: user.id,
         source: 'user',
+        type: eventData.type || 'event',
         university_id: profile.university_id,
         ticket_types: eventData.ticket_types || [],
         invites: eventData.invites || [],
+        sticker: eventData.sticker || null,
+        is_recurring: eventData.is_recurring || false,
+        recurring_frequency: eventData.recurring_frequency || null,
+        recurring_days: eventData.recurring_days || [],
+        recurring_end_date: eventData.recurring_end_date || null,
       }
 
       console.log('Creating event with data:', eventInput)

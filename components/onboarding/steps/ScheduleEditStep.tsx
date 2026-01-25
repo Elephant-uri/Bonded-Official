@@ -10,27 +10,31 @@ import { Ionicons } from '@expo/vector-icons'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import React, { useEffect, useState } from 'react'
 import {
-  Alert,
-  FlatList,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 import { supabase } from '../../../lib/supabase'
 import { ComponentDraft, ComponentType, CourseDraft } from '../../../utils/schedule/parseSchedule'
 
+// Import JavaScript hook with require for TypeScript compatibility
+const useCurrentUserProfile: () => { data: { university_id: string } | null } = require('../../../hooks/useCurrentUserProfile').useCurrentUserProfile
+
 interface Course {
   id: string
   subject_code: string
   course_number: string
   full_code: string
+  course_name?: string
 }
 
 interface ScheduleEditStepProps {
@@ -42,6 +46,7 @@ interface ScheduleEditStepProps {
 export default function ScheduleEditStep({ courses: initialCourses, onSave, onScroll }: ScheduleEditStepProps) {
   const styles = createStyles(ONBOARDING_THEME)
   const [courses, setCourses] = useState<CourseDraft[]>(initialCourses)
+  const { data: userProfile } = useCurrentUserProfile()
 
   // Course search modal state
   const [showCourseSearch, setShowCourseSearch] = useState(false)
@@ -62,21 +67,45 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
   // Search courses from Supabase
   useEffect(() => {
     const searchCourses = async () => {
-      if (courseSearchQuery.length < 2) {
+      if (courseSearchQuery.length < 2 || !userProfile?.university_id) {
         setCourseSearchResults([])
         return
       }
 
       setSearchLoading(true)
       try {
-        const { data, error } = await supabase
+        // Smart search: handle "CSC 110" format by splitting into subject and number
+        const trimmedQuery = courseSearchQuery.trim()
+        const parts = trimmedQuery.split(/\s+/)
+
+        let query = supabase
           .from('courses')
-          .select('id, subject_code, course_number, full_code')
-          .or(`full_code.ilike.%${courseSearchQuery}%,subject_code.ilike.%${courseSearchQuery}%`)
-          .limit(20)
+          .select('id, subject_code, course_number')
+          .eq('university_id', userProfile.university_id)
+
+        if (parts.length >= 2) {
+          // Multi-part search like "CSC 110" - search by subject AND number
+          const subjectPart = parts[0]
+          const numberPart = parts.slice(1).join(' ')
+          query = query
+            .ilike('subject_code', `%${subjectPart}%`)
+            .ilike('course_number', `%${numberPart}%`)
+        } else {
+          // Single word search - search subject OR number
+          query = query.or(`subject_code.ilike.%${trimmedQuery}%,course_number.ilike.%${trimmedQuery}%`)
+        }
+
+        const { data, error } = await query.limit(20)
 
         if (error) throw error
-        setCourseSearchResults(data || [])
+
+        // Transform data to match interface
+        const transformedData = (data || []).map(course => ({
+          ...course,
+          full_code: `${course.subject_code} ${course.course_number}`
+        }))
+
+        setCourseSearchResults(transformedData)
       } catch (error) {
         console.error('Error searching courses:', error)
         setCourseSearchResults([])
@@ -87,7 +116,7 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
 
     const debounce = setTimeout(searchCourses, 300)
     return () => clearTimeout(debounce)
-  }, [courseSearchQuery])
+  }, [courseSearchQuery, userProfile?.university_id])
 
   const updateCourse = (index: number, updates: Partial<CourseDraft>) => {
     const updated = [...courses]
@@ -399,7 +428,7 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
 
         {/* Add Course Button */}
         <TouchableOpacity style={styles.addCourseButton} onPress={handleAddCourse}>
-          <Ionicons name="add-circle-outline" size={hp(2.5)} color={ONBOARDING_THEME.colors.primary} />
+          <Ionicons name="add-circle-outline" size={hp(2.5)} color={ONBOARDING_THEME.colors.bondedPurple} />
           <Text style={styles.addCourseText}>Add Another Course</Text>
         </TouchableOpacity>
 
@@ -454,7 +483,7 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
                 <TouchableOpacity style={styles.courseSearchItem} onPress={() => selectCourse(item)}>
                   <View style={styles.courseSearchItemContent}>
                     <Text style={styles.courseSearchCode}>{item.full_code}</Text>
-                    <Text style={styles.courseSearchSubject}>{item.subject_code}</Text>
+                    <Text style={styles.courseSearchSubject}>{item.subject_code} {item.course_number}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={hp(2.5)} color="#CCC" />
                 </TouchableOpacity>
@@ -764,25 +793,28 @@ const createStyles = (theme: any) =>
     },
     addCourseText: {
       fontSize: hp(1.7),
-      color: theme.colors.primary,
+      color: theme.colors.bondedPurple,
       fontWeight: '600',
       marginLeft: wp(2),
     },
     saveButton: {
-      backgroundColor: theme.colors.primary,
-      borderRadius: 14,
-      paddingVertical: hp(2),
+      backgroundColor: theme.colors.bondedPurple,
+      borderRadius: 16,
+      paddingVertical: hp(2.5),
+      paddingHorizontal: wp(6),
       alignItems: 'center',
-      marginTop: hp(1),
-      shadowColor: theme.colors.primary,
+      marginTop: hp(3),
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
+      shadowOpacity: 0.15,
       shadowRadius: 8,
-      elevation: 4,
+      elevation: 6,
+      borderWidth: 2,
+      borderColor: theme.colors.bondedPurple,
     },
     saveButtonText: {
-      fontSize: hp(1.9),
-      fontWeight: '700',
+      fontSize: hp(2.2),
+      fontWeight: '800',
       color: '#FFFFFF',
       letterSpacing: 0.5,
     },

@@ -17,7 +17,7 @@ export function useMatchClass() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async ({ classCode, className, professor, semester, days, startTime, endTime, location }) => {
+    mutationFn: async ({ classCode, className, sectionNumber = null, professor, semester, termCode, days, startTime, endTime, location }) => {
       if (!user) {
         throw new Error('User must be authenticated')
       }
@@ -34,23 +34,21 @@ export function useMatchClass() {
       }
       
       const normalizedCode = normalizeClassCode(classCode)
-      
-      // Try to find existing class
-      let { data: existingClass, error: findError } = await supabase
+
+      // Try to find existing class in classes table (this is what sections/forums/enrollments reference)
+      let { data: existingClass } = await supabase
         .from('classes')
-        .select('*')
+        .select('id, class_code, class_name')
         .eq('university_id', profile.university_id)
         .or(`class_code.eq.${classCode},class_code.eq.${normalizedCode}`)
-        .limit(1)
-        .single()
-      
+        .maybeSingle()
+
       let classId
-      
+
       if (existingClass) {
-        // Class exists, use it
         classId = existingClass.id
-        
-        // Update class name if provided and different
+
+        // Update name if provided and different
         if (className && className !== existingClass.class_name) {
           await supabase
             .from('classes')
@@ -58,67 +56,75 @@ export function useMatchClass() {
             .eq('id', classId)
         }
       } else {
-        // Create new class
         const { data: newClass, error: createError } = await supabase
           .from('classes')
           .insert({
             university_id: profile.university_id,
             class_code: classCode,
-            class_name: className || '',
-            department: extractDepartment(classCode)
+            class_name: className || classCode,
+            department: extractDepartment(classCode),
           })
-          .select()
+          .select('id')
           .single()
-        
+
         if (createError) {
           throw createError
         }
-        
+
         classId = newClass.id
       }
       
       // Find or create class section
       let sectionId = null
-      
-      if (professor || days || startTime || location) {
-        // Try to find existing section
-        const { data: existingSection } = await supabase
+
+      // Only attempt section matching if we have a section number (preferred) or enough section metadata
+      if (sectionNumber || professor || days || startTime || location) {
+        const resolvedSemester = semester || getCurrentSemester()
+        const resolvedTermCode = termCode || getCurrentTermCode()
+
+        let sectionQuery = supabase
           .from('class_sections')
           .select('id')
           .eq('class_id', classId)
-          .eq('professor_name', professor || '')
-          .eq('semester', semester || '')
-          .limit(1)
-          .single()
-        
+          .eq('term_code', resolvedTermCode)
+
+        if (sectionNumber) {
+          sectionQuery = sectionQuery.eq('section_number', sectionNumber)
+        }
+
+        const { data: existingSection } = await sectionQuery.maybeSingle()
+
         if (existingSection) {
           sectionId = existingSection.id
-        } else {
-          // Create new section
+        } else if (sectionNumber) {
           const { data: newSection, error: sectionError } = await supabase
             .from('class_sections')
             .insert({
               class_id: classId,
+              section_number: sectionNumber,
               professor_name: professor || null,
-              semester: semester || null,
+              semester: resolvedSemester,
+              term_code: resolvedTermCode,
               days_of_week: days || [],
               start_time: startTime || null,
               end_time: endTime || null,
-              location: location || null
+              location: location || null,
             })
-            .select()
+            .select('id')
             .single()
-          
-          if (!sectionError && newSection) {
-            sectionId = newSection.id
+
+          if (sectionError) {
+            throw sectionError
           }
+
+          sectionId = newSection?.id || null
         }
       }
       
       return {
         classId,
         sectionId,
-        class: existingClass || { id: classId, class_code: classCode, class_name: className }
+        class: existingClass || { id: classId, class_code: classCode, class_name: className || classCode }
       }
     },
     onSuccess: () => {
@@ -141,6 +147,9 @@ export function useEnrollInClass() {
       if (!user) {
         throw new Error('User must be authenticated')
       }
+
+      const resolvedSemester = semester || getCurrentSemester()
+      const resolvedTermCode = termCode || getCurrentTermCode()
       
       // Check if already enrolled
       const { data: existing } = await supabase
@@ -148,7 +157,7 @@ export function useEnrollInClass() {
         .select('id')
         .eq('user_id', user.id)
         .eq('class_id', classId)
-        .eq('semester', semester || '')
+        .eq('term_code', resolvedTermCode)
         .limit(1)
         .single()
       
@@ -164,8 +173,8 @@ export function useEnrollInClass() {
           user_id: user.id,
           class_id: classId,
           section_id: sectionId || null,
-          semester: semester || getCurrentSemester(),
-          term_code: termCode || getCurrentTermCode(),
+          semester: resolvedSemester,
+          term_code: resolvedTermCode,
           is_active: true
         })
         .select()
@@ -188,13 +197,13 @@ export function useEnrollInClass() {
  * Find classmates (users in same classes)
  * Filters by same professor if provided
  */
-export function useClassmates(classId, professorName = null) {
+export function useClassmates(courseId, professorName = null) {
   const { user } = useAuthStore()
   
   return useQuery({
-    queryKey: ['classmates', classId, professorName, user?.id],
+    queryKey: ['classmates', courseId, professorName, user?.id],
     queryFn: async () => {
-      if (!user || !classId) {
+      if (!user || !courseId) {
         return []
       }
       
@@ -215,7 +224,7 @@ export function useClassmates(classId, professorName = null) {
             professor_name
           )
         `)
-        .eq('class_id', classId)
+        .eq('class_id', courseId)
         .eq('is_active', true)
         .neq('user_id', user.id) // Exclude current user
       
@@ -237,7 +246,7 @@ export function useClassmates(classId, professorName = null) {
         professor: enrollment.section?.professor_name || null
       }))
     },
-    enabled: !!user && !!classId
+    enabled: !!user && !!courseId
   })
 }
 
@@ -321,7 +330,7 @@ export function useAllClassmates() {
         
         const classmate = classmatesMap.get(userId)
         classmate.sharedClasses.push({
-          classCode: enrollment.class?.class_code,
+          courseCode: enrollment.class?.class_code,
           className: enrollment.class?.class_name,
           professor: enrollment.section?.professor_name
         })
@@ -331,6 +340,34 @@ export function useAllClassmates() {
     },
     enabled: !!user
   })
+}
+
+function getCurrentSemester() {
+  const now = new Date()
+  const month = now.getMonth() // 0-11
+  const year = now.getFullYear()
+
+  if (month >= 0 && month <= 4) {
+    return `Spring ${year}`
+  }
+  if (month >= 5 && month <= 7) {
+    return `Summer ${year}`
+  }
+  return `Fall ${year}`
+}
+
+function getCurrentTermCode() {
+  const now = new Date()
+  const month = now.getMonth()
+  const year = now.getFullYear()
+
+  if (month >= 0 && month <= 4) {
+    return `${year}SP`
+  }
+  if (month >= 5 && month <= 7) {
+    return `${year}SU`
+  }
+  return `${year}FA`
 }
 
 /**
@@ -359,40 +396,6 @@ function extractDepartment(classCode) {
   }
   
   return null
-}
-
-/**
- * Helper: Get current semester (e.g., "Fall 2024")
- */
-function getCurrentSemester() {
-  const now = new Date()
-  const month = now.getMonth() // 0-11
-  const year = now.getFullYear()
-  
-  if (month >= 0 && month <= 4) {
-    return `Spring ${year}`
-  } else if (month >= 5 && month <= 7) {
-    return `Summer ${year}`
-  } else {
-    return `Fall ${year}`
-  }
-}
-
-/**
- * Helper: Get current term code (e.g., "2024FA")
- */
-function getCurrentTermCode() {
-  const now = new Date()
-  const month = now.getMonth()
-  const year = now.getFullYear()
-
-  if (month >= 0 && month <= 4) {
-    return `${year}SP`
-  } else if (month >= 5 && month <= 7) {
-    return `${year}SU`
-  } else {
-    return `${year}FA`
-  }
 }
 
 /**

@@ -1,30 +1,37 @@
-import React, { useMemo, useState } from 'react'
-import {
-  Alert,
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  FlatList,
-  Image,
-  TextInput,
-  Platform,
-} from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { hp, wp } from '../helpers/common'
+import { useMemo, useState } from 'react'
+import {
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppTheme } from '../app/theme'
-import AppHeader from './AppHeader'
-import AppCard from './AppCard'
+import { hp, wp } from '../helpers/common'
 import { useFriends } from '../hooks/useFriends'
 import { useCreateConversation, useSendMessage } from '../hooks/useMessages'
+import AppCard from './AppCard'
+import AppHeader from './AppHeader'
 
 export default function ShareModal({ visible, content, onClose, presentationStyle = 'pageSheet', transparent = false }) {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const insets = useSafeAreaInsets()
+
+  // Debug: Log what content we receive
+  console.log('🔍 ShareModal received content:', {
+    type: content?.type,
+    data: content?.data,
+    fullContent: content
+  })
   const allowTransparent = transparent && (presentationStyle === 'overFullScreen' || presentationStyle === 'fullScreen')
   const modalTransparentProps = allowTransparent ? { transparent: true } : {}
   const router = useRouter()
@@ -63,33 +70,34 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
   const buildShareText = () => {
     switch (content.type) {
       case 'event': {
-        const startDate = content.data.start_at || content.data.startDate
-        const dateLabel = startDate
-          ? new Date(startDate).toLocaleDateString()
-          : 'Event'
-        const location = content.data.location_name || content.data.location || content.data.location_address || 'Event'
-        return `Event: ${content.data.title}\n${location} • ${dateLabel}`
+        return content.data.title || 'Event'
       }
       case 'post': {
-        const title = content.data.title || 'Forum Post'
-        const body = content.data.body ? content.data.body.slice(0, 140) : ''
-        return body ? `Post: ${title}\n${body}` : `Post: ${title}`
+        const title = content.data.title || 'Post'
+        return title
       }
-      case 'story':
+      case 'story': {
         return `Story from ${content.data.userName || 'someone'}`
-      case 'professor':
-        return `${content.data.name} • ${content.data.department}`
-      case 'club':
-        return `${content.data.name} • ${content.data.category || 'Club'}`
+      }
+      case 'professor': {
+        return content.data.name || 'Professor'
+      }
+      case 'organization':
+      case 'org': {
+        return content.data.name || 'Organization'
+      }
+      case 'club': {
+        return content.data.name || 'Club'
+      }
+      case 'class': {
+        return content.data.name || content.data.course_name || 'Class'
+      }
       case 'comment': {
-        const postTitle = content.data.postTitle || 'Forum Post'
-        const body = content.data.body ? content.data.body.slice(0, 140) : ''
-        return body ? `Comment on ${postTitle}\n${body}` : `Comment on ${postTitle}`
+        const postTitle = content.data.postTitle || 'Post'
+        return `Comment on "${postTitle}"`
       }
       case 'profile': {
-        const major = content.data.majorLabel || content.data.major || 'Student'
-        const year = content.data.year ? `Class of ${content.data.year}` : null
-        return `Profile: ${content.data.name}\n${[major, year].filter(Boolean).join(' • ')}`
+        return content.data.name || content.data.username || 'Profile'
       }
       default:
         return 'Shared content'
@@ -104,6 +112,7 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
 
     const shareText = buildShareText()
     const userMessage = message.trim()
+    // Always include content - either user message or post title
     const fullMessage = userMessage ? `${userMessage}\n\n${shareText}` : shareText
 
     const shareData = {
@@ -114,6 +123,16 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
 
     try {
       const conversationIds = []
+      
+      // Debug: Log what we're about to send
+      console.log('📤 About to send message:', {
+        shareText,
+        userMessage,
+        fullMessage,
+        shareData,
+        contentData: content.data
+      })
+      
       for (const friendId of selectedFriends) {
         const conversationId = await createConversation.mutateAsync({ otherUserId: friendId })
         
@@ -124,23 +143,68 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
         // Include metadata for shared posts/comments so they can be displayed properly
         const messageMetadata = content.type === 'post' ? {
           ...baseMetadata,
-          postId: content.data.id,
-          forumId: content.data.forumId || content.data.forum_id || null,
-          postTitle: content.data.title || '',
-          postBody: content.data.body || '',
+          post_id: content.data.id,
+          forum_id: content.data.forumId || content.data.forum_id || null,
+          title: content.data.title || '',
+          body: content.data.body || '',
+          forum_name: content.data.forum?.name || 'Forum',
+          comments_count: content.data.comments_count || 0,
+          upvotes_count: content.data.upvotes_count || 0,
+          image_url: content.data.media_urls?.[0] || content.data.image_url || null,
         } : content.type === 'comment' ? {
           ...baseMetadata,
-          commentId: content.data.id,
-          postId: content.data.postId,
-          forumId: content.data.forumId || null,
-          commentBody: content.data.body || '',
-          postTitle: content.data.postTitle || '',
+          comment_id: content.data.id,
+          post_id: content.data.postId,
+          forum_id: content.data.forumId || null,
+          body: content.data.body || '',
+          post_title: content.data.postTitle || '',
+        } : content.type === 'event' ? {
+          ...baseMetadata,
+          event_id: content.data.id,
+          title: content.data.title || '',
+          image_url: content.data.image_url || null,
+          start_at: content.data.start_at || '',
+          location_name: content.data.location_name || content.data.location || '',
+          attendee_count: content.data.attendee_count || 0,
+        } : content.type === 'organization' || content.type === 'org' ? {
+          ...baseMetadata,
+          org_id: content.data.id,
+          name: content.data.name || '',
+          logo_url: content.data.logo_url || null,
+          category: content.data.category || '',
+          member_count: content.data.member_count || 0,
+        } : content.type === 'class' || content.type === 'club' ? {
+          ...baseMetadata,
+          class_id: content.data.id,
+          name: content.data.name || content.data.course_name || '',
+          description: content.data.description || '',
+          professor_name: content.data.professor_name || '',
+        } : content.type === 'profile' ? {
+          ...baseMetadata,
+          user_id: content.data.id,
+          full_name: content.data.full_name || content.data.username || '',
+          username: content.data.username || '',
+          avatar_url: content.data.avatar_url || null,
+          major: content.data.major || '',
+          graduation_year: content.data.graduation_year || null,
         } : baseMetadata
+        
+        // Debug: Log the final metadata
+        console.log('📋 Final metadata for post:', messageMetadata)
+
+        // Determine message type
+        const messageType = content.type === 'post' ? 'post_share' :
+                          content.type === 'comment' ? 'post_share' :
+                          content.type === 'event' ? 'event_share' :
+                          content.type === 'organization' || content.type === 'org' ? 'org_share' :
+                          content.type === 'profile' ? 'profile_share' :
+                          'text'
         
         await sendMessage.mutateAsync({ 
           conversationId, 
           content: fullMessage,
           metadata: messageMetadata,
+          // message_type: messageType, // Remove this line
         })
         conversationIds.push({ friendId, conversationId })
       }
@@ -149,17 +213,21 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
         const recipient = friendOptions.find((friend) => friend.id === selectedFriends[0])
         const conversationId = conversationIds[0]?.conversationId
         if (conversationId) {
+          console.log('📱 Navigating to chat after sharing:', { conversationId, recipient })
           router.push({
             pathname: '/chat',
             params: {
               conversationId,
               userId: selectedFriends[0],
-              userName: recipient?.name || 'User',
-              share: JSON.stringify(shareData),
+              userName: recipient?.name || recipient?.full_name || 'User',
             },
           })
+        } else {
+          console.warn('⚠️ No conversationId found after sharing')
+          router.push('/messages')
         }
       } else {
+        console.log('📱 Shared to multiple friends, navigating to messages list')
         router.push('/messages')
       }
 

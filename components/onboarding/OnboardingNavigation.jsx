@@ -1,4 +1,3 @@
-import React from 'react'
 import { StyleSheet, View } from 'react-native'
 import { ONBOARDING_THEME } from '../../constants/onboardingTheme'
 import { hp, wp } from '../../helpers/common'
@@ -19,12 +18,13 @@ const OnboardingNavigation = ({
         <Button
           title={isSaving ? "Saving..." : "Continue"}
           onPress={onContinue}
+          disabled={!canContinue || isSaving}
           buttonStyle={[
             styles.button,
             styles.continueButton,
-            !canContinue && styles.buttonDisabled,
+            (!canContinue || isSaving) && styles.buttonDisabled,
           ]}
-          textStyle={!canContinue && styles.buttonDisabledText}
+          textStyle={(!canContinue || isSaving) && styles.buttonDisabledText}
           theme={ONBOARDING_THEME}
           hasShadow={false}
         />
@@ -41,13 +41,11 @@ const createStyles = (theme) => StyleSheet.create({
   },
   primaryButtons: {
     flexDirection: 'row',
-    gap: wp(3),
+    justifyContent: 'center',
     paddingHorizontal: wp(5),
   },
   button: {
-    flex: 1,
-    maxWidth: '90%',
-    alignSelf: 'center',
+    width: '90%',
     paddingVertical: hp(1.4),
     borderRadius: 14,
   },

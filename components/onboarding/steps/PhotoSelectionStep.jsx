@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import * as ImageManipulator from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
@@ -9,6 +9,7 @@ import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
 
 const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
   const styles = createStyles(ONBOARDING_THEME)
+  const isUpdatingFromFormData = useRef(false)
   const [yearbookPhoto, setYearbookPhoto] = useState(
     formData.photos?.find(p => p.isYearbookPhoto) || null
   )
@@ -18,12 +19,29 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [quote, setQuote] = useState(formData.yearbookQuote || '')
 
+  // Sync photos from formData when component mounts or formData changes
+  useEffect(() => {
+    if (formData.photos && !isUpdatingFromFormData.current) {
+      const newYearbookPhoto = formData.photos.find(p => p.isYearbookPhoto) || null
+      const newGalleryPhotos = formData.photos.filter(p => !p.isYearbookPhoto) || []
+      
+      setYearbookPhoto(newYearbookPhoto)
+      setGalleryPhotos(newGalleryPhotos)
+    }
+  }, [formData.photos])
+
   // Helper to update formData with current photos
   const syncPhotosToFormData = (newYearbookPhoto, newGalleryPhotos) => {
+    isUpdatingFromFormData.current = true
     const allPhotos = []
     if (newYearbookPhoto) allPhotos.push(newYearbookPhoto)
     allPhotos.push(...newGalleryPhotos)
     updateFormData(ONBOARDING_STEPS.PHOTOS, { photos: allPhotos })
+    
+    // Reset flag after a short delay to allow formData to update
+    setTimeout(() => {
+      isUpdatingFromFormData.current = false
+    }, 100)
   }
 
   // Request permissions
@@ -124,7 +142,11 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
           })
         )
 
-        const updatedGallery = [...galleryPhotos, ...newPhotos]
+        // Deduplicate photos by URI to prevent duplicates
+        const existingUris = new Set(galleryPhotos.map(photo => photo.uri))
+        const uniqueNewPhotos = newPhotos.filter(photo => !existingUris.has(photo.uri))
+
+        const updatedGallery = [...galleryPhotos, ...uniqueNewPhotos]
         setGalleryPhotos(updatedGallery)
         syncPhotosToFormData(yearbookPhoto, updatedGallery)
       }

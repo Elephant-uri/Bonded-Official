@@ -1,35 +1,35 @@
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import React, { useMemo, useState, useEffect } from 'react'
-import { ActivityIndicator, Animated, FlatList, Image, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import React, { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Animated, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
-import YearbookProfileModalContent from '../components/YearbookProfileModalContent'
+import { useProfileModal } from '../contexts/ProfileModalContext'
 import { hp, wp } from '../helpers/common'
-import { useFriendRequests, useAcceptFriendRequest, useDeclineFriendRequest } from '../hooks/useFriends'
+import { useAcceptFriendRequest, useDeclineFriendRequest, useFriendRequests } from '../hooks/useFriends'
 import { useNotifications } from '../hooks/useNotifications'
-import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
-import { useAppTheme } from './theme'
 import { supabase } from '../lib/supabase'
 import { formatTimeAgo } from '../utils/dateFormatters'
+import { useAppTheme } from './theme'
 
 export default function Notifications() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
-  
+
   // Fetch friend requests
+  const { openProfile } = useProfileModal()
   const { data: friendRequests = [], isLoading, refetch } = useFriendRequests()
   const { data: notificationsData = [] } = useNotifications()
   const { data: currentUserProfile } = useCurrentUserProfile()
   const acceptRequest = useAcceptFriendRequest()
   const declineRequest = useDeclineFriendRequest()
-  
+
   const [refreshing, setRefreshing] = useState(false)
-  const [activeProfile, setActiveProfile] = useState(null)
+
   const [seenRequestIds, setSeenRequestIds] = useState(() => new Set())
 
   useEffect(() => {
@@ -165,24 +165,13 @@ export default function Notifications() {
               style={styles.avatarContainer}
               onPress={() => {
                 const sender = item.sender || {}
-                setActiveProfile({
-                  id: sender.id || item.senderId,
-                  name: sender.full_name || sender.username || 'User',
-                  photoUrl: sender.avatar_url || null,
-                  quote: sender.bio || 'No bio yet',
-                  major: sender.major || 'Undeclared',
-                  year: sender.graduation_year?.toString() || '2025',
-                  grade: sender.grade || null,
-                  location: sender.university?.name || null,
-                  university: sender.university?.name || null,
-                  interests: Array.isArray(sender.interests) ? sender.interests : [],
-                  photos: Array.isArray(sender.photos) ? sender.photos : [],
-                })
+                const targetId = sender.id || item.senderId
+                if (targetId) openProfile(targetId)
               }}
             >
               {item.sender?.avatar_url ? (
-                <Image 
-                  source={{ uri: item.sender.avatar_url }} 
+                <Image
+                  source={{ uri: item.sender.avatar_url }}
                   style={styles.avatar}
                 />
               ) : (
@@ -191,7 +180,7 @@ export default function Notifications() {
                 </View>
               )}
             </TouchableOpacity>
-            
+
             {/* Content */}
             <View style={styles.notificationContent}>
               <Text style={styles.friendRequestTitle}>
@@ -206,7 +195,7 @@ export default function Notifications() {
                 </Text>
               )}
               <Text style={styles.notificationTime}>{item.timeAgo}</Text>
-              
+
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
                 <TouchableOpacity
@@ -220,7 +209,7 @@ export default function Notifications() {
                     <Text style={styles.acceptButtonText}>Accept</Text>
                   )}
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={styles.declineButton}
                   onPress={() => handleDecline(item)}
@@ -321,7 +310,7 @@ export default function Notifications() {
       <View style={styles.container}>
         <AppHeader
           title="Notifications"
-          rightAction={() => {}}
+          rightAction={() => { }}
           rightActionLabel=""
         />
 
@@ -332,10 +321,10 @@ export default function Notifications() {
           </View>
         ) : notifications.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons 
-              name="notifications-off-outline" 
-              size={hp(6)} 
-              color={theme.colors.textSecondary} 
+            <Ionicons
+              name="notifications-off-outline"
+              size={hp(6)}
+              color={theme.colors.textSecondary}
               style={{ opacity: 0.5 }}
             />
             <Text style={styles.emptyTitle}>No notifications</Text>
@@ -351,8 +340,8 @@ export default function Notifications() {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
+              <RefreshControl
+                refreshing={refreshing}
                 onRefresh={onRefresh}
                 colors={[theme.colors.bondedPurple]}
                 tintColor={theme.colors.bondedPurple}
@@ -363,21 +352,7 @@ export default function Notifications() {
 
         <BottomNav />
 
-        <Modal
-          visible={!!activeProfile}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setActiveProfile(null)}
-        >
-          <YearbookProfileModalContent
-            activeProfile={activeProfile}
-            setActiveProfile={setActiveProfile}
-            theme={theme}
-            router={router}
-            currentUserInterests={new Set(currentUserProfile?.interests || [])}
-            onClose={() => setActiveProfile(null)}
-          />
-        </Modal>
+        <BottomNav />
       </View>
     </SafeAreaView>
   )

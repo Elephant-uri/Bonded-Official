@@ -105,8 +105,27 @@ export default function ClubDetail() {
         .select('user_id, role, joined_at, profile:profiles(id, full_name, username, avatar_url, major, graduation_year)')
         .eq('organization_id', club.id)
 
-      if (error) {
+      if (error || !data || data.length === 0) {
         console.warn('Failed to load org members:', error)
+        if (club?.members?.length) {
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, full_name, username, avatar_url, major, graduation_year')
+            .in('id', club.members)
+
+          if (!profileError) {
+            const fallbackMembers = (profiles || []).map((profile) => ({
+              user_id: profile.id,
+              role: club.admins?.includes(profile.id) ? 'admin' : 'member',
+              joined_at: null,
+              profile,
+            }))
+            setMemberProfiles(fallbackMembers)
+            setAdminProfiles(fallbackMembers.filter((row) => row.role === 'admin'))
+            setPendingProfiles([])
+            return
+          }
+        }
         setMemberProfiles([])
         setAdminProfiles([])
         setPendingProfiles([])
@@ -984,7 +1003,7 @@ export default function ClubDetail() {
 
         <Modal visible={showCreatePostModal} animationType="slide" onRequestClose={() => setShowCreatePostModal(false)}>
           <SafeAreaView style={styles.createPostModalSafeArea} edges={['top', 'bottom']}>
-            <View style={styles.createPostHeader}>
+            <View style={[styles.createPostHeader, { paddingTop: Math.max(hp(1.5), insets.top * 0.6) }]}>
               <TouchableOpacity onPress={() => setShowCreatePostModal(false)} style={styles.createPostClose}>
                 <Ionicons name="close" size={hp(3)} color={theme.colors.charcoal} />
               </TouchableOpacity>
@@ -1018,7 +1037,7 @@ export default function ClubDetail() {
 
         <Modal visible={showMembersModal} animationType="slide" onRequestClose={() => setShowMembersModal(false)}>
           <SafeAreaView style={styles.membersModalSafeArea} edges={['top', 'bottom']}>
-            <View style={[styles.membersModalHeader, { paddingTop: Math.max(hp(1.5), insets.top * 0.6) }]}>
+            <View style={[styles.membersModalHeader, { paddingTop: Math.max(hp(3.5), insets.top + hp(1.5)) }]}>
               <TouchableOpacity onPress={() => setShowMembersModal(false)} style={styles.membersModalClose}>
                 <Ionicons name="close" size={hp(3)} color={theme.colors.charcoal} />
               </TouchableOpacity>

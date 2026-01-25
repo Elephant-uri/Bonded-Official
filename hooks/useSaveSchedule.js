@@ -13,17 +13,54 @@ export function useSaveSchedule() {
 
   return useMutation({
     mutationFn: async ({ courses, selectedSections, universityId }) => {
-      if (!user?.id) {
-        throw new Error('User must be authenticated to save schedule')
+      try {
+        if (!user?.id) {
+          throw new Error('User must be authenticated to save schedule')
+        }
+
+        if (!universityId) {
+          throw new Error('University ID is required')
+        }
+
+        const sectionKeys = new Set(selectedSections)
+        console.log(`📋 Saving schedule: ${courses.length} courses, ${selectedSections.length} selected sections`)
+        console.log(`📋 Selected sections:`, Array.from(sectionKeys))
+
+      let displayName =
+        user?.user_metadata?.full_name ||
+        user?.user_metadata?.username ||
+        user?.email?.split('@')[0] ||
+        'Someone'
+
+      let preferences = {
+        autoJoinCourseForums: true,
+        autoJoinSectionChats: true,
       }
 
-      if (!universityId) {
-        throw new Error('University ID is required')
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('forum_preferences, full_name, username')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError) {
+          console.warn('⚠️ Could not load forum preferences, using defaults:', profileError)
+        } else if (profileData) {
+          displayName = profileData.full_name || profileData.username || displayName
+          if (profileData.forum_preferences) {
+            preferences = {
+              ...preferences,
+              ...profileData.forum_preferences,
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Could not load forum preferences (exception), using defaults:', err)
       }
 
-      const sectionKeys = new Set(selectedSections)
-      console.log(`📋 Saving schedule: ${courses.length} courses, ${selectedSections.length} selected sections`)
-      console.log(`📋 Selected sections:`, Array.from(sectionKeys))
+      const semester = getCurrentSemester()
+      const termCode = getCurrentTermCode()
 
       // Process each course
       for (const course of courses) {
@@ -33,6 +70,7 @@ export function useSaveSchedule() {
         let { data: classData, error: classError } = await supabase
           .from('classes')
           .select('id')
+          .eq('university_id', universityId)
           .eq('class_code', course.courseCode.trim())
           .maybeSingle()
 
@@ -42,12 +80,13 @@ export function useSaveSchedule() {
           throw classError
         }
 
-        let courseId
+        let classId
         if (!classData) {
           // Create class with class_code and class_name
           const { data: newClass, error: createError } = await supabase
             .from('classes')
             .insert({
+              university_id: universityId,
               class_code: course.courseCode.trim(),
               class_name: course.courseName || course.courseCode.trim(),
             })
@@ -58,9 +97,9 @@ export function useSaveSchedule() {
             console.error('Error creating class:', createError)
             throw createError
           }
-          courseId = newClass.id
+          classId = newClass.id
         } else {
-          courseId = classData.id
+          classId = classData.id
         }
 
         // 2. Find or create section
@@ -70,7 +109,9 @@ export function useSaveSchedule() {
         let { data: sectionData, error: sectionError } = await supabase
           .from('class_sections')
           .select('id')
-          .eq('class_id', courseId)
+          .eq('class_id', classId)
+          .eq('section_number', course.sectionId)
+          .eq('term_code', termCode)
           .maybeSingle()
 
         if (sectionError && sectionError.code !== 'PGRST116') {
@@ -86,9 +127,11 @@ export function useSaveSchedule() {
           const { data: newSection, error: createError } = await supabase
             .from('class_sections')
             .insert({
-              class_id: courseId,
+              class_id: classId,
+              section_number: course.sectionId,
               professor_name: course.professor || null,
-              semester: null, // Could be extracted from course data if available
+              semester,
+              term_code: termCode,
               days_of_week: lectureComponent?.days || [],
               start_time: lectureComponent?.startTime || null,
               end_time: lectureComponent?.endTime || null,
@@ -106,28 +149,9 @@ export function useSaveSchedule() {
           sectionId = sectionData.id
         }
 
-        // 3. Update section with component details if needed
-        // Note: class_sections table stores days_of_week, start_time, end_time, location directly
-        // If we have multiple components, we'll use the lecture component or first component
-        // The section was already created with component data in step 2, so this is mainly for updates
-        const lectureComponent = course.components.find((c) => c.type === 'Lecture') || course.components[0]
-        if (lectureComponent) {
-          // Update section with latest component data if it changed
-          const { error: updateError } = await supabase
-            .from('class_sections')
-            .update({
-              days_of_week: lectureComponent.days || [],
-              start_time: lectureComponent.startTime || null,
-              end_time: lectureComponent.endTime || null,
-              location: lectureComponent.location || null,
-            })
-            .eq('id', sectionId)
-
-          if (updateError) {
-            console.error('Error updating section component data:', updateError)
-            // Don't throw - section exists, this is just metadata update
-          }
-        }
+        // 3. Section data is set once during creation (step 2)
+        // We don't update it afterwards to avoid overwriting existing data
+        // This ensures consistent section data regardless of which student uploads their schedule first
 
         // 4. Add user to section enrollment (if not already enrolled)
         // Using user_class_enrollments table (not section_members)
@@ -135,9 +159,10 @@ export function useSaveSchedule() {
           .from('user_class_enrollments')
           .insert({
             user_id: user.id,
-            class_id: courseId,
+            class_id: classId,
             section_id: sectionId,
-            semester: null, // Could be extracted if available
+            semester,
+            term_code: termCode,
             is_active: true,
           })
           .select()
@@ -152,15 +177,16 @@ export function useSaveSchedule() {
         // 5. Ensure class forum exists for this course at user's university
         // This is what makes the class appear in the sidebar
         // IMPORTANT: Create forum for ALL courses, not just selected sections
+        // RESPECT: Check user's forum preferences before auto-joining
         try {
           const { data: existingForum } = await supabase
             .from('forums')
             .select('id')
-            .eq('university_id', universityId)
-            .eq('name', course.courseCode.trim())
+            .eq('class_id', classId)
             .eq('type', 'class')
             .maybeSingle()
 
+          let forumId
           if (!existingForum) {
             // Create class forum
             const { data: newForum, error: forumError } = await supabase
@@ -169,6 +195,7 @@ export function useSaveSchedule() {
                 name: course.courseCode.trim(),
                 type: 'class',
                 university_id: universityId,
+                class_id: classId,
                 description: `Forum for ${course.courseCode.trim()}`,
                 is_public: false,
               })
@@ -176,14 +203,53 @@ export function useSaveSchedule() {
               .single()
 
             if (forumError && forumError.code !== '23505') {
-              // Ignore duplicate errors (race condition)
               console.error('Error creating class forum:', forumError)
-              // Don't throw - forum creation is non-critical, enrollment is more important
             } else if (newForum) {
-              console.log(`✅ Created class forum for ${course.courseCode.trim()} (ID: ${newForum.id})`)
+              forumId = newForum.id
+              console.log(`✅ Created class forum for ${course.courseCode.trim()} (ID: ${forumId})`)
+              
+              // Auto-add user to forum if preferences allow
+              if (preferences.autoJoinCourseForums) {
+                await supabase
+                  .from('forum_members')
+                  .insert({
+                    forum_id: forumId,
+                    user_id: user.id,
+                    role: 'member'
+                  })
+                  .select()
+                  .single()
+                console.log(`✅ Auto-added user to course forum for ${course.courseCode.trim()}`)
+              } else {
+                console.log(`⚠️ User opted out of auto-joining course forum for ${course.courseCode.trim()}`)
+              }
             }
           } else {
+            forumId = existingForum.id
             console.log(`✅ Class forum already exists for ${course.courseCode.trim()}`)
+            
+            // Add user to existing forum if preferences allow and not already member
+            if (preferences.autoJoinCourseForums) {
+              const { data: existingMembership } = await supabase
+                .from('forum_members')
+                .select('id')
+                .eq('forum_id', forumId)
+                .eq('user_id', user.id)
+                .maybeSingle()
+              
+              if (!existingMembership) {
+                await supabase
+                  .from('forum_members')
+                  .insert({
+                    forum_id: forumId,
+                    user_id: user.id,
+                    role: 'member'
+                  })
+                  .select()
+                  .single()
+                console.log(`✅ Added user to existing course forum for ${course.courseCode.trim()}`)
+              }
+            }
           }
         } catch (forumErr) {
           console.error('Exception creating forum:', forumErr)
@@ -200,7 +266,7 @@ export function useSaveSchedule() {
         if (sectionKeys.has(sectionKey) && hasLecture) {
           try {
             // Create or find group conversation for this section
-            // Use naming convention: "{CourseCode} Section {SectionId}"
+            // Link to section via conversations.class_section_id (recommended)
             const chatName = `${course.courseCode.trim()} Section ${course.sectionId}`
             
             // Check if conversation already exists
@@ -208,7 +274,7 @@ export function useSaveSchedule() {
               .from('conversations')
               .select('id')
               .eq('type', 'group')
-              .eq('name', chatName)
+              .eq('class_section_id', sectionId)
               .maybeSingle()
 
             if (checkError && checkError.code !== 'PGRST116') {
@@ -219,29 +285,50 @@ export function useSaveSchedule() {
             if (existingConv) {
               conversationId = existingConv.id
               console.log(`✅ Found existing chat for ${chatName} (ID: ${conversationId})`)
-              // Ensure user is a participant
-              const { error: participantError } = await supabase
-                .from('conversation_participants')
-                .insert({
-                  conversation_id: conversationId,
-                  user_id: user.id,
-                })
-                .select()
-                .single()
               
-              if (participantError && participantError.code !== '23505') {
-                console.error('Error adding user to existing chat:', participantError)
-              } else if (!participantError) {
-                console.log(`✅ Added user to existing chat ${chatName}`)
+              // Add user to existing chat if preferences allow and not already participant
+              if (preferences.autoJoinSectionChats) {
+                const { data: existingParticipant } = await supabase
+                  .from('conversation_participants')
+                  .select('conversation_id')
+                  .eq('conversation_id', conversationId)
+                  .eq('user_id', user.id)
+                  .maybeSingle()
+                
+                if (!existingParticipant) {
+                  const { error: participantError } = await supabase
+                    .from('conversation_participants')
+                    .insert({
+                      conversation_id: conversationId,
+                      user_id: user.id,
+                    })
+                  
+                  if (!participantError) {
+                    await supabase.from('messages').insert({
+                      conversation_id: conversationId,
+                      sender_id: user.id,
+                      content: `${displayName} joined the chat`,
+                      metadata: { type: 'system', action: 'joined' },
+                    })
+                    console.log(`✅ Added user to existing section chat ${chatName}`)
+                  } else {
+                    console.error('Error adding user to existing chat:', participantError)
+                  }
+                } else {
+                  console.log(`✅ User already in section chat ${chatName}`)
+                }
+              } else {
+                console.log(`⚠️ User opted out of auto-joining section chat for ${chatName}`)
               }
             } else {
               // Create new group conversation for this section
               const { data: newConv, error: convError } = await supabase
                 .from('conversations')
                 .insert({
-                  name: chatName,
                   type: 'group',
+                  name: chatName,
                   created_by: user.id,
+                  class_section_id: sectionId,
                 })
                 .select('id')
                 .single()
@@ -250,31 +337,43 @@ export function useSaveSchedule() {
                 console.error('Error creating section chat:', convError)
               } else if (newConv) {
                 conversationId = newConv.id
-                // Add user as participant
-                const { error: participantError } = await supabase
-                  .from('conversation_participants')
-                  .insert({
-                    conversation_id: conversationId,
-                    user_id: user.id,
-                  })
+                console.log(`✅ Created section chat for ${chatName} (ID: ${conversationId})`)
                 
-                if (participantError && participantError.code !== '23505') {
-                  console.error('Error adding user to new chat:', participantError)
+                // Auto-add user to new chat if preferences allow
+                if (preferences.autoJoinSectionChats) {
+                  const { error: participantError } = await supabase
+                    .from('conversation_participants')
+                    .insert({
+                      conversation_id: conversationId,
+                      user_id: user.id,
+                    })
+                  
+                  if (!participantError) {
+                    console.log(`✅ Auto-added user to new section chat ${chatName}`)
+                  } else {
+                    console.error('Error adding user to new chat:', participantError)
+                  }
                 } else {
-                  console.log(`✅ Created section chat for ${chatName} (ID: ${conversationId})`)
+                  console.log(`⚠️ User opted out of auto-joining new section chat for ${chatName}`)
                 }
               }
             }
           } catch (chatErr) {
-            console.error('Exception creating chat:', chatErr)
+            console.error('Exception creating section chat:', chatErr)
             // Continue - don't block enrollment
           }
         } else {
           console.log(`⏭️ Skipping chat creation for ${sectionKey} - not selected or no lecture`)
         }
+
       }
 
-      return { success: true }
+        console.log('✅ Finished saving schedule')
+        return { success: true }
+      } catch (err) {
+        console.error('❌ Schedule save failed:', err)
+        throw err
+      }
     },
     onSuccess: () => {
       // Invalidate relevant queries
@@ -288,4 +387,30 @@ export function useSaveSchedule() {
   })
 }
 
+function getCurrentSemester() {
+  const now = new Date()
+  const month = now.getMonth() // 0-11
+  const year = now.getFullYear()
 
+  if (month >= 0 && month <= 4) {
+    return `Spring ${year}`
+  }
+  if (month >= 5 && month <= 7) {
+    return `Summer ${year}`
+  }
+  return `Fall ${year}`
+}
+
+function getCurrentTermCode() {
+  const now = new Date()
+  const month = now.getMonth()
+  const year = now.getFullYear()
+
+  if (month >= 0 && month <= 4) {
+    return `${year}SP`
+  }
+  if (month >= 5 && month <= 7) {
+    return `${year}SU`
+  }
+  return `${year}FA`
+}

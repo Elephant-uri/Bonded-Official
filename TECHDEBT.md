@@ -328,6 +328,7 @@ Production: Full OCR extraction from schedule screenshots
 
 **Calendar Features (app/calendar.jsx):**
 - [ ] Fetch connections from Supabase
+- [ ] Academics page to edit schedule, semester dates, and auto-manage class forum/chat enrollment
 
 ---
 
