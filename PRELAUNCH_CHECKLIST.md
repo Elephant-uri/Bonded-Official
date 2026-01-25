@@ -1,6 +1,6 @@
 # Pre-Launch Checklist
 
-## ✅ Completed (17/39)
+## ✅ Completed (19/39)
 1. ✅ Fixed duplicate Main forum in sidebar
 2. ✅ Removed tags from forum posts (deferred to V2)
 3. ✅ Removed video picker from create forum (deferred to V2)
@@ -18,6 +18,9 @@
 15. ✅ Fixed org joining and requesting workflow
 16. ✅ Auto-add members to org chats and forums on join
 17. ✅ Auto-remove members from org chats/forums on leave
+18. ✅ Fixed org forum creation trigger error
+19. ✅ Wired up profile views in profile page
+20. ✅ Added message reactions (heart messages)
 
 ## 🚧 In Progress (0/39)
 
@@ -34,7 +37,7 @@
 ### Messaging Core Features
 - [x] Fix sidebar class icons - chat icon should go to chat, add forum icon
 - [ ] Add delete message functionality
-- [ ] Add message reactions (heart messages)
+- [x] Add message reactions (heart messages)
 - [ ] Add notification when message request is accepted
 - [ ] Allow creating messages with non-friends
 
@@ -64,7 +67,7 @@
 - [ ] Fix event attendance count display
 
 ### Profile & Yearbook
-- [ ] Wire up profile views in sidebar
+- [x] Wire up profile views in sidebar
 - [ ] Add classmate sort filter to yearbook
 - [ ] Highlight similar interests on profile page
 - [ ] Show friend count on other user profiles
@@ -89,11 +92,11 @@
 - Started: 2026-01-24
 - Session completed: 2026-01-24
 - Total items: 39
-- Completed: 17
-- Remaining: 22
-- Progress: 44%
-- Estimated remaining effort: 50-60 hours
-- Launch readiness: Core 85%, Polish 60%
+- Completed: 19
+- Remaining: 20
+- Progress: 49%
+- Estimated remaining effort: 45-50 hours
+- Launch readiness: Core 88%, Polish 65%
 
 ## Next Actions (Prioritized)
 See LAUNCH_STATUS_REPORT.md for detailed breakdown and implementation guidance.
