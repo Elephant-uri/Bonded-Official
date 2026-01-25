@@ -338,6 +338,7 @@ export default function Chat() {
         <MessageList
           messages={messages}
           currentUserId={user?.id}
+          conversationId={conversationId}
           isLoading={isMessagesLoading}
           isLoadingMore={isFetchingNextPage}
           onLoadMore={handleLoadMore}

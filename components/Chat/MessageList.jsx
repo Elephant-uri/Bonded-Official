@@ -1,13 +1,15 @@
-import { useRef } from 'react'
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native'
+import { useMemo, useRef, useState } from 'react'
+import { ActionSheetIOS, ActivityIndicator, Alert, FlatList, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
+import { useConversationReactions, useToggleReaction } from '../../hooks/useMessageReactions'
 import { formatChatDate, isSameGroup, shouldShowDateSeparator } from '../../utils/chatHelpers'
 import MessageBubble from '../Message/MessageBubble'
 
 export default function MessageList({
     messages,
     currentUserId,
+    conversationId,
     isLoading,
     isLoadingMore,
     onLoadMore,
@@ -16,6 +18,51 @@ export default function MessageList({
     const theme = useAppTheme()
     const styles = createStyles(theme)
     const listRef = useRef(null)
+    const [showReactionModal, setShowReactionModal] = useState(false)
+    const [selectedMessage, setSelectedMessage] = useState(null)
+
+    // Fetch reactions for all messages in conversation
+    const messageIds = useMemo(() => messages.map(m => m.id), [messages])
+    const { data: reactionsMap = {} } = useConversationReactions(conversationId, messageIds)
+
+    const toggleReaction = useToggleReaction()
+
+    const handleLongPress = (message) => {
+        setSelectedMessage(message)
+
+        if (Platform.OS === 'ios') {
+            // Use ActionSheet on iOS
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options: ['❤️ React with Heart', 'Cancel'],
+                    cancelButtonIndex: 1,
+                },
+                (buttonIndex) => {
+                    if (buttonIndex === 0) {
+                        handleReaction(message, 'heart')
+                    }
+                }
+            )
+        } else {
+            // Use Modal on Android
+            setShowReactionModal(true)
+        }
+    }
+
+    const handleReaction = async (message, reactionType) => {
+        try {
+            const existingReactions = reactionsMap[message.id] || []
+            await toggleReaction.mutateAsync({
+                messageId: message.id,
+                reactionType,
+                existingReactions,
+            })
+            setShowReactionModal(false)
+        } catch (error) {
+            console.error('Error toggling reaction:', error)
+            Alert.alert('Error', 'Failed to add reaction. Please try again.')
+        }
+    }
 
     const renderItem = ({ item, index }) => {
         // Determine positioning in group
@@ -80,7 +127,9 @@ export default function MessageList({
                     isLastInGroup={isLastInGroup}
                     showAvatar={showAvatar}
                     theme={theme}
+                    reactions={reactionsMap[item.id] || []}
                     onPress={() => onMessagePress && onMessagePress(item)}
+                    onLongPress={handleLongPress}
                 />
 
                 {/* If we need spacing between groups? */}
@@ -96,8 +145,9 @@ export default function MessageList({
                     <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
                 </View>
             ) : (
-                <FlatList
-                    ref={listRef}
+                <>
+                    <FlatList
+                        ref={listRef}
                     data={messages}
                     keyExtractor={(item) => item.id || item.created_at}
                     renderItem={renderItem}
@@ -122,7 +172,41 @@ export default function MessageList({
                             <Text style={styles.emptySubtext}>Say hello!</Text>
                         </View>
                     }
-                />
+                    />
+
+                    {/* Reaction Modal for Android */}
+                    {Platform.OS === 'android' && (
+                        <Modal
+                            visible={showReactionModal}
+                            transparent
+                            animationType="fade"
+                            onRequestClose={() => setShowReactionModal(false)}
+                        >
+                            <TouchableOpacity
+                                style={styles.modalOverlay}
+                                activeOpacity={1}
+                                onPress={() => setShowReactionModal(false)}
+                            >
+                                <View style={styles.reactionSheet}>
+                                    <Text style={styles.reactionSheetTitle}>React to message</Text>
+                                    <TouchableOpacity
+                                        style={styles.reactionOption}
+                                        onPress={() => selectedMessage && handleReaction(selectedMessage, 'heart')}
+                                    >
+                                        <Text style={styles.reactionEmoji}>❤️</Text>
+                                        <Text style={styles.reactionLabel}>Heart</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.cancelButton}
+                                        onPress={() => setShowReactionModal(false)}
+                                    >
+                                        <Text style={styles.cancelText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableOpacity>
+                        </Modal>
+                    )}
+                </>
             )}
         </View>
     )
@@ -172,5 +256,53 @@ const createStyles = (theme) => StyleSheet.create({
     emptySubtext: {
         fontSize: hp(1.8),
         color: theme.colors.textSecondary,
-    }
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    reactionSheet: {
+        backgroundColor: theme.colors.background,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: wp(5),
+        paddingBottom: hp(4),
+    },
+    reactionSheetTitle: {
+        fontSize: hp(2),
+        fontWeight: '600',
+        color: theme.colors.textPrimary,
+        marginBottom: hp(2),
+        textAlign: 'center',
+    },
+    reactionOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: hp(2),
+        backgroundColor: theme.colors.backgroundSecondary,
+        borderRadius: theme.radius.md,
+        marginBottom: hp(1),
+        gap: wp(3),
+    },
+    reactionEmoji: {
+        fontSize: hp(3),
+    },
+    reactionLabel: {
+        fontSize: hp(2),
+        color: theme.colors.textPrimary,
+        fontWeight: '500',
+    },
+    cancelButton: {
+        marginTop: hp(2),
+        padding: hp(2),
+        alignItems: 'center',
+        backgroundColor: theme.colors.backgroundSecondary,
+        borderRadius: theme.radius.md,
+    },
+    cancelText: {
+        fontSize: hp(2),
+        color: theme.colors.textSecondary,
+        fontWeight: '600',
+    },
 })

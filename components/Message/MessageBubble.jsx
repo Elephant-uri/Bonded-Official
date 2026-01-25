@@ -1,4 +1,7 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { hp } from '../../helpers/common'
+import { useAuthStore } from '../../stores/authStore'
 import RichMessagePreview from './RichMessagePreviewSimple'
 
 export default function MessageBubble({
@@ -9,7 +12,10 @@ export default function MessageBubble({
     isLastInGroup,  // Visually Bottom
     showAvatar,
     onPress,
+    onLongPress,
+    reactions = [],
 }) {
+    const { user } = useAuthStore()
     const styles = createStyles(theme)
 
     // Bubble Shape Logic
@@ -35,6 +41,20 @@ export default function MessageBubble({
 
     const senderAvatar = message.sender?.avatar_url
 
+    // Count reactions by type
+    const reactionCounts = {}
+    const userReactions = new Set()
+
+    reactions.forEach(reaction => {
+        const type = reaction.reaction_type
+        reactionCounts[type] = (reactionCounts[type] || 0) + 1
+        if (reaction.user_id === user?.id) {
+            userReactions.add(type)
+        }
+    })
+
+    const hasReactions = Object.keys(reactionCounts).length > 0
+
     return (
         <View style={[styles.container, isMe ? styles.containerMe : styles.containerOther]}>
             {/* Avatar (Left side, only if other and last in group) */}
@@ -56,17 +76,49 @@ export default function MessageBubble({
                 </View>
             )}
 
-            <View style={[
-                styles.bubble,
-                isMe ? styles.bubbleMe : styles.bubbleOther,
-                bubbleStyle
-            ]}>
-                <Text style={[styles.text, isMe ? styles.textMe : styles.textOther]}>
-                    {message.content}
-                </Text>
-                
-                {/* Rich Message Preview */}
-                <RichMessagePreview message={message} isOwn={isMe} />
+            <View style={styles.bubbleWrapper}>
+                <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={onPress}
+                    onLongPress={() => onLongPress && onLongPress(message)}
+                    style={[
+                        styles.bubble,
+                        isMe ? styles.bubbleMe : styles.bubbleOther,
+                        bubbleStyle
+                    ]}
+                >
+                    <Text style={[styles.text, isMe ? styles.textMe : styles.textOther]}>
+                        {message.content}
+                    </Text>
+
+                    {/* Rich Message Preview */}
+                    <RichMessagePreview message={message} isOwn={isMe} />
+                </TouchableOpacity>
+
+                {/* Reactions Display */}
+                {hasReactions && (
+                    <View style={[
+                        styles.reactionsContainer,
+                        isMe ? styles.reactionsContainerMe : styles.reactionsContainerOther
+                    ]}>
+                        {Object.entries(reactionCounts).map(([reactionType, count]) => (
+                            <View
+                                key={reactionType}
+                                style={[
+                                    styles.reactionBadge,
+                                    userReactions.has(reactionType) && styles.reactionBadgeActive
+                                ]}
+                            >
+                                <Text style={styles.reactionEmoji}>
+                                    {reactionType === 'heart' ? '❤️' : '👍'}
+                                </Text>
+                                {count > 1 && (
+                                    <Text style={styles.reactionCount}>{count}</Text>
+                                )}
+                            </View>
+                        ))}
+                    </View>
+                )}
             </View>
 
             {/* Status / Time (Optional, maybe only on last message or tap) */}
@@ -110,8 +162,11 @@ const createStyles = (theme) => StyleSheet.create({
         fontWeight: '600',
         color: theme.colors.textSecondary,
     },
-    bubble: {
+    bubbleWrapper: {
         maxWidth: '70%',
+        position: 'relative',
+    },
+    bubble: {
         paddingVertical: 8,
         paddingHorizontal: 12,
         minHeight: 36,
@@ -139,5 +194,40 @@ const createStyles = (theme) => StyleSheet.create({
         marginTop: 2,
         marginRight: 4,
         alignSelf: 'flex-end',
-    }
+    },
+    reactionsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 4,
+        marginTop: 4,
+    },
+    reactionsContainerMe: {
+        alignSelf: 'flex-end',
+    },
+    reactionsContainerOther: {
+        alignSelf: 'flex-start',
+    },
+    reactionBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.backgroundSecondary,
+        borderRadius: 12,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        gap: 2,
+    },
+    reactionBadgeActive: {
+        backgroundColor: theme.colors.bondedPurple + '20',
+        borderColor: theme.colors.bondedPurple,
+    },
+    reactionEmoji: {
+        fontSize: hp(1.8),
+    },
+    reactionCount: {
+        fontSize: hp(1.3),
+        color: theme.colors.textSecondary,
+        fontWeight: '600',
+    },
 })

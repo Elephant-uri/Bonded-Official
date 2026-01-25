@@ -13,6 +13,7 @@ import { createSignedUrlForPath, uploadImageToBondedMedia } from '../helpers/med
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useFriends } from '../hooks/useFriends'
 import { useProfile, useProfilePhotos } from '../hooks/useProfiles'
+import { useProfileViewTracker, useProfileViewersCount } from '../hooks/useProfileViews'
 import { useUpdateProfile } from '../hooks/useUpdateProfile'
 import { useAuthStore } from '../stores/authStore'
 import { useAppTheme } from './theme'
@@ -69,7 +70,11 @@ export default function Profile() {
   }, [userProfileRaw, isMe, otherPhotos])
 
   const { data: friends = [], isLoading: friendsLoading } = useFriends(isMe ? undefined : targetUserId)
+  const { data: viewersCount = 0 } = useProfileViewersCount(targetUserId, { windowDays: 30 })
   const updateProfile = useUpdateProfile()
+
+  // Track profile view if viewing another user's profile
+  useProfileViewTracker(isMe ? null : targetUserId, 'profile_page', !isMe)
 
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -500,6 +505,16 @@ export default function Profile() {
             onPress={() => setShowFriendsModal(true)}
             style={styles.friendsButton}
           />
+
+          {/* Profile Views Counter (only show on own profile) */}
+          {isMe && viewersCount > 0 && (
+            <View style={styles.profileViewsContainer}>
+              <Ionicons name="eye-outline" size={hp(2)} color={theme.colors.textSecondary} />
+              <Text style={styles.profileViewsText}>
+                {viewersCount} {viewersCount === 1 ? 'person' : 'people'} viewed your profile in the last 30 days
+              </Text>
+            </View>
+          )}
 
           {/* Meta Pills */}
           <View style={styles.metaRow}>
@@ -965,6 +980,24 @@ const createStyles = (theme) => StyleSheet.create({
   },
   friendsButton: {
     marginBottom: hp(2.5),
+  },
+  profileViewsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(4),
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.radius.md,
+    marginBottom: hp(2.5),
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  profileViewsText: {
+    flex: 1,
+    fontSize: hp(1.5),
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
   },
   metaRow: {
     flexDirection: 'row',
