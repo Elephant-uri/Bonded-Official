@@ -87,8 +87,34 @@
 
 ## Notes
 - Started: 2026-01-24
-- Target completion: Before launch
+- Session completed: 2026-01-24
 - Total items: 39
 - Completed: 17
 - Remaining: 22
 - Progress: 44%
+- Estimated remaining effort: 50-60 hours
+- Launch readiness: Core 85%, Polish 60%
+
+## Next Actions (Prioritized)
+See LAUNCH_STATUS_REPORT.md for detailed breakdown and implementation guidance.
+
+### Quick Wins (< 2 hours each)
+1. Wire up delete event button (useDeleteEvent hook exists)
+2. Fix event attendance count display
+3. Wire up profile views in sidebar (useProfileViews hook exists)
+4. Test non-friend messaging (may already work)
+
+### High Impact (2-4 hours each)
+5. Add message reactions UI (message_reactions table exists)
+6. Add delete message functionality
+7. Implement chat search
+8. Add liked event filter
+
+### Medium Effort (4-8 hours each)
+9. Edit event functionality
+10. Typing indicators (component exists, needs Realtime)
+11. Group members view modal
+12. Chat preview (Instagram style)
+
+### Large Effort (8+ hours)
+13. Full admin panel for organizations
