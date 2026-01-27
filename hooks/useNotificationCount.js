@@ -63,6 +63,9 @@ export function useNotificationCount() {
           !messageRequestsResult.error?.message?.includes('does not exist')
         ) {
           console.error('Error fetching message request count:', messageRequestsResult.error)
+        } else if (!warned) {
+          warned = true
+          console.warn('Message requests table missing or blocked by RLS.')
         }
       }
 

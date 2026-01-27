@@ -3,7 +3,8 @@ import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import { ArrowLeft, Calendar, MapPin, School, User } from '../components/Icons'
@@ -90,6 +91,12 @@ export default function Profile() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
   const quoteInputRef = useRef(null)
 
+  // Swipe-to-close gesture state
+  const scrollViewRef = useRef(null)
+  const [isAtTop, setIsAtTop] = useState(true)
+  const translateY = useRef(new Animated.Value(0)).current
+  const gestureState = useRef({ isEnabled: true })
+
   // Keep track of the last synced profile ID to prevent infinite loops
   const lastSyncedIdRef = useRef(null)
 
@@ -124,6 +131,53 @@ export default function Profile() {
 
   const avatarUrl = userProfile?.yearbookPhotoUrl || userProfile?.avatarUrl || profilePhotos[0] || null
   const displayQuote = userProfile?.yearbookQuote || userProfile?.yearbook_quote || ''
+
+  // Disable gesture when modals are open
+  useEffect(() => {
+    gestureState.current.isEnabled = !showFriendsModal && !showEditModal
+  }, [showFriendsModal, showEditModal])
+
+  // Handle scroll position tracking
+  const handleScroll = (event) => {
+    const offsetY = event.nativeEvent.contentOffset.y
+    setIsAtTop(offsetY <= 0)
+  }
+
+  // Handle swipe-down-to-close gesture
+  const onGestureEvent = (event) => {
+    if (!isAtTop || !gestureState.current.isEnabled) return
+
+    const { translationY, state } = event.nativeEvent
+
+    if (state === State.ACTIVE && translationY > 0) {
+      translateY.setValue(translationY)
+    }
+  }
+
+  const onHandlerStateChange = (event) => {
+    const { translationY, velocityY, state } = event.nativeEvent
+
+    if (state === State.END) {
+      const shouldClose = (translationY > 100 || velocityY > 800) && isAtTop
+
+      if (shouldClose) {
+        Animated.timing(translateY, {
+          toValue: 500,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          router.back()
+        })
+      } else {
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 80,
+          friction: 10,
+        }).start()
+      }
+    }
+  }
 
   // Handle avatar selection
   const handleSelectAvatar = async () => {
@@ -365,35 +419,52 @@ export default function Profile() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Back Button - Fixed */}
-      <TouchableOpacity
-        style={styles.backButton}
-        activeOpacity={0.7}
-        onPress={() => router.back()}
+    <GestureHandlerRootView style={styles.container}>
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+        activeOffsetY={10}
+        failOffsetY={-10}
       >
-        <View style={styles.backButtonCircle}>
-          <ArrowLeft size={hp(2)} color="#fff" strokeWidth={2} />
-        </View>
-      </TouchableOpacity>
-
-      {/* More Options Button - Fixed (Only for "me") */}
-      {isMe && (
-        <TouchableOpacity
-          style={styles.moreButton}
-          activeOpacity={0.7}
-          onPress={() => setShowEditModal(true)}
+        <Animated.View
+          style={[
+            styles.container,
+            {
+              transform: [{ translateY }],
+            },
+          ]}
         >
-          <Ionicons name="ellipsis-horizontal" size={hp(2.5)} color="#fff" />
-        </TouchableOpacity>
-      )}
+          {/* Back Button - Fixed */}
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.7}
+            onPress={() => router.back()}
+          >
+            <View style={styles.backButtonCircle}>
+              <ArrowLeft size={hp(2)} color="#fff" strokeWidth={2} />
+            </View>
+          </TouchableOpacity>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
+          {/* More Options Button - Fixed (Only for "me") */}
+          {isMe && (
+            <TouchableOpacity
+              style={styles.moreButton}
+              activeOpacity={0.7}
+              onPress={() => setShowEditModal(true)}
+            >
+              <Ionicons name="ellipsis-horizontal" size={hp(2.5)} color="#fff" />
+            </TouchableOpacity>
+          )}
+
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          >
         {/* Hero Image Carousel */}
         <View style={styles.heroSection}>
           {profilePhotos.length > 1 ? (
@@ -767,7 +838,9 @@ export default function Profile() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </View>
+        </Animated.View>
+      </PanGestureHandler>
+    </GestureHandlerRootView>
   )
 }
 
