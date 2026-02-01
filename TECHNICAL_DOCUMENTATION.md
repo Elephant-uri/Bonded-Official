@@ -29,6 +29,8 @@
 
 - **[AI_CODING_GUIDELINES.md](./AI_CODING_GUIDELINES.md)** - **IMPORTANT**: Coding patterns, best practices, and conventions for AI assistants. **Read this before implementing new features.**
 - **[.planning/codebase/CONVENTIONS.md](./.planning/codebase/CONVENTIONS.md)** - Code style and naming conventions
+- **[docs/MIGRATION_HISTORY.md](./docs/MIGRATION_HISTORY.md)** - Supabase migration history and baseline notes
+- **[docs/PRODUCTION_READINESS_AUDIT.md](./docs/PRODUCTION_READINESS_AUDIT.md)** - Launch audit and blockers list
 
 ---
 
@@ -1721,6 +1723,64 @@ The location picker uses this pattern with additional features:
 ## Production Readiness
 
 ### Critical Blockers (MUST FIX)
+
+#### Store Compliance & Sensitive Logging 🔴
+**Impact:** App Store rejection, privacy violations, credential leakage, and unstable production logs.
+
+**Issues (must fix before submission):**
+- **Public debug routes**: `app/auth/debug.tsx` is a public expo-router screen and can expose token workflows.
+- **Sensitive auth logging**: `app/auth/callback.tsx` previously logged tokens/emails during deep-link auth.
+- **Missing iOS usage strings**: camera, photo library, microphone, and location permissions must be declared in `app.json` or the App Store will reject the build.
+- **Excessive console logging in production**: high-volume `console.log` in chat/forum/onboarding can leak user data and impact performance.
+
+**Fix applied (Jan 2026):**
+- Gate debug routes and auth logs behind `__DEV__` and remove sensitive token/email output.
+- Add iOS usage descriptions in `app.json` for camera, photo library, microphone, and location.
+- Replace production `console.log` calls in core flows with dev-only logs.
+
+**Maintenance: What to watch going forward**
+- **New routes**: any debug/test pages under `app/` must be gated behind `__DEV__` or moved out of production routing.
+- **Auth logs**: never log full URLs or token values; use sanitized logs only in dev.
+- **Permissions**: when adding a new native capability (e.g., contacts, Bluetooth), add its iOS usage string immediately.
+- **Logging policy**: keep a single logger utility and enforce `__DEV__` gates for non-error logs; review before each release.
+
+---
+
+#### Dynamic University Context & Route Hygiene 🟠
+**Impact:** Incorrect campus branding in UI, user confusion, and accidental exposure of legacy screens.
+
+**Issues:**
+- **Hardcoded school names** in Yearbook/Calendar caused incorrect campus labels for non‑URI users.
+- **Legacy screens in `app/`** are routable by default in Expo Router (e.g., `app/chat_legacy.jsx`).
+
+**Fix applied (Jan 2026):**
+- Yearbook/Calendar now read the university name from the current user profile (`profiles → universities.name`).
+- Moved legacy screens out of `app/` so they are not route‑addressable.
+
+**Maintenance: What to watch going forward**
+- **No hardcoded campus strings**: always pull from `profiles.university` or a centralized campus context.
+- **Route surface area**: anything under `app/` is a public route. Keep legacy/debug files outside `app/`.
+- **Fallbacks**: use neutral copy like “Your University” when the profile hasn’t loaded.
+
+---
+
+#### Migration Parity & RLS Fallbacks 🟠
+**Impact:** Features silently degrade (empty states, missing counts) even when the UI looks healthy.
+
+**Issues:**
+- Client warnings indicate tables or RLS policies might be missing or blocked (`notifications`, `org_members`, `forums`, etc.).
+- Supabase migrations list should match repo/expected schema; gaps lead to runtime fallbacks.
+
+**Fix guidance (Jan 2026):**
+- Verify **all required tables exist** and RLS policies are applied in production.
+- Compare `database/` scripts + expected schema against actual Supabase migrations.
+
+**Maintenance: What to watch going forward**
+- **Add a migration checklist** to release process (tables + RLS + realtime).
+- **Fail fast in dev**: log missing tables loudly and add a health check screen for admins.
+- **Schema drift**: use migration tooling or a schema diff before every release.
+
+---
 
 #### 1. Security Vulnerabilities 🔴
 **Impact:** Data breaches, privacy violations

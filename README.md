@@ -25,6 +25,15 @@ A social networking app designed to help college students connect, collaborate, 
 
 ## Getting Started
 
+## Accessing the App
+
+1. Install dependencies (`npm install`)
+2. Start the Expo dev server (`npx expo start`)
+3. Open the app:
+   - Mobile: scan the QR code with Expo Go
+   - iOS Simulator: press `i`
+   - Android Emulator: press `a`
+
 ### Prerequisites
 
 - Node.js (v18+)
