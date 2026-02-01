@@ -5,8 +5,10 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native'
 import { useAppTheme } from '../../app/theme'
 import { useProfileModal } from '../../contexts/ProfileModalContext'
 import { hp, wp } from '../../helpers/common'
-import { formatTimeForDisplay } from '../../utils/dateFormatters'
+import { formatRelativeMessageTime } from '../../utils/dateFormatters'
 import Text from '../ui/Text'
+
+const LINK_LOGO = require('../../assets/images/transparent-bonded.png')
 
 export default function MessageListItem({ conversation, onPress, onLongPress, currentUserId }) {
     const theme = useAppTheme()
@@ -16,6 +18,8 @@ export default function MessageListItem({ conversation, onPress, onLongPress, cu
 
     const isOrg = conversation.type === 'org'
     const isGroup = conversation.type === 'group'
+    const isClass = conversation.type === 'class'
+    const isLink = conversation.isLink || conversation.type === 'link'
 
     // Determine avatar and name based on type
     let avatarUrl = conversation.image_url
@@ -32,11 +36,23 @@ export default function MessageListItem({ conversation, onPress, onLongPress, cu
     }
 
     const lastMessage = conversation.last_message
+    const lastMessageContent =
+        conversation.last_preview_text ||
+        lastMessage?.content ||
+        conversation.last_message ||
+        null
+    const lastMessageCreatedAt =
+        conversation.last_preview_at ||
+        lastMessage?.created_at ||
+        conversation.last_message_at ||
+        null
+    const lastMessageSenderId = lastMessage?.sender_id || conversation.last_message_sender_id || null
     const isUnread = conversation.unread_count > 0
-    const isSelf = lastMessage?.sender_id === currentUserId
+    const isSelf = lastMessageSenderId === currentUserId
+    const isPreviewPrefixed = typeof lastMessageContent === 'string' && lastMessageContent.startsWith('You: ')
 
-    const timeString = lastMessage?.created_at
-        ? formatTimeForDisplay(new Date(lastMessage.created_at))
+    const timeString = lastMessageCreatedAt
+        ? formatRelativeMessageTime(lastMessageCreatedAt)
         : ''
 
     const handleAvatarPress = () => {
@@ -52,18 +68,28 @@ export default function MessageListItem({ conversation, onPress, onLongPress, cu
 
     const Avatar = () => (
         <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.8} style={[styles.avatarContainer, isOrg && styles.avatarOrg]}>
-            {avatarUrl ? (
+            {isLink ? (
+                <View style={[styles.avatarPlaceholder, styles.avatarPlaceholderLink]}>
+                    <Image
+                        source={LINK_LOGO}
+                        style={styles.linkLogo}
+                        contentFit="contain"
+                    />
+                </View>
+            ) : avatarUrl ? (
                 <Image
                     source={{ uri: avatarUrl }}
                     style={[styles.avatar, isOrg && styles.avatarOrgImage]}
                     contentFit="cover"
                 />
             ) : (
-                <View style={[styles.avatarPlaceholder, isOrg && styles.avatarPlaceholderOrg, isGroup && styles.avatarPlaceholderGroup]}>
+                <View style={[styles.avatarPlaceholder, isOrg && styles.avatarPlaceholderOrg, (isGroup || isClass) && styles.avatarPlaceholderGroup]}>
                     {isOrg ? (
                         <Ionicons name="business" size={hp(3)} color={theme.colors.textSecondary} />
                     ) : isGroup ? (
                         <Ionicons name="people" size={hp(3.5)} color={theme.colors.textSecondary} />
+                    ) : isClass ? (
+                        <Ionicons name="school" size={hp(3.5)} color={theme.colors.textSecondary} />
                     ) : (
                         <Text style={styles.avatarPlaceholderText}>
                             {name ? name.charAt(0).toUpperCase() : '?'}
@@ -86,10 +112,18 @@ export default function MessageListItem({ conversation, onPress, onLongPress, cu
 
             <View style={styles.content}>
                 <View style={styles.topRow}>
-                    <Text style={styles.name} numberOfLines={1}>
-                        {name}
+                    <View style={styles.nameContainer}>
+                        <Text style={styles.name} numberOfLines={1}>
+                            {name}
+                        </Text>
+                        {isLink && (
+                            <View style={styles.linkBadge}>
+                                <Ionicons name="sparkles" size={hp(1.6)} color={theme.colors.bondedPurple} />
+                                <Text style={styles.linkBadgeText}>AI</Text>
+                            </View>
+                        )}
                         {isOrg && <Text style={styles.orgBadge}> • Org</Text>}
-                    </Text>
+                    </View>
                     <Text style={[styles.time, isUnread && styles.timeUnread]}>
                         {timeString}
                     </Text>
@@ -103,7 +137,8 @@ export default function MessageListItem({ conversation, onPress, onLongPress, cu
                         ]}
                         numberOfLines={1}
                     >
-                        {isSelf && 'You: '}{lastMessage?.content || 'Started a conversation'}
+                        {isSelf && !conversation.last_preview_text && !isPreviewPrefixed && 'You: '}
+                        {lastMessageContent || 'Started a conversation'}
                     </Text>
                     {isUnread && (
                         <View style={styles.unreadDot} />
@@ -152,6 +187,13 @@ const createStyles = (theme) => StyleSheet.create({
     avatarPlaceholderGroup: {
         backgroundColor: theme.colors.backgroundSecondary,
     },
+    avatarPlaceholderLink: {
+        backgroundColor: theme.colors.bondedPurple + '15',
+    },
+    linkLogo: {
+        width: '70%',
+        height: '70%',
+    },
     avatarPlaceholderText: {
         fontSize: hp(2.5),
         color: theme.colors.textSecondary,
@@ -167,12 +209,32 @@ const createStyles = (theme) => StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    nameContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: wp(1.5),
+    },
     name: {
         fontSize: hp(1.9),
         fontFamily: theme.typography.fontFamily.heading,
         fontWeight: '600',
         color: theme.colors.textPrimary,
-        flex: 1,
+    },
+    linkBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(0.5),
+        backgroundColor: theme.colors.bondedPurple + '15',
+        paddingHorizontal: wp(1.5),
+        paddingVertical: hp(0.2),
+        borderRadius: theme.radius.sm,
+    },
+    linkBadgeText: {
+        fontSize: hp(1.2),
+        color: theme.colors.bondedPurple,
+        fontWeight: '700',
+        fontFamily: theme.typography.fontFamily.heading,
     },
     orgBadge: {
         fontSize: hp(1.4),

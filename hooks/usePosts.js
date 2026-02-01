@@ -34,6 +34,7 @@ export function usePosts(forumId, filters = {}) {
           id,
           forum_id,
           user_id,
+          org_id,
           title,
           body,
           tags,
@@ -52,6 +53,11 @@ export function usePosts(forumId, filters = {}) {
             full_name,
             avatar_url,
             email
+          ),
+          organization:organizations(
+            id,
+            name,
+            logo_url
           ),
           forum:forums(
             id,
@@ -95,14 +101,26 @@ export function usePosts(forumId, filters = {}) {
       const resolvedPosts = await Promise.all(
         (data || []).map(async (post) => {
           const resolvedMedia = await resolveMediaUrls(post.media_urls || [])
+
+          // Determine author info (org takes precedence over user)
+          const isOrgPost = !!post.org_id && !!post.organization
+          const author = isOrgPost
+            ? post.organization.name
+            : post.is_anonymous
+              ? 'Anon'
+              : (post.author?.username && post.author.username.trim() !== ''
+                  ? post.author.username
+                  : (post.author?.email ? post.author.email.split('@')[0] : 'Anonymous'))
+          const authorAvatar = isOrgPost
+            ? post.organization.logo_url
+            : post.author?.avatar_url || null
+
           return {
             id: post.id,
-            author: post.is_anonymous ? 'Anon' : (
-              post.author?.username && post.author.username.trim() !== ''
-                ? post.author.username
-                : (post.author?.email ? post.author.email.split('@')[0] : 'Anonymous')
-            ),
+            author,
             isAnon: post.is_anonymous || false,
+            isOrgPost,
+            orgId: post.org_id || null,
             title: post.title,
             body: post.body,
             forum: post.forum?.name || 'Unknown',
@@ -118,7 +136,7 @@ export function usePosts(forumId, filters = {}) {
             createdAt: post.created_at,
             userId: post.user_id,
             anonNumber: post.is_anonymous ? (parseInt(post.user_id.replace(/[^0-9]/g, '').slice(-2)) || 1) : null,
-            authorAvatar: post.author?.avatar_url || null,
+            authorAvatar,
             poll: post.poll || null,
           }
         })
@@ -172,6 +190,7 @@ export function usePost(postId) {
         .select(`
           *,
           author:profiles!posts_user_id_fkey(*),
+          organization:organizations(id, name, logo_url),
           forum:forums(*),
           poll:polls(*)
         `)

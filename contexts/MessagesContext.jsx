@@ -18,6 +18,9 @@ const MessagesContext = createContext()
 
 export const MessagesProvider = ({ children }) => {
   const { user } = useAuthStore()
+  const log = (...args) => {
+    if (__DEV__) console.log(...args)
+  }
   const [conversations, setConversations] = useState([])
   const [messages, setMessages] = useState({}) // { conversationId: [messages] }
   const [typingUsers, setTypingUsers] = useState({}) // { conversationId: { oderId: timestamp } }
@@ -466,7 +469,7 @@ export const MessagesProvider = ({ children }) => {
         throw error
       }
 
-      // console.log('✅ Message sent:', data.id)
+      // log('✅ Message sent:', data.id)
 
       // Add to local state immediately to ensure smooth UX
       // The real-time listener will also try to add it, but we handle duplicates there
@@ -513,7 +516,7 @@ export const MessagesProvider = ({ children }) => {
 
     // Unsubscribe if already subscribed
     if (subscriptionsRef.current[conversationId]) {
-      // console.log('🧹 Unsubscribing from existing channel for:', conversationId)
+      // log('🧹 Unsubscribing from existing channel for:', conversationId)
       subscriptionsRef.current[conversationId].unsubscribe()
       delete subscriptionsRef.current[conversationId]
     }
@@ -522,7 +525,7 @@ export const MessagesProvider = ({ children }) => {
       delete pollingIntervalsRef.current[conversationId]
     }
 
-    // console.log('📡 Setting up real-time subscription for conversation:', conversationId)
+    // log('📡 Setting up real-time subscription for conversation:', conversationId)
 
     let isSubscribed = false
     const timeoutId = setTimeout(() => {
@@ -558,7 +561,7 @@ export const MessagesProvider = ({ children }) => {
             return
           }
 
-          // console.log('📬 Real-time message change:', payload.eventType, newMessage.id)
+          // log('📬 Real-time message change:', payload.eventType, newMessage.id)
 
           // Parse metadata if it's a string (JSONB from database)
           let parsedMetadata = newMessage.metadata
@@ -602,7 +605,7 @@ export const MessagesProvider = ({ children }) => {
               },
             }
 
-            // console.log('📬 Real-time message with metadata:', {
+            // log('📬 Real-time message with metadata:', {
             //   id: messageWithSender.id,
             //   hasImage: parsedMetadata?.type === 'image',
             //   imageUrl: parsedMetadata?.imageUrl,
@@ -613,10 +616,10 @@ export const MessagesProvider = ({ children }) => {
               const existing = prev[conversationId] || []
               // Avoid duplicates
               if (existing.find(m => m.id === newMessage.id)) {
-                console.log('⚠️ Duplicate message ignored:', newMessage.id)
+                log('⚠️ Duplicate message ignored:', newMessage.id)
                 return prev
               }
-              // console.log('✅ Adding new message to state:', newMessage.id)
+              // log('✅ Adding new message to state:', newMessage.id)
               return {
                 ...prev,
                 [conversationId]: [...existing, messageWithSender],
@@ -646,7 +649,7 @@ export const MessagesProvider = ({ children }) => {
               const updatedArray = [...existing]
               updatedArray[index] = updatedMessage
 
-              // console.log('🔄 Updated message in state (e.g., unsent):', newMessage.id)
+              // log('🔄 Updated message in state (e.g., unsent):', newMessage.id)
 
               return {
                 ...prev,
@@ -657,14 +660,14 @@ export const MessagesProvider = ({ children }) => {
         }
       )
       .subscribe((status, err) => {
-        // console.log('📡 Message subscription status:', status, 'for conversation:', conversationId)
+        // log('📡 Message subscription status:', status, 'for conversation:', conversationId)
         if (status === 'SUBSCRIBED') {
           isSubscribed = true
           if (subscriptionTimeoutsRef.current[conversationId]) {
             clearTimeout(subscriptionTimeoutsRef.current[conversationId])
             delete subscriptionTimeoutsRef.current[conversationId]
           }
-          // console.log('✅ Successfully subscribed to messages for conversation:', conversationId)
+          // log('✅ Successfully subscribed to messages for conversation:', conversationId)
         } else if (status === 'CHANNEL_ERROR') {
           if (subscriptionTimeoutsRef.current[conversationId]) {
             clearTimeout(subscriptionTimeoutsRef.current[conversationId])
@@ -676,13 +679,13 @@ export const MessagesProvider = ({ children }) => {
             if (err) {
               console.error('   Error details:', err)
             }
-            console.log('💡 This may be due to:')
-            console.log('   1. Real-time not enabled for messages table in Supabase')
-            console.log('      → Run database/enable-realtime-messaging.sql in Supabase SQL Editor')
-            console.log('   2. RLS policies blocking subscription')
-            console.log('      → Run database/check-realtime-status.sql to diagnose')
-            console.log('   3. Conversation not fully created yet')
-            console.log('   Messages will still work via polling, but real-time updates may not work')
+            log('💡 This may be due to:')
+            log('   1. Real-time not enabled for messages table in Supabase')
+            log('      → Run database/enable-realtime-messaging.sql in Supabase SQL Editor')
+            log('   2. RLS policies blocking subscription')
+            log('      → Run database/check-realtime-status.sql to diagnose')
+            log('   3. Conversation not fully created yet')
+            log('   Messages will still work via polling, but real-time updates may not work')
           }
           realtimeDisabledRef.current = true
           setRealtimeDisabled(true)
@@ -697,12 +700,12 @@ export const MessagesProvider = ({ children }) => {
           setRealtimeDisabled(true)
           startPollingMessages(conversationId)
         } else if (status === 'CLOSED') {
-          // console.log('🔒 Message subscription closed for conversation:', conversationId)
+          // log('🔒 Message subscription closed for conversation:', conversationId)
         }
       })
 
     subscriptionsRef.current[conversationId] = channel
-    // console.log('📡 Subscribed to messages for conversation:', conversationId)
+    // log('📡 Subscribed to messages for conversation:', conversationId)
   }, [startPollingMessages])
 
   const unsubscribeFromMessages = useCallback((conversationId) => {
@@ -795,7 +798,7 @@ export const MessagesProvider = ({ children }) => {
       .subscribe()
 
     subscriptionsRef.current[`typing-${conversationId}`] = channel
-    // console.log('📡 Subscribed to typing for conversation:', conversationId)
+    // log('📡 Subscribed to typing for conversation:', conversationId)
   }, [user?.id])
 
   // Check if someone is typing in a conversation
@@ -922,7 +925,7 @@ export const MessagesProvider = ({ children }) => {
         throw error
       }
 
-      console.log('✅ Message marked as unsent:', messageId)
+      log('✅ Message marked as unsent:', messageId)
 
       // Optimistically update local state so the sender sees it immediately
       setMessages(prev => {

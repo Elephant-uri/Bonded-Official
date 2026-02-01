@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { hp, wp } from '../../../helpers/common'
 import { useAppTheme } from '../../theme'
 import { formatDateTime, formatTimeForDisplay } from '../../../utils/dateFormatters'
+import { getFriendlyErrorMessage } from '../../../utils/userFacingErrors'
 import { useEvent } from '../../../hooks/events/useEvent'
 import { useAuthStore } from '../../../stores/authStore'
 import { supabase } from '../../../lib/supabase'
@@ -69,7 +70,8 @@ export default function ManageEvent() {
       ])
     },
     onError: (error) => {
-      Alert.alert('Error', error.message || 'Failed to delete event')
+      console.error('Failed to delete event:', error)
+      Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to delete event'))
     }
   })
 
@@ -100,8 +102,14 @@ export default function ManageEvent() {
   }
 
   const handleEdit = () => {
-    // Navigate to edit screen (to be implemented)
-    Alert.alert('Coming Soon', 'Event editing will be available soon!')
+    // Navigate to create screen with event data for editing
+    router.push({
+      pathname: '/events/create',
+      params: {
+        eventId: eventId,
+        mode: 'edit',
+      }
+    })
   }
 
 

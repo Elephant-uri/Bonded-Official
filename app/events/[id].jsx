@@ -18,6 +18,7 @@ import BottomNav from '../../components/BottomNav'
 import { Calendar, ChevronLeft, MapPin, Users } from '../../components/Icons'
 import Button from '../../components/ui/Button'
 import { hp, wp } from '../../helpers/common'
+import { getFriendlyErrorMessage } from '../../utils/userFacingErrors'
 import { getStaticMapUrl } from '../../helpers/mapUtils'
 import { useEvent } from '../../hooks/events/useEvent'
 import { useEventActions } from '../../hooks/events/useEventActions'
@@ -173,7 +174,7 @@ export default function EventDetail() {
           <View style={styles.centered}>
             <Text style={styles.errorText}>Event not found</Text>
             <Text style={styles.errorSubtext}>
-              {error?.message || 'The event you\'re looking for doesn\'t exist or has been removed.'}
+              {getFriendlyErrorMessage(error, 'The event you\'re looking for doesn\'t exist or has been removed.')}
             </Text>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <Text style={styles.backButtonText}>Go back</Text>

@@ -7,6 +7,8 @@ import { useRouter } from 'expo-router'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
+import { useProfileModal } from '../../contexts/ProfileModalContext'
+import { useOrgModal } from '../../contexts/OrgModalContext'
 
 // Base preview card component
 const PreviewCard = ({ children, onPress, style }) => {
@@ -51,7 +53,6 @@ export const EventSharePreview = ({ message, isOwn }) => {
             <Image 
               source={{ uri: event.image_url }} 
               style={styles.previewThumbnail}
-              defaultSource={require('../../assets/images/default-event.png')}
             />
           )}
           <View style={styles.previewInfo}>
@@ -131,11 +132,17 @@ export const ProfileSharePreview = ({ message, isOwn }) => {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
+  const { openProfile } = useProfileModal()
   
   const profile = message.metadata
   const handlePress = () => {
     if (profile.user_id) {
-      router.push(`/profile/${profile.user_id}`)
+      openProfile(profile.user_id)
+      return
+    }
+    if (profile.id) {
+      openProfile(profile.id)
+      return
     }
   }
   
@@ -154,7 +161,6 @@ export const ProfileSharePreview = ({ message, isOwn }) => {
               uri: profile.avatar_url || undefined 
             }} 
             style={[styles.previewThumbnail, styles.profileAvatar]}
-            defaultSource={require('../../assets/images/default-avatar.png')}
           />
           <View style={styles.previewInfo}>
             <Text style={styles.previewTitle} numberOfLines={1}>
@@ -184,11 +190,17 @@ export const OrgSharePreview = ({ message, isOwn }) => {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
+  const { openOrg } = useOrgModal()
   
   const org = message.metadata
   const handlePress = () => {
     if (org.org_id) {
-      router.push(`/org/${org.org_id}`)
+      openOrg(org.org_id)
+      return
+    }
+    if (org.id) {
+      openOrg(org.id)
+      return
     }
   }
   
@@ -205,7 +217,6 @@ export const OrgSharePreview = ({ message, isOwn }) => {
           <Image 
             source={{ uri: org.logo_url || undefined }} 
             style={styles.previewThumbnail}
-            defaultSource={require('../../assets/images/default-org.png')}
           />
           <View style={styles.previewInfo}>
             <Text style={styles.previewTitle} numberOfLines={1}>

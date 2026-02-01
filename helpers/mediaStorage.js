@@ -62,6 +62,11 @@ export function buildMediaPath({
       ensureValue(postId, 'postId')
       ensureValue(mediaId, 'mediaId')
       return `universities/${universityId}/users/${userId}/posts/${postId}/${mediaId}.jpg`
+    case 'org_post':
+      ensureValue(orgId, 'orgId')
+      ensureValue(postId, 'postId')
+      ensureValue(mediaId, 'mediaId')
+      return `orgs/${orgId}/posts/${postId}/${mediaId}.jpg`
     case 'org_logo':
       ensureValue(orgId, 'orgId')
       return `orgs/${orgId}/logo/logo.jpg`
@@ -214,19 +219,53 @@ export async function uploadImageToBondedMedia({
   }
 }
 
+// Simple in-memory cache for signed URLs
+const signedUrlCache = new Map()
+const CACHE_DURATION = 60 * 60 * 1000 // 1 hour in milliseconds
+
 export async function createSignedUrlForPath(path, ttlSeconds = DEFAULT_SIGNED_URL_TTL) {
   ensureValue(path, 'path')
 
-  const { data, error } = await supabase.storage
-    .from(BONDED_MEDIA_BUCKET)
-    .createSignedUrl(path, ttlSeconds)
-
-  if (error) {
-    console.error('Failed to create signed URL:', error)
-    throw error
+  // Check cache first
+  const cacheKey = `${path}:${ttlSeconds}`
+  const cached = signedUrlCache.get(cacheKey)
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.url
   }
 
-  return data?.signedUrl || null
+  try {
+    const { data, error } = await supabase.storage
+      .from(BONDED_MEDIA_BUCKET)
+      .createSignedUrl(path, ttlSeconds)
+
+    if (error) {
+      console.warn('Failed to sign media URL:', error.message)
+      // Fallback: try to get public URL
+      const { data: publicData } = supabase.storage
+        .from(BONDED_MEDIA_BUCKET)
+        .getPublicUrl(path)
+
+      if (publicData?.publicUrl) {
+        return publicData.publicUrl
+      }
+
+      throw error
+    }
+
+    const signedUrl = data?.signedUrl
+    if (signedUrl) {
+      // Cache the result
+      signedUrlCache.set(cacheKey, {
+        url: signedUrl,
+        timestamp: Date.now()
+      })
+    }
+
+    return signedUrl || null
+  } catch (error) {
+    console.error('Failed to create signed URL:', error)
+    return null
+  }
 }
 
 export async function resolveMediaUrls(mediaUrls, ttlSeconds = DEFAULT_SIGNED_URL_TTL) {
@@ -242,8 +281,10 @@ export async function resolveMediaUrls(mediaUrls, ttlSeconds = DEFAULT_SIGNED_UR
       }
 
       try {
-        return await createSignedUrlForPath(url, ttlSeconds)
+        const resolvedUrl = await createSignedUrlForPath(url, ttlSeconds)
+        return resolvedUrl
       } catch (error) {
+        console.warn('Failed to resolve media URL:', url, error.message)
         return null
       }
     })

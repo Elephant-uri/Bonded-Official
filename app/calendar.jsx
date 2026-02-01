@@ -32,6 +32,7 @@ import { useFriends } from '../hooks/useFriends'
 import { useAuthStore } from '../stores/authStore'
 import { formatDate, formatDateShort, formatTime } from '../utils/dateFormatters'
 import { useAppTheme } from './theme'
+import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
 
 const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -117,7 +118,7 @@ export default function Calendar() {
   const [viewMode, setViewMode] = useState('month') // 'month', 'week', 'day', 'schedule'
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showCreateEventModal, setShowCreateEventModal] = useState(false)
-  const [eventTypeFilter, setEventTypeFilter] = useState('all') // 'all', 'personal', 'org', 'campus', 'tasks', 'events'
+  const [eventTypeFilter, setEventTypeFilter] = useState('all') // 'all', 'events', 'tasks', 'classes'
   const [showEventTypes, setShowEventTypes] = useState({
     events: true,
     tasks: true,
@@ -128,6 +129,7 @@ export default function Calendar() {
   })
   const { user } = useAuthStore()
   const { data: userProfile } = useCurrentUserProfile()
+  const universityName = userProfile?.university?.name || 'Your University'
   const { getAdminClubs } = useClubsContext()
   const { data: friends } = useFriends()
   const { data: calendarData, isLoading: calendarLoading } = useCalendarData(user?.id)
@@ -177,30 +179,16 @@ export default function Calendar() {
       return true
     })
 
-    // Filter by event type (if specific filter selected)
-    if (eventTypeFilter === 'personal') {
-      filtered = filtered.filter((event) =>
-        event.visibility === 'invite_only' ||
-        event.organizer_id === currentUserId ||
-        !event.org_id // Personal events don't have org_id
-      )
-    } else if (eventTypeFilter === 'social') {
-      filtered = filtered.filter((event) =>
-        event.type === 'event' && event.visibility === 'public' && !event.org_id // Social/party events only
-      )
-    } else if (eventTypeFilter === 'org') {
-      filtered = filtered.filter((event) =>
-        event.visibility === 'org_only' && event.org_id
-      )
-    } else if (eventTypeFilter === 'campus') {
-      filtered = filtered.filter((event) =>
-        event.visibility === 'school' || event.visibility === 'public'
-      )
-    } else if (eventTypeFilter === 'tasks') {
+    // Filter by event type (simplified)
+    if (eventTypeFilter === 'tasks') {
       filtered = filtered.filter((event) => event.type === 'task')
     } else if (eventTypeFilter === 'events') {
-      filtered = filtered.filter((event) => event.type !== 'task')
+      filtered = filtered.filter((event) => event.type !== 'task' && event.type !== 'class')
+    } else if (eventTypeFilter === 'classes') {
+      // Show only class events (from recurring class schedule)
+      filtered = filtered.filter((event) => event.type === 'class' || event.isClassEvent)
     }
+    // 'all' shows everything, no additional filter needed
 
     return filtered
   }, [allEvents, eventTypeFilter, currentUserId, showEventTypes])
@@ -874,7 +862,7 @@ export default function Calendar() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         <AppTopBar
-          schoolName="University of Rhode Island"
+          schoolName={universityName}
           onPressProfile={() => router.push('/profile')}
           onPressSchool={() => { }}
           onPressNotifications={() => router.push('/notifications')}
@@ -910,25 +898,19 @@ export default function Calendar() {
             />
           </View>
 
-          {/* Event Type Filter Row */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.eventTypeFilterContent}
-            nestedScrollEnabled
-          >
+          {/* Event Type Tabs - Messages Style */}
+          <View style={styles.eventTypeTabContainer}>
             <TouchableOpacity
               style={[
-                styles.filterChip,
-                eventTypeFilter === 'all' && styles.filterChipActive,
+                styles.eventTypeTab,
+                eventTypeFilter === 'all' && styles.eventTypeTabActive,
               ]}
               onPress={() => setEventTypeFilter('all')}
-              activeOpacity={0.7}
             >
               <Text
                 style={[
-                  styles.filterChipText,
-                  eventTypeFilter === 'all' && styles.filterChipTextActive,
+                  styles.eventTypeTabText,
+                  eventTypeFilter === 'all' && styles.eventTypeTabTextActive,
                 ]}
               >
                 All
@@ -936,16 +918,15 @@ export default function Calendar() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[
-                styles.filterChip,
-                eventTypeFilter === 'events' && styles.filterChipActive,
+                styles.eventTypeTab,
+                eventTypeFilter === 'events' && styles.eventTypeTabActive,
               ]}
               onPress={() => setEventTypeFilter('events')}
-              activeOpacity={0.7}
             >
               <Text
                 style={[
-                  styles.filterChipText,
-                  eventTypeFilter === 'events' && styles.filterChipTextActive,
+                  styles.eventTypeTabText,
+                  eventTypeFilter === 'events' && styles.eventTypeTabTextActive,
                 ]}
               >
                 Events
@@ -953,16 +934,15 @@ export default function Calendar() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[
-                styles.filterChip,
-                eventTypeFilter === 'tasks' && styles.filterChipActive,
+                styles.eventTypeTab,
+                eventTypeFilter === 'tasks' && styles.eventTypeTabActive,
               ]}
               onPress={() => setEventTypeFilter('tasks')}
-              activeOpacity={0.7}
             >
               <Text
                 style={[
-                  styles.filterChipText,
-                  eventTypeFilter === 'tasks' && styles.filterChipTextActive,
+                  styles.eventTypeTabText,
+                  eventTypeFilter === 'tasks' && styles.eventTypeTabTextActive,
                 ]}
               >
                 Tasks
@@ -970,73 +950,21 @@ export default function Calendar() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[
-                styles.filterChip,
-                eventTypeFilter === 'personal' && styles.filterChipActive,
+                styles.eventTypeTab,
+                eventTypeFilter === 'classes' && styles.eventTypeTabActive,
               ]}
-              onPress={() => setEventTypeFilter('personal')}
-              activeOpacity={0.7}
+              onPress={() => setEventTypeFilter('classes')}
             >
               <Text
                 style={[
-                  styles.filterChipText,
-                  eventTypeFilter === 'personal' && styles.filterChipTextActive,
+                  styles.eventTypeTabText,
+                  eventTypeFilter === 'classes' && styles.eventTypeTabTextActive,
                 ]}
               >
-                Personal
+                Classes
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                eventTypeFilter === 'social' && styles.filterChipActive,
-              ]}
-              onPress={() => setEventTypeFilter('social')}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  eventTypeFilter === 'social' && styles.filterChipTextActive,
-                ]}
-              >
-                Social
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                eventTypeFilter === 'org' && styles.filterChipActive,
-              ]}
-              onPress={() => setEventTypeFilter('org')}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  eventTypeFilter === 'org' && styles.filterChipTextActive,
-                ]}
-              >
-                Org
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                eventTypeFilter === 'campus' && styles.filterChipActive,
-              ]}
-              onPress={() => setEventTypeFilter('campus')}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  eventTypeFilter === 'campus' && styles.filterChipTextActive,
-                ]}
-              >
-                Campus
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
+          </View>
 
           {/* Month Navigation (only for month view) - Integrated */}
           {viewMode === 'month' && (
@@ -1117,13 +1045,13 @@ export default function Calendar() {
         {/* Calendar View */}
         {renderView()}
 
-        {/* Create Event Button */}
+        {/* Create Event FAB */}
         <TouchableOpacity
-          style={styles.createButton}
+          style={styles.fab}
           onPress={() => setShowCreateEventModal(true)}
           activeOpacity={0.8}
         >
-          <Plus size={hp(2.5)} color={theme.colors.white} strokeWidth={2.5} />
+          <Plus size={hp(3.5)} color={theme.colors.white} strokeWidth={2.5} />
         </TouchableOpacity>
 
         {/* Create Calendar Event Modal */}
@@ -1306,7 +1234,7 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       console.error('Error creating event:', error)
-      showError('Error', error.message || 'Failed to create event. Please try again.')
+      showError('Error', getFriendlyErrorMessage(error, 'Failed to create event. Please try again.'))
     } finally {
       setIsCreating(false)
     }
@@ -1799,6 +1727,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
                           }
                         }}
                         minimumDate={new Date()}
+                        textColor={theme.colors.textPrimary}
+                        themeVariant={theme.mode}
                       />
                     </View>
                   </View>
@@ -1838,6 +1768,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
                             setShowStartTimePicker(false)
                           }
                         }}
+                        textColor={theme.colors.textPrimary}
+                        themeVariant={theme.mode}
                       />
                     </View>
                   </View>
@@ -1877,6 +1809,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
                             setShowEndTimePicker(false)
                           }
                         }}
+                        textColor={theme.colors.textPrimary}
+                        themeVariant={theme.mode}
                       />
                     </View>
                   </View>
@@ -1898,6 +1832,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
                     }
                   }}
                   minimumDate={new Date()}
+                  textColor={theme.colors.textPrimary}
+                  themeVariant={theme.mode}
                 />
               )}
               {showStartTimePicker && (
@@ -1911,6 +1847,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
                       setStartTime(selectedTime)
                     }
                   }}
+                  textColor={theme.colors.textPrimary}
+                  themeVariant={theme.mode}
                 />
               )}
               {showEndTimePicker && (
@@ -1924,6 +1862,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
                       setEndTime(selectedTime)
                     }
                   }}
+                  textColor={theme.colors.textPrimary}
+                  themeVariant={theme.mode}
                 />
               )}
             </>
@@ -1965,6 +1905,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
                       }
                     }}
                     minimumDate={new Date()}
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -2197,38 +2139,32 @@ const createStyles = (theme) => StyleSheet.create({
   viewModeChip: {
     flex: 1,
   },
-  eventTypeFilterContent: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    gap: theme.spacing.xs,
-    alignItems: 'center',
+  // Event Type Tabs - Messages Style
+  eventTypeTabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+    paddingBottom: hp(0.5),
+    gap: wp(6),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
   },
-  filterChip: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginRight: theme.spacing.xs,
-    minHeight: hp(2.5),
-    justifyContent: 'center',
-    alignItems: 'center',
+  eventTypeTab: {
+    paddingBottom: hp(1),
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  filterChipActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+  eventTypeTabActive: {
+    borderBottomColor: theme.colors.accent,
   },
-  filterChipText: {
-    fontSize: theme.typography.sizes.xs,
+  eventTypeTabText: {
+    fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.textSecondary,
-    letterSpacing: 0.1,
-  },
-  filterChipTextActive: {
-    color: theme.colors.white,
     fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  eventTypeTabTextActive: {
+    color: theme.colors.textPrimary,
   },
   monthNavigation: {
     flexDirection: 'row',
@@ -2313,28 +2249,22 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.textPrimary,
   },
-  createButton: {
+  fab: {
     position: 'absolute',
     bottom: hp(12),
-    right: wp(6),
-    width: hp(6),
-    height: hp(6),
-    borderRadius: hp(3),
-    backgroundColor: theme.colors.accent,
+    right: wp(5),
+    width: hp(7),
+    height: hp(7),
+    borderRadius: hp(3.5),
+    backgroundColor: theme.colors.bondedPurple,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
-    ...Platform.select({
-      ios: {
-        shadowColor: theme.colors.bondedPurple,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 10,
-      },
-    }),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+    zIndex: 100,
   },
   // Month View Styles - Modern iOS Design
   monthContainer: {

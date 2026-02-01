@@ -37,6 +37,7 @@ export function useCreatePost() {
         tags: Array.isArray(tags) ? tags : [],
         media_urls: Array.isArray(mediaUrls) ? mediaUrls : [],
         is_anonymous: isAnonymous || false,
+        org_id: null, // Will be set by caller if posting as org
         upvotes_count: 0,
         comments_count: 0,
         reposts_count: 0,

@@ -22,8 +22,9 @@ const isPolicyRecursionError = (error) => {
  */
 export function useConversations() {
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['conversations', user?.id],
     queryFn: async () => {
       if (!user?.id) return []
@@ -44,8 +45,11 @@ export function useConversations() {
             created_by,
             created_at,
             updated_at,
+            last_message_at,
             org_id,
-            class_section_id
+            class_section_id,
+            avatar_url,
+            is_system_generated
           )
         `)
         .eq('user_id', user.id)
@@ -76,6 +80,37 @@ export function useConversations() {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
+
+          // Get last reaction in conversation (for preview)
+          let lastReaction = null
+          try {
+            const { data: reaction } = await supabase
+              .from('message_reactions')
+              .select(`
+                id,
+                reaction_type,
+                created_at,
+                user_id,
+                user:profiles!message_reactions_user_id_fkey (
+                  id,
+                  full_name,
+                  username
+                ),
+                message:messages!message_reactions_message_id_fkey (
+                  id,
+                  conversation_id,
+                  sender_id
+                )
+              `)
+              .eq('message.conversation_id', conv.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            lastReaction = reaction || null
+          } catch (err) {
+            // Ignore reaction preview failures
+          }
 
           // Get other participants using RPC function (avoids RLS recursion)
           let participants = []
@@ -124,11 +159,33 @@ export function useConversations() {
 
           // console.log('📬 Conversation:', conv.id, 'type:', conv.type, 'other_participant:', other_participant?.id, other_participant?.full_name)
 
+          const lastMessageAt = lastMsg?.created_at || conv.last_message_at || conv.created_at
+
+          let lastPreviewText = lastMsg?.content || null
+          let lastPreviewAt = lastMessageAt
+          if (lastMsg?.sender_id === user.id && lastMsg?.content) {
+            lastPreviewText = `You: ${lastMsg.content}`
+          }
+          if (lastReaction?.created_at) {
+            const reactionTime = new Date(lastReaction.created_at).getTime()
+            const messageTime = lastMessageAt ? new Date(lastMessageAt).getTime() : 0
+            const isReactionOnMyMessage = lastReaction.message?.sender_id === user.id
+            const isOtherUser = lastReaction.user_id && lastReaction.user_id !== user.id
+
+            if (reactionTime >= messageTime && isReactionOnMyMessage && isOtherUser) {
+              const emoji = lastReaction.reaction_type === 'heart' ? '❤️' : '👍'
+              lastPreviewText = `reacted to your message ${emoji}`
+              lastPreviewAt = lastReaction.created_at
+            }
+          }
+
           return {
             ...conv,
             last_message: lastMsg?.content || null,
-            last_message_at: lastMsg?.created_at || conv.created_at,
+            last_message_at: lastMessageAt,
             last_message_sender_id: lastMsg?.sender_id || null,
+            last_preview_text: lastPreviewText,
+            last_preview_at: lastPreviewAt,
             participants,
             other_participant,
             unread_count: unread_count,
@@ -137,8 +194,51 @@ export function useConversations() {
         })
       )
 
+      // De-dupe by conversation id (defensive: handle duplicated participant rows)
+      const uniqueById = new Map()
+      for (const conv of conversationsWithDetails.filter(Boolean)) {
+        const existing = uniqueById.get(conv.id)
+        if (!existing) {
+          uniqueById.set(conv.id, conv)
+          continue
+        }
+        const existingTime = new Date(existing.last_message_at || existing.created_at).getTime()
+        const nextTime = new Date(conv.last_message_at || conv.created_at).getTime()
+        uniqueById.set(
+          conv.id,
+          nextTime >= existingTime ? { ...existing, ...conv } : existing
+        )
+      }
+
+      // De-dupe group/org/class conversations by composite key (prevents duplicate org/group rows)
+      const uniqueByGroupKey = new Map()
+      for (const conv of uniqueById.values()) {
+        if (conv.type === 'direct') {
+          uniqueByGroupKey.set(`direct:${conv.id}`, conv)
+          continue
+        }
+
+        const groupKey = conv.org_id
+          ? `${conv.type}:org:${conv.org_id}`
+          : conv.class_section_id
+            ? `${conv.type}:class:${conv.class_section_id}`
+            : conv.name
+              ? `${conv.type}:name:${conv.name.toLowerCase()}`
+              : `other:${conv.id}`
+
+        const existing = uniqueByGroupKey.get(groupKey)
+        if (!existing) {
+          uniqueByGroupKey.set(groupKey, conv)
+          continue
+        }
+
+        const existingTime = new Date(existing.last_message_at || existing.created_at).getTime()
+        const nextTime = new Date(conv.last_message_at || conv.created_at).getTime()
+        uniqueByGroupKey.set(groupKey, nextTime >= existingTime ? { ...existing, ...conv } : existing)
+      }
+
       // Filter out nulls and conversations that shouldn't be shown
-      const sorted = conversationsWithDetails
+      const sorted = Array.from(uniqueByGroupKey.values())
         .filter(Boolean)
         .filter(conv => {
           // Always show conversations the user created
@@ -157,6 +257,7 @@ export function useConversations() {
     staleTime: 30 * 1000, // 30 seconds
     refetchOnWindowFocus: true,
     refetchInterval: 5000,
+    refetchIntervalInBackground: true,
     retry: (failureCount, error) => {
       // Don't retry on network errors - they'll resolve when connection is restored
       if (isNetworkError(error)) {
@@ -167,6 +268,38 @@ export function useConversations() {
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   })
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    const channel = supabase
+      .channel(`conversations-updates-${user.id}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => {
+          // Refresh conversation previews + unread counts on new/updated messages
+          queryClient.invalidateQueries({ queryKey: ['conversations', user.id] })
+          queryClient.invalidateQueries({ queryKey: ['notificationCount', user.id] })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_reactions' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['conversations', user.id] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [user?.id, queryClient])
+
+  return query
 }
 
 /**
@@ -495,6 +628,63 @@ export function useSendMessage() {
       })
 
       // Invalidate conversations to update last message preview in list
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+  })
+}
+
+/**
+ * Hook to unsend (delete for everyone) a message
+ */
+export function useUnsendMessage() {
+  const { user } = useAuthStore()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ messageId, conversationId }) => {
+      if (!user?.id) throw new Error('User must be authenticated')
+      if (!messageId) throw new Error('Message ID is required')
+
+      const unsentAt = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('messages')
+        .update({
+          content: '',
+          metadata: {
+            unsent: true,
+            unsent_by: user.id,
+            unsent_at: unsentAt,
+          },
+        })
+        .eq('id', messageId)
+        .eq('sender_id', user.id)
+        .select('id, conversation_id, sender_id, content, metadata, created_at')
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: (data, variables) => {
+      const { conversationId } = variables
+      const convId = conversationId || data?.conversation_id
+
+      if (convId) {
+        queryClient.setQueryData(['messages', convId], (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              messages: page.messages.map(msg =>
+                msg.id === data.id
+                  ? { ...msg, content: '', metadata: data.metadata || { unsent: true } }
+                  : msg
+              ),
+            })),
+          }
+        })
+      }
+
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
   })

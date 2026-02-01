@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import {
   FlatList,
@@ -14,10 +15,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
+import { supabase } from '../lib/supabase'
 
 const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, onClose, onCreateForum }) => {
   const theme = useAppTheme()
   const styles = createStyles(theme)
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedSections, setExpandedSections] = useState({
     campus: true, // Main forum section expanded by default
@@ -26,6 +29,33 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
     orgs: true,
     private: true,
   })
+
+  // Navigate to class section chat
+  const handleClassChatPress = async (item) => {
+    try {
+      // Find the conversation for this class section
+      const { data: conversation, error } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('type', 'group')
+        .eq('class_section_id', item.class_section_id)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error finding class chat:', error)
+        return
+      }
+
+      if (conversation?.id) {
+        onClose()
+        router.push(`/chat?conversationId=${conversation.id}`)
+      } else {
+        console.log('No chat found for this class section')
+      }
+    } catch (err) {
+      console.error('Error navigating to class chat:', err)
+    }
+  }
 
   // Organize forums by category
   const organizedForums = useMemo(() => {
@@ -36,8 +66,15 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
     const classes = forums.filter((f) => f.type === 'class')
     const orgs = forums.filter((f) => f.type === 'org')
     const privateForums = forums.filter((f) => f.type === 'private')
+    // Filter out campus, class, org, private AND main forums (Main is already shown at top)
     const other = forums.filter(
-      (f) => !f.isPinned && f.type !== 'class' && f.type !== 'org' && f.type !== 'private' && f.type !== 'campus'
+      (f) => !f.isPinned && 
+             f.type !== 'class' && 
+             f.type !== 'org' && 
+             f.type !== 'private' && 
+             f.type !== 'campus' &&
+             f.type !== 'main' &&
+             f.name?.toLowerCase() !== 'main' // Also filter by name in case type isn't set
     )
 
     return { campus: campusForums, pinned, classes, orgs, private: privateForums, other }
@@ -65,12 +102,19 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
     )
 
     return {
+      campus: filtered.filter((f) => f.type === 'campus'),
       pinned: filtered.filter((f) => f.isPinned),
       classes: filtered.filter((f) => f.type === 'class'),
       orgs: filtered.filter((f) => f.type === 'org'),
       private: filtered.filter((f) => f.type === 'private'),
       other: filtered.filter(
-        (f) => !f.isPinned && f.type !== 'class' && f.type !== 'org' && f.type !== 'private'
+        (f) => !f.isPinned && 
+               f.type !== 'class' && 
+               f.type !== 'org' && 
+               f.type !== 'private' &&
+               f.type !== 'campus' &&
+               f.type !== 'main' &&
+               f.name?.toLowerCase() !== 'main'
       ),
     }
   }, [searchQuery, organizedForums])
@@ -123,12 +167,11 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
       <TouchableOpacity
         style={[styles.forumItem, isSelected && styles.forumItemSelected]}
         onPress={() => {
-          if (!isClass) {
-            onSelectForum(item)
-            onClose()
-          }
+          // For classes and other forums, clicking opens the forum
+          onSelectForum(item)
+          onClose()
         }}
-        activeOpacity={isClass ? 1 : 0.7}
+        activeOpacity={0.7}
       >
         {item.image ? (
           <Image
@@ -168,32 +211,18 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
             )}
           </View>
         </View>
-        {isClass ? (
-          <View style={styles.classActions}>
-            <TouchableOpacity
-              style={styles.classActionButton}
-              onPress={() => {
-                // Navigate to class chat
-                // TODO: Implement navigation to class chat
-                console.log('Navigate to class chat:', item.id, item.class_section_id)
-                onClose()
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="chatbubble-outline" size={hp(2.2)} color={theme.colors.bondedPurple} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.classActionButton}
-              onPress={() => {
-                // Navigate to class forum
-                onSelectForum(item)
-                onClose()
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="chatbubbles-outline" size={hp(2.2)} color={theme.colors.bondedPurple} />
-            </TouchableOpacity>
-          </View>
+        {isClass && item.class_section_id ? (
+          // Class: show only chat button (clicking row opens forum)
+          <TouchableOpacity
+            style={styles.classActionButton}
+            onPress={(e) => {
+              e.stopPropagation()
+              handleClassChatPress(item)
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chatbubble-outline" size={hp(2.2)} color={theme.colors.bondedPurple} />
+          </TouchableOpacity>
         ) : isSelected ? (
           <Ionicons name="checkmark-circle" size={hp(2.5)} color={theme.colors.bondedPurple} />
         ) : null}
@@ -311,7 +340,7 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
                 <View>
-                  {/* Campus/Main forum is shown at the top via ForumSwitcher, don't duplicate here */}
+                  {renderSection('🏫 Main forum', filteredForums.campus, 'campus', 'globe')}
                   {renderSection('⭐ Pinned', filteredForums.pinned.filter(f => f.type !== 'campus'), 'pinned', 'star')}
                   {renderSection('📚 Your classes', filteredForums.classes, 'classes', 'school')}
                   {renderSection('🎯 Public forums', filteredForums.other.filter(f => f.type !== 'campus'), 'other', 'globe')}
@@ -505,15 +534,10 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.white,
   },
-  classActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2),
-  },
   classActionButton: {
-    padding: hp(0.8),
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.bondedPurple + '10',
+    padding: hp(1),
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.bondedPurple + '15',
   },
   footer: {
     paddingHorizontal: wp(4),

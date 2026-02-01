@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     Animated,
+    Alert,
     Dimensions,
     Modal,
     PanResponder,
@@ -23,29 +24,25 @@ const DISMISS_THRESHOLD = 150
  * Listens to activeProfileId from ProfileModalContext
  */
 const ProfileModal = () => {
-    const { activeProfileId, closeProfile } = useProfileModal()
+    const { activeProfileId, profileStack, closeProfile, closeAllProfiles } = useProfileModal()
     const theme = useAppTheme()
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current
     const [isVisible, setIsVisible] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
+    const [isReady, setIsReady] = useState(false) // Delay content rendering
     const scrollYRef = useRef(0)
+    const allowBackdropCloseRef = useRef(false)
+    const prevProfileIdRef = useRef(null)
 
     // Fetch profile data when an ID is set
-    const { data: profile, isLoading } = useProfile(activeProfileId)
-
+    const { data: profile, isLoading, refetch } = useProfile(activeProfileId)
+    const [hasShownError, setHasShownError] = useState(false)
+    
+    // Track if profile changed (for nested profiles)
+    const profileChanged = prevProfileIdRef.current !== activeProfileId && prevProfileIdRef.current !== null && activeProfileId !== null
+    
     useEffect(() => {
-        if (activeProfileId) {
-            setIsVisible(true)
-            translateY.setValue(SCREEN_HEIGHT)
-            Animated.spring(translateY, {
-                toValue: 0,
-                useNativeDriver: true,
-                tension: 65,
-                friction: 11,
-            }).start()
-        } else if (isVisible) {
-            handleClose()
-        }
+        prevProfileIdRef.current = activeProfileId
     }, [activeProfileId])
 
     const handleClose = useCallback(() => {
@@ -55,9 +52,63 @@ const ProfileModal = () => {
             useNativeDriver: true,
         }).start(() => {
             setIsVisible(false)
+            setIsReady(false) // Reset ready state
             closeProfile()
         })
     }, [closeProfile, translateY])
+
+    useEffect(() => {
+        if (activeProfileId) {
+            // Reset scroll position when profile changes
+            scrollYRef.current = 0
+            setHasShownError(false)
+            setIsReady(false) // Reset ready state
+            
+            if (!isVisible) {
+                // Opening fresh - animate in from bottom
+                setIsVisible(true)
+                allowBackdropCloseRef.current = false
+                translateY.setValue(SCREEN_HEIGHT)
+                Animated.spring(translateY, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                    tension: 65,
+                    friction: 11,
+                }).start()
+                const timer = setTimeout(() => {
+                    allowBackdropCloseRef.current = true
+                }, 250)
+                
+                // Delay content rendering to allow modal animation to complete
+                const readyTimer = setTimeout(() => {
+                    setIsReady(true)
+                }, 100)
+                
+                return () => {
+                    clearTimeout(timer)
+                    clearTimeout(readyTimer)
+                }
+            } else {
+                // Already visible, just update - small delay for stability
+                setTimeout(() => setIsReady(true), 50)
+            }
+            // If already visible and profile changed (nested profile), just let it update
+            // The content will re-render with the new profile data
+        } else if (isVisible) {
+            handleClose()
+        }
+    }, [activeProfileId, handleClose, isVisible, translateY])
+
+    useEffect(() => {
+        if (!activeProfileId) {
+            setHasShownError(false)
+            return
+        }
+        if (isLoading || profile || hasShownError) return
+        setHasShownError(true)
+        Alert.alert('Profile Unavailable', 'Unable to load this profile right now.')
+        handleClose()
+    }, [activeProfileId, hasShownError, handleClose, isLoading, profile])
 
     const panResponder = useMemo(() =>
         PanResponder.create({
@@ -66,13 +117,13 @@ const ProfileModal = () => {
                 const isAtTop = scrollYRef.current <= 5
                 if (!isAtTop) return false
 
-                // Check for vertical swipe down
                 const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 2
                 const isSwipingDown = gestureState.dy > 15
                 return isVertical && isSwipingDown
             },
             onPanResponderGrant: () => {
                 setIsDragging(true)
+                translateY.stopAnimation()
             },
             onPanResponderMove: (_, gestureState) => {
                 if (gestureState.dy > 0) {
@@ -111,12 +162,6 @@ const ProfileModal = () => {
         extrapolate: 'clamp',
     })
 
-    const modalScale = translateY.interpolate({
-        inputRange: [0, SCREEN_HEIGHT],
-        outputRange: [1, 0.9],
-        extrapolate: 'clamp',
-    })
-
     return (
         <Modal
             visible={isVisible}
@@ -124,16 +169,24 @@ const ProfileModal = () => {
             animationType="none"
             statusBarTranslucent
             onRequestClose={handleClose}
+            presentationStyle="overFullScreen"
         >
-            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <View style={{ flex: 1, backgroundColor: 'transparent', zIndex: 9999 }}>
                 <Animated.View
                     style={{
                         ...StyleSheet.absoluteFillObject,
-                        backgroundColor: '#000',
                         opacity: backdropOpacity,
+                        zIndex: 9999,
                     }}
                 >
-                    <View style={{ flex: 1 }} onTouchStart={handleClose} />
+                    <View
+                        style={{ flex: 1 }}
+                        onTouchStart={() => {
+                            if (allowBackdropCloseRef.current) {
+                                handleClose()
+                            }
+                        }}
+                    />
                 </Animated.View>
 
                 <Animated.View
@@ -145,31 +198,39 @@ const ProfileModal = () => {
                         bottom: 0,
                         transform: [
                             { translateY },
-                            { scale: modalScale },
                         ],
-                        backgroundColor: theme.colors.background,
-                        borderTopLeftRadius: 20,
-                        borderTopRightRadius: 20,
-                        overflow: 'hidden',
+                        backgroundColor: 'transparent',
+                        zIndex: 10000,
                     }}
                 >
-                    {isLoading ? (
-                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                            <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
-                        </View>
-                    ) : profile ? (
-                        <ProfileModalContent
-                            activeProfile={{
-                                ...profile,
-                                name: profile.full_name || 'User',
-                                photoUrl: profile.avatar_url,
-                                quote: profile.yearbook_quote,
-                            }}
-                            onClose={handleClose}
-                            scrollYRef={scrollYRef}
-                            panResponder={panResponder}
-                        />
-                    ) : null}
+                    <View
+                        style={{
+                            flex: 1,
+                            backgroundColor: theme.colors.background,
+                            borderTopLeftRadius: 20,
+                            borderTopRightRadius: 20,
+                            overflow: 'hidden',
+                        }}
+                    >
+                        {(isLoading || !isReady) ? (
+                            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
+                            </View>
+                        ) : profile ? (
+                            <ProfileModalContent
+                                activeProfile={{
+                                    ...profile,
+                                    name: profile.full_name || 'User',
+                                    photoUrl: profile.avatar_url,
+                                    quote: profile.yearbook_quote,
+                                }}
+                                onClose={handleClose}
+                                scrollYRef={scrollYRef}
+                                panResponder={panResponder}
+                                isDragging={isDragging}
+                            />
+                        ) : null}
+                    </View>
                 </Animated.View>
             </View>
         </Modal>

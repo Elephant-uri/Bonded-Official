@@ -180,11 +180,78 @@ export function UnifiedForumProvider({ children }) {
 
       console.log('All forums combined:', uniqueForums)
 
-      setForums(uniqueForums)
+      const memberCountsMap = {}
 
-      // Set current forum if not already set
-      if (!currentForum && uniqueForums.length > 0) {
-        setCurrentForum(uniqueForums[0])
+      // Campus/main forums: count all users in the university
+      if (profile?.university_id) {
+        const { count: universityUserCount, error: universityCountError } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('university_id', profile.university_id)
+
+        if (!universityCountError) {
+          uniqueForums.forEach((forum) => {
+            if (forum.type === 'campus' || forum.type === 'main') {
+              memberCountsMap[forum.id] = universityUserCount || 0
+            }
+          })
+        }
+      }
+
+      // Class forums: count enrolled students
+      const classForumsForCount = uniqueForums.filter((forum) => forum.type === 'class' && forum.class_id)
+      for (const forum of classForumsForCount) {
+        const { count, error: classCountError } = await supabase
+          .from('user_class_enrollments')
+          .select('*', { count: 'exact', head: true })
+          .eq('class_id', forum.class_id)
+          .eq('is_active', true)
+
+        if (!classCountError) {
+          memberCountsMap[forum.id] = count || 0
+        }
+      }
+
+      // Org forums: count org members
+      const orgForumsForCount = uniqueForums.filter((forum) => forum.type === 'org' && forum.org_id)
+      for (const forum of orgForumsForCount) {
+        let orgMemberCount = 0
+        let orgCountError = null
+        ;({ count: orgMemberCount, error: orgCountError } = await supabase
+          .from('org_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', forum.org_id)
+          .in('role', ['member', 'admin', 'owner']))
+
+        if (orgCountError?.code === '42703') {
+          ;({ count: orgMemberCount, error: orgCountError } = await supabase
+            .from('org_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', forum.org_id)
+            .in('role', ['member', 'admin', 'owner']))
+        }
+
+        if (!orgCountError) {
+          memberCountsMap[forum.id] = orgMemberCount || 0
+        }
+      }
+
+      const nextForums = uniqueForums.map((forum) => {
+        const fallbackCount = forum.member_count ?? forum.memberCount ?? 0
+        const memberCount = memberCountsMap[forum.id] ?? fallbackCount
+        return { ...forum, memberCount }
+      })
+
+      setForums(nextForums)
+
+      const nextCurrentForum = currentForum
+        ? nextForums.find((forum) => forum.id === currentForum.id)
+        : null
+
+      if (nextCurrentForum) {
+        setCurrentForum(nextCurrentForum)
+      } else if (!currentForum && nextForums.length > 0) {
+        setCurrentForum(nextForums[0])
       }
 
     } catch (err) {

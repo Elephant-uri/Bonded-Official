@@ -1,7 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,7 @@ import { getStaticMapUrlWithCoords } from '../../helpers/mapUtils'
 import { createSignedUrlForPath, uploadImageToBondedMedia } from '../../helpers/mediaStorage'
 import { useCreateEvent } from '../../hooks/events/useCreateEvent'
 import { supabase } from '../../lib/supabase'
+import { getFriendlyErrorMessage } from '../../utils/userFacingErrors'
 import { useAuthStore } from '../../stores/authStore'
 import { useClubsContext } from '../../contexts/ClubsContext'
 import { useAppTheme } from '../theme'
@@ -35,11 +36,14 @@ export default function CreateEvent() {
   const styles = createStyles(theme)
   const router = useRouter()
   const { user } = useAuthStore()
-  const { orgId } = useLocalSearchParams()
+  const { orgId, eventId, mode } = useLocalSearchParams()
   const { getClub } = useClubsContext()
   const preselectedOrg = orgId ? getClub(orgId) : null
   const preselectedOrgId = typeof orgId === 'string' ? orgId : null
   const createEventMutation = useCreateEvent()
+
+  const isEditMode = mode === 'edit' && eventId
+  const [isLoadingEvent, setIsLoadingEvent] = useState(isEditMode)
 
   const [eventName, setEventName] = useState('')
   const [description, setDescription] = useState('')
@@ -60,6 +64,41 @@ export default function CreateEvent() {
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [mapPreviewUrl, setMapPreviewUrl] = useState(null)
+
+  // Fetch event data if in edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      const fetchEventData = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .single()
+
+          if (error) throw error
+
+          if (data) {
+            setEventName(data.title || '')
+            setDescription(data.description || '')
+            setEventDate(new Date(data.start_at))
+            setEventTime(new Date(data.start_at))
+            setEndTime(new Date(data.end_at))
+            setLocation(data.location_name || '')
+            setEventImage(data.image_url)
+            setSelectedVisibility(data.visibility || 'public')
+            setSelectedOrgId(data.org_id)
+          }
+        } catch (error) {
+          console.error('Error fetching event:', error)
+          Alert.alert('Error', 'Failed to load event data')
+        } finally {
+          setIsLoadingEvent(false)
+        }
+      }
+      fetchEventData()
+    }
+  }, [isEditMode, eventId])
 
   const pickImage = async () => {
     try {
@@ -146,7 +185,7 @@ export default function CreateEvent() {
       Logger.error('Error uploading image:', error)
       Alert.alert(
         'Upload Error',
-        `Failed to upload event image: ${error.message || 'Unknown error'}. Event will be created without image.`,
+        getFriendlyErrorMessage(error, 'Failed to upload event image. Event will be created without image.'),
         [{ text: 'OK' }]
       )
       return null
@@ -181,7 +220,6 @@ export default function CreateEvent() {
       const eventData = {
         title: eventName.trim(),
         description: description.trim() || null,
-        image_url: null,
         start_at: startDateTime.toISOString(),
         end_at: endDateTime.toISOString(),
         location_name: location.trim(),
@@ -190,30 +228,45 @@ export default function CreateEvent() {
         requires_approval: selectedVisibility === 'invite_only',
         allow_sharing: true,
         is_paid: false,
-        invites: selectedInvitees.map(id => ({ user_id: id })),
         org_id: selectedOrgId || null,
       }
 
-      // Create event first (needs event_id for canonical media path)
-      const createdEvent = await createEventMutation.mutateAsync(eventData)
+      let targetEventId
 
-      if (eventImage && createdEvent?.id) {
-        const imageUrl = await uploadEventImage(createdEvent.id)
+      if (isEditMode) {
+        // Update existing event
+        const { error } = await supabase
+          .from('events')
+          .update(eventData)
+          .eq('id', eventId)
+
+        if (error) throw error
+        targetEventId = eventId
+      } else {
+        // Create new event
+        eventData.image_url = null
+        eventData.invites = selectedInvitees.map(id => ({ user_id: id }))
+        const createdEvent = await createEventMutation.mutateAsync(eventData)
+        targetEventId = createdEvent?.id
+      }
+
+      // Handle image upload if there's a new image
+      if (eventImage && targetEventId && !eventImage.startsWith('http')) {
+        const imageUrl = await uploadEventImage(targetEventId)
         if (imageUrl) {
-          // TODO: Store media path or media_id instead of signed URL in events.image_url.
           await supabase
             .from('events')
             .update({ image_url: imageUrl })
-            .eq('id', createdEvent.id)
+            .eq('id', targetEventId)
         }
       }
 
-      Alert.alert('Success', 'Event created successfully!', [
+      Alert.alert('Success', isEditMode ? 'Event updated successfully!' : 'Event created successfully!', [
         { text: 'OK', onPress: () => router.back() }
       ])
     } catch (error) {
       Logger.error('Error creating event:', error)
-      Alert.alert('Error', error.message || 'Failed to create event. Please try again.')
+      Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to create event. Please try again.'))
     }
   }
 
@@ -222,6 +275,19 @@ export default function CreateEvent() {
   const toggleInvitee = (id) => {
     setSelectedInvitees((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    )
+  }
+
+  if (isLoadingEvent) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.container}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
+            <Text style={{ marginTop: hp(2), color: theme.colors.textSecondary }}>Loading event...</Text>
+          </View>
+        </View>
+      </SafeAreaView>
     )
   }
 
@@ -237,7 +303,7 @@ export default function CreateEvent() {
           >
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Event</Text>
+          <Text style={styles.headerTitle}>{isEditMode ? 'Edit Event' : 'Create Event'}</Text>
           <TouchableOpacity
             onPress={handleCreateEvent}
             style={styles.headerButton}
@@ -247,7 +313,7 @@ export default function CreateEvent() {
             {createEventMutation.isPending || isUploading ? (
               <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
             ) : (
-              <Text style={styles.createText}>Create</Text>
+              <Text style={styles.createText}>{isEditMode ? 'Save' : 'Create'}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -497,6 +563,8 @@ export default function CreateEvent() {
                   }
                 }}
                 minimumDate={new Date()}
+                textColor={theme.colors.textPrimary}
+                themeVariant={theme.mode}
               />
             )}
             {showTimePicker && (
@@ -510,6 +578,8 @@ export default function CreateEvent() {
                     setEventTime(selectedTime)
                   }
                 }}
+                textColor={theme.colors.textPrimary}
+                themeVariant={theme.mode}
               />
             )}
             {showEndTimePicker && (
@@ -523,6 +593,8 @@ export default function CreateEvent() {
                     setEndTime(selectedTime)
                   }
                 }}
+                textColor={theme.colors.textPrimary}
+                themeVariant={theme.mode}
               />
             )}
           </>
@@ -563,6 +635,8 @@ export default function CreateEvent() {
                       }
                     }}
                     minimumDate={new Date()}
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -600,6 +674,8 @@ export default function CreateEvent() {
                         setEventTime(selectedTime)
                       }
                     }}
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -637,6 +713,8 @@ export default function CreateEvent() {
                         setEndTime(selectedTime)
                       }
                     }}
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>

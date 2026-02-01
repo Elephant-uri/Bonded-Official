@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
+import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -11,11 +11,29 @@ import CircleCard from '../components/Circles/CircleCard'
 import PreAnswerModal from '../components/Circles/PreAnswerModal'
 import CircleRoom from '../components/Circles/CircleRoom'
 import { useCirclesContext } from '../contexts/CirclesContext'
+import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
+import { isFeatureEnabled } from '../utils/featureGates'
 
 export default function Circles() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
+  if (!isFeatureEnabled('CIRCLES')) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <View style={styles.emptyState}>
+            <Ionicons name="radio-outline" size={hp(6)} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
+            <Text style={styles.emptyTitle}>Circles is coming soon</Text>
+            <Text style={styles.emptySubtitle}>We’re finishing the live rooms experience.</Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={() => router.back()}>
+              <Text style={styles.emptyButtonText}>Go back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
+  }
   const {
     dailyTopic,
     circleStats,
@@ -46,7 +64,8 @@ export default function Circles() {
       setCurrentRoomInfo(roomInfo)
       setShowCircleRoom(true)
     } catch (error) {
-      alert(error.message)
+      console.error('Failed to join circle:', error)
+      Alert.alert('Error', getFriendlyErrorMessage(error, 'Unable to join the circle right now.'))
     }
   }
 
@@ -237,6 +256,35 @@ const createStyles = (theme) => StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(8),
+  },
+  emptyTitle: {
+    marginTop: hp(2),
+    fontSize: hp(2.2),
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+  },
+  emptySubtitle: {
+    marginTop: hp(1),
+    fontSize: hp(1.7),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: hp(2),
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(1.2),
+    borderRadius: 999,
+    backgroundColor: theme.colors.bondedPurple,
+  },
+  emptyButtonText: {
+    color: theme.colors.white,
+    fontWeight: '600',
   },
   content: {
     paddingBottom: hp(12),

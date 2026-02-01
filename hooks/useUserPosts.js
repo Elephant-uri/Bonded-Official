@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { resolveMediaUrls } from '../helpers/mediaStorage'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 
@@ -22,6 +23,8 @@ export function useUserPosts(userId, limit = 3) {
           comments_count,
           upvotes_count,
           downvotes_count,
+          media_urls,
+          org_id,
           forum:forums(
             id,
             name
@@ -36,6 +39,7 @@ export function useUserPosts(userId, limit = 3) {
         .eq('user_id', userId)
         .eq('is_anonymous', false)
         .is('deleted_at', null)
+        .is('org_id', null) // Only show personal posts, not posts made as org admin
         .order('created_at', { ascending: false })
         .limit(limit)
 
@@ -44,7 +48,18 @@ export function useUserPosts(userId, limit = 3) {
         throw error
       }
 
-      return data || []
+      // Resolve media URLs
+      const postsWithMedia = await Promise.all(
+        (data || []).map(async (post) => {
+          const resolvedMedia = await resolveMediaUrls(post.media_urls || [])
+          return {
+            ...post,
+            media: resolvedMedia,
+          }
+        })
+      )
+
+      return postsWithMedia
     },
     enabled: !!user?.id && !!userId,
     staleTime: 30 * 1000,

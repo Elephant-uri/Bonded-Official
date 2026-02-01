@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import React, { useState } from 'react'
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,6 +22,7 @@ import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
 import { hp, wp } from '../../../helpers/common'
 import { parseScheduleImage } from '../../../services/scheduleParser'
 import { pickScheduleImage, takeSchedulePhoto } from '../../../utils/ocr/extractText'
+import { getFriendlyErrorMessage } from '../../../utils/userFacingErrors'
 
 interface ScheduleUploadStepProps {
   formData: any
@@ -125,7 +127,7 @@ export default function ScheduleUploadStep({
     } catch (error: any) {
       console.error('Scan failed:', error)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-      Alert.alert('Scan Failed', error.message || 'Could not parse schedule. Please try a clearer photo.')
+      Alert.alert('Scan Failed', getFriendlyErrorMessage(error, 'Could not parse schedule. Please try a clearer photo.'))
     } finally {
       setIsScanning(false)
     }

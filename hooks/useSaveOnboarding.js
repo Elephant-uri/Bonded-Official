@@ -10,6 +10,12 @@ import { useAuthStore } from '../stores/authStore'
 export const useSaveOnboarding = () => {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+  const logDebug = (...args) => {
+    if (__DEV__) console.log(...args)
+  }
+  const logError = (...args) => {
+    if (__DEV__) console.error(...args)
+  }
 
   return useMutation({
     mutationFn: async ({ formData, completedSteps, completionPercentage }) => {
@@ -156,6 +162,15 @@ export const useSaveOnboarding = () => {
         updateData.onboarding_complete = true
       }
 
+      logDebug('🧾 Onboarding upsert meta:', {
+        userId: user.id,
+        hasEmail: !!user.email,
+        hasUniversityId: !!universityId,
+        completedStepsCount: completedSteps?.length || 0,
+        completionPercentage,
+      })
+      logDebug('🧾 Onboarding upsert payload keys:', Object.keys(updateData))
+
       // Use upsert to create profile if it doesn't exist, or update if it does
       const { data, error } = await supabase
         .from('profiles')
@@ -176,7 +191,14 @@ export const useSaveOnboarding = () => {
           usernameTakenError.code = 'USERNAME_TAKEN'
           throw usernameTakenError
         }
-        console.error('Error saving onboarding data:', error)
+        logError('❌ Onboarding save failed (supabase error):', {
+          message: error?.message,
+          code: error?.code,
+          details: error?.details,
+          hint: error?.hint,
+          status: error?.status,
+        })
+        logError('❌ Onboarding save failed (raw error):', error)
         throw error
       }
 

@@ -14,9 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import EventCard from '../../components/Events/EventCard'
-import { Add, Search } from '../../components/Icons'
+import { Add, Heart, HeartFill, Search } from '../../components/Icons'
 import { hp, wp } from '../../helpers/common'
 import { useEventsForUser } from '../../hooks/events/useEventsForUser'
+import { useEventLikes, useToggleEventLike } from '../../hooks/events/useEventLikes'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { isFeatureEnabled } from '../../utils/featureGates'
@@ -24,19 +25,16 @@ import ThemedText from '../components/ThemedText'
 import ThemedView from '../components/ThemedView'
 import { useAppTheme } from '../theme'
 
-const FILTER_CHIPS = [
-  { id: 'all', label: 'All' },
-  { id: 'today', label: 'Today' },
-  { id: 'thisWeek', label: 'This Week' },
-  { id: 'free', label: 'Free' },
-  { id: 'onCampus', label: 'On Campus' },
-]
-
 const TAB_OPTIONS = [
   { id: 'browse', label: 'Browse' },
   { id: 'going', label: 'Going' },
-  { id: 'pending', label: 'Pending' },
   { id: 'myEvents', label: 'My Events' },
+]
+
+const DATE_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'today', label: 'Today' },
+  { id: 'thisWeek', label: 'This Week' },
 ]
 
 export default function EventsHome() {
@@ -47,7 +45,7 @@ export default function EventsHome() {
   const [activeFilter, setActiveFilter] = useState('all')
   const [activeTab, setActiveTab] = useState('browse')
   const [refreshing, setRefreshing] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
+  const [showLikedOnly, setShowLikedOnly] = useState(false)
 
   const { user } = useAuthStore()
 
@@ -85,6 +83,11 @@ export default function EventsHome() {
 
     return flattenedEvents
   }, [data])
+
+  const eventIds = useMemo(() => events.map(e => e.id), [events])
+  const { data: likedEvents = [] } = useEventLikes(eventIds)
+  const toggleLike = useToggleEventLike()
+  const likedEventIds = useMemo(() => new Set(likedEvents.map(e => e.event_id)), [likedEvents])
 
   // Check if any page has RLS errors (degraded mode)
   const hasRlsError = useMemo(() => {
@@ -150,9 +153,11 @@ export default function EventsHome() {
   const tabEvents = useMemo(() => {
     switch (activeTab) {
       case 'going':
-        return events.filter((event) => eventAttendance[event.id] === 'going')
-      case 'pending':
-        return events.filter((event) => eventAttendance[event.id] === 'pending')
+        // Include both going and pending (pending approval) events
+        return events.filter((event) =>
+          eventAttendance[event.id] === 'going' ||
+          eventAttendance[event.id] === 'pending'
+        )
       case 'myEvents':
         // Filter events where current user is the organizer
         return events.filter((event) => event.organizer_id === user?.id)
@@ -188,39 +193,32 @@ export default function EventsHome() {
     endOfWeek.setDate(startOfWeek.getDate() + 6)
     endOfWeek.setHours(23, 59, 59, 999)
 
-    switch (activeFilter) {
-      case 'today':
-        result = result.filter((event) => {
-          const eventDate = new Date(event.start_at)
-          return eventDate >= today && eventDate <= endOfToday
-        })
-        break
-      case 'thisWeek':
-        result = result.filter((event) => {
-          const eventDate = new Date(event.start_at)
-          return eventDate >= startOfWeek && eventDate <= endOfWeek
-        })
-        break
-      case 'free':
-        // If paid events are disabled, filter them out
-        if (!isFeatureEnabled('PAID_EVENTS')) {
-          result = result.filter((event) => !event.is_paid)
-        } else {
-          result = result.filter((event) => !event.is_paid)
-        }
-        break
-      case 'onCampus':
-        result = result.filter((event) => {
-          const location = event.location_name?.toLowerCase() || ''
-          return !location.includes('off-campus') && !location.includes('off campus')
-        })
-        break
-      default:
-        break
+    // Only apply date filters for Browse tab
+    if (activeTab === 'browse') {
+      switch (activeFilter) {
+        case 'today':
+          result = result.filter((event) => {
+            const eventDate = new Date(event.start_at)
+            return eventDate >= today && eventDate <= endOfToday
+          })
+          break
+        case 'thisWeek':
+          result = result.filter((event) => {
+            const eventDate = new Date(event.start_at)
+            return eventDate >= startOfWeek && eventDate <= endOfWeek
+          })
+          break
+        default:
+          break
+      }
+    }
+
+    if (showLikedOnly) {
+      result = result.filter(event => likedEventIds.has(event.id))
     }
 
     return result.sort((a, b) => new Date(a.start_at) - new Date(b.start_at))
-  }, [tabEvents, searchQuery, activeFilter])
+  }, [tabEvents, searchQuery, activeFilter, showLikedOnly, likedEventIds])
 
   const sections = useMemo(() => {
     const now = new Date()
@@ -284,6 +282,12 @@ export default function EventsHome() {
         currentUserId={currentUserId}
         attendanceStatus={eventAttendance[item.id]}
         onAction={handleEventAction}
+        isLiked={likedEventIds.has(item.id)}
+        onToggleLike={(eventId) => {
+          if (!user?.id) return
+          const isLiked = likedEventIds.has(eventId)
+          toggleLike.mutate({ eventId, isLiked })
+        }}
       />
       {activeTab === 'myEvents' && (
         <TouchableOpacity
@@ -313,6 +317,12 @@ export default function EventsHome() {
               event={event}
               onPress={() => router.push({ pathname: '/events/[id]', params: { id: event.id } })}
               currentUserId={currentUserId}
+              isLiked={likedEventIds.has(event.id)}
+              onToggleLike={(eventId) => {
+                if (!user?.id) return
+                const isLiked = likedEventIds.has(eventId)
+                toggleLike.mutate({ eventId, isLiked })
+              }}
             />
           </View>
         ))}
@@ -322,6 +332,7 @@ export default function EventsHome() {
 
   const renderScrollableHeader = () => (
     <>
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={[styles.searchBar, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: StyleSheet.hairlineWidth }]}>
           <Search size={hp(2)} color={theme.colors.textSecondary} strokeWidth={2} />
@@ -342,35 +353,67 @@ export default function EventsHome() {
             </TouchableOpacity>
           )}
         </View>
-        {activeTab === 'browse' && (
-          <View style={styles.controlsRow}>
-            <TouchableOpacity
-              style={[styles.filterToggleButton, { backgroundColor: showFilters ? theme.colors.accent : theme.colors.surface, borderColor: theme.colors.border, borderWidth: StyleSheet.hairlineWidth }]}
-              onPress={() => setShowFilters(!showFilters)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterToggleText, { color: showFilters ? '#FFFFFF' : theme.colors.textPrimary }]}>Filters</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
-      <View style={[styles.tabContainer, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
-          {TAB_OPTIONS.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tab, { backgroundColor: activeTab === tab.id ? theme.colors.accent : theme.colors.surface, borderColor: theme.colors.border, borderWidth: StyleSheet.hairlineWidth }]}
-              onPress={() => {
-                setActiveTab(tab.id)
-                if (tab.id !== 'browse') setShowFilters(false)
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabLabel, { color: activeTab === tab.id ? '#FFFFFF' : theme.colors.textPrimary }]}>{tab.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+
+      {/* Tabs - Messages Style */}
+      <View style={styles.tabContainer}>
+        {TAB_OPTIONS.map((tab) => (
+          <TouchableOpacity
+            key={tab.id}
+            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+            onPress={() => {
+              setActiveTab(tab.id)
+              // Reset filters when switching tabs
+              if (tab.id !== 'browse') {
+                setActiveFilter('all')
+              }
+            }}
+          >
+            <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={[styles.likeFilterButton, showLikedOnly && styles.likeFilterButtonActive]}
+          onPress={() => setShowLikedOnly(prev => !prev)}
+          activeOpacity={0.7}
+        >
+          {showLikedOnly ? (
+            <HeartFill size={hp(2)} color="#FF3B30" strokeWidth={2} fill="#FF3B30" />
+          ) : (
+            <Heart size={hp(2)} color={theme.colors.textSecondary} strokeWidth={2} />
+          )}
+        </TouchableOpacity>
       </View>
+
+      {/* Date Filters - Only show for Browse tab */}
+      {activeTab === 'browse' && (
+        <View style={styles.dateFilterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateFilterScroll}>
+            {DATE_FILTERS.map((filter) => (
+              <TouchableOpacity
+                key={filter.id}
+                style={[
+                  styles.dateFilterChip,
+                  activeFilter === filter.id && styles.dateFilterChipActive,
+                ]}
+                onPress={() => setActiveFilter(filter.id)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.dateFilterText,
+                    activeFilter === filter.id && styles.dateFilterTextActive,
+                  ]}
+                >
+                  {filter.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </>
   )
 
@@ -412,22 +455,6 @@ export default function EventsHome() {
             </Text>
           </View>
         )}
-        {activeTab === 'browse' && showFilters && (
-          <View style={styles.filterChipsFixed}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
-              {FILTER_CHIPS.map((chip) => (
-                <TouchableOpacity
-                  key={chip.id}
-                  style={[styles.filterChip, { backgroundColor: activeFilter === chip.id ? theme.colors.accent : theme.colors.surface, borderColor: theme.colors.border, borderWidth: StyleSheet.hairlineWidth }]}
-                  onPress={() => setActiveFilter(chip.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.filterChipText, { color: activeFilter === chip.id ? '#FFFFFF' : theme.colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit={true}>{chip.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
         {isLoading ? (
           renderSkeleton()
         ) : filteredEvents.length === 0 && !isLoading ? (
@@ -436,13 +463,11 @@ export default function EventsHome() {
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>
                 {activeTab === 'going' && "No events you're going to"}
-                {activeTab === 'pending' && 'No pending confirmations'}
                 {activeTab === 'myEvents' && "You haven't created any events"}
                 {activeTab === 'browse' && 'No events found'}
               </Text>
               <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                 {activeTab === 'going' && 'RSVP to events to see them here'}
-                {activeTab === 'pending' && 'Events waiting for approval will appear here'}
                 {activeTab === 'myEvents' && 'Create your first event to get started'}
                 {activeTab === 'browse' && (searchQuery.trim() || activeFilter !== 'all' ? 'Try adjusting your filters or search' : 'Be the first to create an event!')}
               </Text>
@@ -501,13 +526,76 @@ const createStyles = (theme) => StyleSheet.create({
   searchInput: { flex: 1, fontSize: hp(1.6), fontFamily: theme.typography.fontFamily.body, color: theme.colors.textPrimary },
   clearButton: { paddingHorizontal: wp(2) },
   clearButtonText: { fontSize: hp(1.4), fontFamily: theme.typography.fontFamily.body, color: theme.colors.accent, fontWeight: '600' },
-  tabContainer: { paddingVertical: hp(0.5) },
-  tabScrollContent: { paddingHorizontal: wp(5), gap: wp(3) },
-  tab: { paddingHorizontal: wp(5), paddingVertical: hp(1.5), borderRadius: theme.radius.xl, marginRight: wp(2), backgroundColor: theme.colors.surface, minHeight: hp(4.4), justifyContent: 'center', alignItems: 'center' },
-  tabLabel: { fontSize: hp(1.5), fontFamily: theme.typography.fontFamily.body, fontWeight: '600', color: theme.colors.textPrimary, textAlign: 'center', includeFontPadding: false },
-  filterContainer: { paddingHorizontal: theme.spacing.xl, paddingVertical: hp(0.8), paddingRight: theme.spacing.xl, backgroundColor: theme.colors.background, gap: theme.spacing.md },
-  filterChip: { paddingHorizontal: theme.spacing.xl, paddingVertical: hp(1.3), borderRadius: theme.radius.xl, backgroundColor: theme.colors.surface, borderWidth: 0, minHeight: hp(4), minWidth: wp(24), justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  filterChipText: { fontSize: hp(1.5), fontFamily: theme.typography.fontFamily.body, fontWeight: '600', color: theme.colors.textPrimary, letterSpacing: 0.2, includeFontPadding: false, textAlignVertical: 'center' },
+
+  // Messages-style tabs
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+    paddingBottom: hp(0.5),
+    gap: wp(6),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  tab: {
+    paddingBottom: hp(1),
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: theme.colors.accent,
+  },
+  tabText: {
+    fontSize: hp(1.7),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  activeTabText: {
+    color: theme.colors.textPrimary,
+  },
+  likeFilterButton: {
+    marginLeft: 'auto',
+    padding: hp(0.8),
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
+  likeFilterButtonActive: {
+    backgroundColor: '#FF3B3020',
+  },
+
+  // Date filter chips (compact, below tabs)
+  dateFilterContainer: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  dateFilterScroll: {
+    gap: wp(2),
+  },
+  dateFilterChip: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(0.8),
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+  },
+  dateFilterChipActive: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  dateFilterText: {
+    fontSize: hp(1.4),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+  },
+  dateFilterTextActive: {
+    color: '#FFFFFF',
+  },
+
   manageButton: { marginTop: hp(1), paddingVertical: hp(1), paddingHorizontal: wp(4), backgroundColor: theme.colors.accent, borderRadius: theme.radius.lg, alignItems: 'center' },
   manageButtonText: { fontSize: hp(1.5), fontFamily: theme.typography.fontFamily.body, fontWeight: '700', color: theme.colors.white },
   listContent: { paddingBottom: hp(12), paddingHorizontal: wp(4) },
@@ -522,10 +610,6 @@ const createStyles = (theme) => StyleSheet.create({
   createFirstButton: { marginTop: hp(3), backgroundColor: theme.colors.accent, paddingHorizontal: wp(6), paddingVertical: hp(1.5), borderRadius: theme.radius.xl },
   createFirstButtonText: { fontSize: hp(1.7), fontFamily: theme.typography.fontFamily.body, fontWeight: '700', color: theme.colors.white },
   createEventIconButton: { padding: hp(0.5) },
-  controlsRow: { flexDirection: 'row', alignItems: 'center', gap: wp(2.5), justifyContent: 'flex-end' },
-  filterToggleButton: { paddingHorizontal: wp(4), paddingVertical: hp(0.8), borderRadius: theme.radius.xl, backgroundColor: theme.colors.surface, ...theme.shadows.sm },
-  filterToggleText: { fontSize: hp(1.4), fontFamily: theme.typography.fontFamily.body, fontWeight: '600', color: theme.colors.textPrimary },
-  filterChipsFixed: { backgroundColor: theme.colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border, zIndex: 10 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: hp(12) },
   rlsWarningBanner: { paddingVertical: hp(1), paddingHorizontal: wp(4), alignItems: 'center' },

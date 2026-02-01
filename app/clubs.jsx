@@ -20,11 +20,12 @@ import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
 import Chip from '../components/Chip'
 import { useClubsContext } from '../contexts/ClubsContext'
+import { useOrgModal } from '../contexts/OrgModalContext'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from './theme'
 
 const CATEGORIES = [
-  { value: 'all', label: 'All Categories' },
+  { value: 'all', label: 'All' },
   { value: 'academic', label: 'Academic' },
   { value: 'sports', label: 'Sports' },
   { value: 'arts', label: 'Arts' },
@@ -38,6 +39,7 @@ export default function Clubs() {
   const styles = createStyles(theme)
   const router = useRouter()
   const { getAllClubs, isUserInterested, showInterest, removeInterest, refetch } = useClubsContext()
+  const { openOrg } = useOrgModal()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
@@ -96,7 +98,7 @@ export default function Clubs() {
 
     return (
       <TouchableOpacity
-        onPress={() => router.push(`/clubs/${item.id}`)}
+        onPress={() => openOrg(item.id)}
         activeOpacity={0.7}
         style={styles.clubCardWrapper}
       >
@@ -257,22 +259,34 @@ export default function Clubs() {
             )}
           </View>
 
-          {/* Category Filter - Chip Components */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContainer}
-          >
-            {CATEGORIES.map((category) => (
-              <Chip
-                key={category.value}
-                label={category.label}
-                active={selectedCategory === category.value}
-                onPress={() => setSelectedCategory(category.value)}
-                style={styles.categoryChip}
-              />
-            ))}
-          </ScrollView>
+          {/* Category Tabs - Messages Style */}
+          <View style={styles.tabContainerWrapper}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabScrollContent}
+            >
+              {CATEGORIES.map((category) => (
+                <TouchableOpacity
+                  key={category.value}
+                  style={[
+                    styles.tab,
+                    selectedCategory === category.value && styles.activeTab,
+                  ]}
+                  onPress={() => setSelectedCategory(category.value)}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      selectedCategory === category.value && styles.activeTabText,
+                    ]}
+                  >
+                    {category.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* Results Count */}
           <Text style={styles.resultsCount}>
@@ -359,13 +373,34 @@ const createStyles = (theme) => StyleSheet.create({
   clearButton: {
     padding: hp(0.5),
   },
-  categoriesContainer: {
-    gap: wp(2),
+  // Category Tabs - Messages Style
+  tabContainerWrapper: {
     marginBottom: hp(2),
-    paddingRight: wp(4),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+    marginHorizontal: -wp(4),
+    paddingHorizontal: wp(4),
   },
-  categoryChip: {
-    marginRight: wp(2),
+  tabScrollContent: {
+    gap: wp(6),
+    paddingBottom: hp(0.5),
+  },
+  tab: {
+    paddingBottom: hp(1),
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: theme.colors.accent,
+  },
+  tabText: {
+    fontSize: hp(1.7),
+    fontFamily: theme.typography.fontFamily.body,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  activeTabText: {
+    color: theme.colors.textPrimary,
   },
   resultsCount: {
     fontSize: hp(1.6),

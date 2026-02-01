@@ -540,3 +540,69 @@ export function useUniversityProfiles() {
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }
+
+/**
+ * Hook to get shared classes between current user and another user
+ */
+export function useSharedClasses(otherUserId) {
+  const { user } = useAuthStore()
+
+  return useQuery({
+    queryKey: ['shared-classes', user?.id, otherUserId],
+    queryFn: async () => {
+      if (!user?.id || !otherUserId) return []
+
+      const { data, error } = await supabase
+        .from('user_class_enrollments')
+        .select(`
+          user_id,
+          class_id,
+          class:class_id(
+            class_code,
+            class_name
+          )
+        `)
+        .in('user_id', [user.id, otherUserId])
+        .eq('is_active', true)
+
+      if (error) throw error
+
+      const classesByUser = new Map()
+      data.forEach((row) => {
+        if (!classesByUser.has(row.user_id)) {
+          classesByUser.set(row.user_id, new Set())
+        }
+        if (row.class_id) {
+          classesByUser.get(row.user_id).add(row.class_id)
+        }
+      })
+
+      const myClasses = classesByUser.get(user.id) || new Set()
+      const otherClasses = classesByUser.get(otherUserId) || new Set()
+
+      const sharedIds = new Set()
+      myClasses.forEach((id) => {
+        if (otherClasses.has(id)) sharedIds.add(id)
+      })
+
+      const shared = (data || [])
+        .filter((row) => sharedIds.has(row.class_id))
+        .map((row) => ({
+          id: row.class_id,
+          code: row.class?.class_code || null,
+          name: row.class?.class_name || null,
+        }))
+
+      const deduped = new Map()
+      shared.forEach((item) => {
+        if (!deduped.has(item.id)) deduped.set(item.id, item)
+      })
+
+      return Array.from(deduped.values())
+    },
+    enabled: !!user?.id && !!otherUserId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  })
+}

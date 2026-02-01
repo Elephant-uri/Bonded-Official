@@ -21,10 +21,14 @@ import StudyHabitsStep from '../components/onboarding/steps/StudyHabitsStep'
 import { ONBOARDING_THEME } from '../constants/onboardingTheme'
 import { hp, wp } from '../helpers/common'
 import { useAuthStore } from '../stores/authStore'
+import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
 
 export default function Onboarding() {
   const styles = createStyles(ONBOARDING_THEME)
   const router = useRouter()
+  const log = (...args) => {
+    if (__DEV__) console.log(...args)
+  }
   const { setMode } = useThemeMode()
   const systemScheme = useColorScheme() || 'light'
   const { user } = useAuthStore()
@@ -82,18 +86,18 @@ export default function Onboarding() {
 
     // Don't trigger auto-save if a save is already in progress
     if (isSaving) {
-      console.log('⏳ Skipping auto-save - save already in progress')
+      log('⏳ Skipping auto-save - save already in progress')
       return
     }
 
     const timer = setTimeout(() => {
       // Double-check isSaving hasn't changed during debounce period
       if (isSaving) {
-        console.log('⏳ Skipping auto-save - save started during debounce')
+        log('⏳ Skipping auto-save - save started during debounce')
         return
       }
 
-      console.log('💾 Auto-saving onboarding progress:', {
+      log('💾 Auto-saving onboarding progress:', {
         completionPercentage,
         completedSteps: completedSteps.length,
         hasBasicInfo: !!(formData.school && formData.age && formData.grade && formData.major),
@@ -106,7 +110,7 @@ export default function Onboarding() {
         completionPercentage,
       }, {
         onSuccess: (result) => {
-          console.log('✅ Onboarding progress saved')
+          log('✅ Onboarding progress saved')
           // Show alert if photo upload had issues
           if (result?.photoUploadError) {
             Alert.alert(
@@ -119,7 +123,7 @@ export default function Onboarding() {
         onError: (error) => {
           console.error('❌ Failed to save onboarding progress:', error)
           if (error.code === 'USERNAME_TAKEN') {
-            Alert.alert('Username Taken', error.message)
+            Alert.alert('Username Taken', getFriendlyErrorMessage(error, 'This username is already taken.'))
           }
         }
       })
@@ -293,7 +297,8 @@ export default function Onboarding() {
   // Can continue logic - all steps require validation
   const canContinue =
     (currentStep === ONBOARDING_STEPS.BASIC_INFO &&
-      formData.school && formData.age && formData.grade && formData.gender && formData.major && formData.fullName && formData.username) ||
+      formData.school && formData.age && formData.grade && formData.gender && formData.major &&
+      (formData.fullName || (formData.firstName && formData.lastName)) && formData.username) ||
     (currentStep === ONBOARDING_STEPS.PHOTOS && formData.photos?.length > 0) ||
     (currentStep === ONBOARDING_STEPS.INTERESTS && formData.interests?.length > 0) ||
     (currentStep === ONBOARDING_STEPS.CLASS_SCHEDULE && formData.classSchedule?.courses?.length > 0) ||

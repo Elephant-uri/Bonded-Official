@@ -68,6 +68,8 @@ export default function Notifications() {
         return `${name} replied to your comment`
       case 'comment_like':
         return `${name} liked your comment`
+      case 'message_request_accepted':
+        return item.body || `${name} accepted your message request`
       default:
         return `${name} interacted with your post`
     }
@@ -89,20 +91,29 @@ export default function Notifications() {
       created_at: request.created_at,
     }))
 
-    const notificationItems = notificationsData.map((item) => ({
-      id: item.id,
-      type: 'notification',
-      title: 'Notification',
-      body: formatNotificationBody(item),
-      timeAgo: formatTimeAgo(item.created_at),
-      icon: item.type === 'post_like' ? 'heart-outline' : 'chatbubble-ellipses-outline',
-      read: !!item.read_at,
-      actor: item.actor,
-      entityType: item.entity_type,
-      entityId: item.entity_id,
-      data: item.data || {},
-      created_at: item.created_at,
-    }))
+    const notificationItems = notificationsData.map((item) => {
+      let icon = 'chatbubble-ellipses-outline'
+      if (item.type === 'post_like') {
+        icon = 'heart-outline'
+      } else if (item.type === 'message_request_accepted') {
+        icon = 'checkmark-circle-outline'
+      }
+
+      return {
+        id: item.id,
+        type: 'notification',
+        title: 'Notification',
+        body: formatNotificationBody(item),
+        timeAgo: formatTimeAgo(item.created_at),
+        icon,
+        read: !!item.read_at,
+        actor: item.actor,
+        entityType: item.entity_type,
+        entityId: item.entity_id,
+        data: item.data || {},
+        created_at: item.created_at,
+      }
+    })
 
     return [...requestItems, ...notificationItems].sort(
       (a, b) => new Date(b.created_at) - new Date(a.created_at)
@@ -271,7 +282,16 @@ export default function Notifications() {
             style={styles.notificationCard}
             activeOpacity={0.7}
             onPress={() => {
-              if (item.entityId) {
+              if (item.data?.conversation_id) {
+                // Navigate to conversation for message_request_accepted
+                router.push({
+                  pathname: '/chat',
+                  params: {
+                    conversationId: item.data.conversation_id,
+                    isGroupChat: 'false',
+                  },
+                })
+              } else if (item.entityId) {
                 router.push({
                   pathname: '/forum',
                   params: { postId: item.data?.post_id || item.entityId },

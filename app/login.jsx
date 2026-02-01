@@ -9,6 +9,7 @@ import Input from '../components/Input'
 import ScreenWrapper from '../components/ScreenWrapper'
 import { hp } from '../helpers/common'
 import { useSendOTP } from '../hooks/useSendOTP'
+import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
 import { useAppTheme, useThemeMode } from './theme'
 
 export default function Login() {
@@ -82,7 +83,7 @@ export default function Login() {
       },
       onError: (error) => {
         console.error('❌ Error sending OTP:', error)
-        Alert.alert('Error', error.message || 'Failed to send code')
+        Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send code'))
         setIsSending(false)
       },
     })

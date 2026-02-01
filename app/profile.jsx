@@ -144,21 +144,29 @@ export default function Profile() {
   }
 
   // Handle swipe-down-to-close gesture
-  const onGestureEvent = (event) => {
-    if (!isAtTop || !gestureState.current.isEnabled) return
-
-    const { translationY, state } = event.nativeEvent
-
-    if (state === State.ACTIVE && translationY > 0) {
-      translateY.setValue(translationY)
+  const onGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: translateY } }],
+    {
+      useNativeDriver: true,
+      listener: (event) => {
+        const { translationY: ty } = event.nativeEvent
+        if (!isAtTop || !gestureState.current.isEnabled) {
+          translateY.setValue(0)
+          return
+        }
+        // Only allow downward gestures
+        if (ty < 0) {
+          translateY.setValue(0)
+        }
+      }
     }
-  }
+  )
 
   const onHandlerStateChange = (event) => {
-    const { translationY, velocityY, state } = event.nativeEvent
+    const { translationY: ty, velocityY, state } = event.nativeEvent
 
     if (state === State.END) {
-      const shouldClose = (translationY > 100 || velocityY > 800) && isAtTop
+      const shouldClose = (ty > 100 || velocityY > 800) && isAtTop && gestureState.current.isEnabled
 
       if (shouldClose) {
         Animated.timing(translateY, {
@@ -209,8 +217,7 @@ export default function Profile() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
+      allowsEditing: false,
       quality: 0.8,
     })
 
@@ -423,8 +430,9 @@ export default function Profile() {
       <PanGestureHandler
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
-        activeOffsetY={10}
-        failOffsetY={-10}
+        activeOffsetY={5}
+        failOffsetY={[-5, 0]}
+        shouldCancelWhenOutside={false}
       >
         <Animated.View
           style={[

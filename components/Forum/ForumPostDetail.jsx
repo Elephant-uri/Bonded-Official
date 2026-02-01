@@ -11,6 +11,7 @@
 
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
     Dimensions,
@@ -26,6 +27,7 @@ import {
     View
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useOrgModal } from '../../contexts/OrgModalContext'
 import { useProfileModal } from '../../contexts/ProfileModalContext'
 import { hp, wp } from '../../helpers/common'
 import { ArrowDownCircle, ArrowUpCircle } from '../Icons'
@@ -71,7 +73,10 @@ const PostAvatar = ({ post, size = hp(4.5), theme, onPress }) => {
 
     // Always wrap in TouchableOpacity if onPress is provided and not anonymous
     // This ensures consistent clickability
-    if (onPress && !post.isAnon && post.userId) {
+    // For org posts, check orgId; for user posts, check userId
+    const isClickable = onPress && !post.isAnon && (post.isOrgPost ? post.orgId : post.userId)
+
+    if (isClickable) {
         return (
             <TouchableOpacity
                 onPress={onPress}
@@ -250,6 +255,7 @@ export default function ForumPostDetail({
     router,
 }) {
     const { openProfile } = useProfileModal()
+    const { openOrg } = useOrgModal()
     const insets = useSafeAreaInsets()
     const [newComment, setNewComment] = useState('')
     const [isAnon, setIsAnon] = useState(true)
@@ -388,8 +394,12 @@ export default function ForumPostDetail({
                                             size={hp(4.5)}
                                             theme={theme}
                                             onPress={() => {
-                                                if (!post.isAnon && post.userId) {
-                                                    openProfile(post.userId)
+                                                if (!post.isAnon) {
+                                                    if (post.isOrgPost && post.orgId) {
+                                                        openOrg(post.orgId)
+                                                    } else if (post.userId) {
+                                                        openProfile(post.userId)
+                                                    }
                                                 }
                                             }}
                                         />
@@ -397,9 +407,14 @@ export default function ForumPostDetail({
                                             style={styles.postAuthorInfo}
                                             activeOpacity={0.7}
                                             onPress={() => {
-                                                if (!post.isAnon && post.userId) {
-                                                    console.log('👤 Navigating to main post author profile:', post.userId)
-                                                    router.push(`/profile/${post.userId}`)
+                                                if (!post.isAnon) {
+                                                    if (post.isOrgPost && post.orgId) {
+                                                        console.log('🏢 Opening org modal:', post.orgId)
+                                                        openOrg(post.orgId)
+                                                    } else if (post.userId) {
+                                                        console.log('👤 Navigating to main post author profile:', post.userId)
+                                                        router.push(`/profile/${post.userId}`)
+                                                    }
                                                 }
                                             }}
                                             disabled={post.isAnon}

@@ -12,7 +12,12 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.Bonded",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Bonded uses your camera to take photos and videos for your profile, stories, and posts.",
+        "NSPhotoLibraryUsageDescription": "Bonded needs access to your photo library to upload photos for your profile, posts, and messages.",
+        "NSPhotoLibraryAddUsageDescription": "Bonded saves media you create to your photo library.",
+        "NSMicrophoneUsageDescription": "Bonded uses your microphone for voice and video content.",
+        "NSLocationWhenInUseUsageDescription": "Bonded uses your location to show nearby campus events and places."
       }
     },
     "android": {
@@ -51,7 +56,6 @@
       "expo-video",
       "expo-audio",
       "expo-secure-store",
-      "expo-dev-client",
       [
         "@sentry/react-native/expo",
         {

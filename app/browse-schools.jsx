@@ -7,6 +7,7 @@ import AppTopBar from '../components/AppTopBar'
 import BottomNav from '../components/BottomNav'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from './theme'
+import { isFeatureEnabled } from '../utils/featureGates'
 
 // TODO: Wire to real Supabase data
 // - Fetch schools from universities table
@@ -17,6 +18,23 @@ export default function BrowseSchools() {
   const styles = createStyles(theme)
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+
+  if (!isFeatureEnabled('BROWSE_SCHOOLS')) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <View style={styles.emptyState}>
+            <Ionicons name="school-outline" size={hp(6)} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
+            <Text style={styles.emptyTitle}>Browse Schools is coming soon</Text>
+            <Text style={styles.emptySubtitle}>We’re finalizing campus discovery.</Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={() => router.back()}>
+              <Text style={styles.emptyButtonText}>Go back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   const filteredSchools = schools.filter((school) =>
     school.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -144,6 +162,36 @@ const createStyles = (theme) => StyleSheet.create({
   listContent: {
     paddingBottom: hp(10),
   },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(6),
+  },
+  emptyTitle: {
+    marginTop: hp(2),
+    fontSize: hp(2.2),
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    marginTop: hp(1),
+    fontSize: hp(1.7),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: hp(2),
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(1.2),
+    borderRadius: 999,
+    backgroundColor: theme.colors.bondedPurple,
+  },
+  emptyButtonText: {
+    color: theme.colors.white,
+    fontWeight: '600',
+  },
   schoolCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -185,4 +233,3 @@ const createStyles = (theme) => StyleSheet.create({
     opacity: 0.8,
   },
 })
-

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import AppTopBar from '../components/AppTopBar'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from './theme'
+import { isFeatureEnabled } from '../utils/featureGates'
 
 // TODO: Wire to real Supabase data
 // - Use useForums hook to fetch forums
@@ -16,6 +17,23 @@ export default function SearchForums() {
   const styles = createStyles(theme)
   const router = useRouter()
   const [query, setQuery] = useState('')
+
+  if (!isFeatureEnabled('SEARCH_FORUMS')) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <View style={styles.emptyState}>
+            <Ionicons name="search-outline" size={hp(6)} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
+            <Text style={styles.emptyTitle}>Forum search is coming soon</Text>
+            <Text style={styles.emptySubtitle}>We’re polishing discovery across campus.</Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={() => router.back()}>
+              <Text style={styles.emptyButtonText}>Go back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   const filtered = forums.filter((f) =>
     f.name.toLowerCase().includes(query.toLowerCase())
@@ -127,6 +145,36 @@ const createStyles = (theme) => StyleSheet.create({
   list: {
     paddingTop: hp(1),
   },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(6),
+  },
+  emptyTitle: {
+    marginTop: hp(2),
+    fontSize: hp(2.2),
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    marginTop: hp(1),
+    fontSize: hp(1.7),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: hp(2),
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(1.2),
+    borderRadius: 999,
+    backgroundColor: theme.colors.bondedPurple,
+  },
+  emptyButtonText: {
+    color: theme.colors.white,
+    fontWeight: '600',
+  },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -145,6 +193,4 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
   },
 })
-
-
 

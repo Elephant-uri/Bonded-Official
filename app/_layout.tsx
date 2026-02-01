@@ -1,15 +1,18 @@
 import { Ionicons } from '@expo/vector-icons'
 import * as Sentry from '@sentry/react-native'
 import { Stack, usePathname, useRouter } from 'expo-router'
+import Constants from 'expo-constants'
 import React, { useEffect, useRef, useState } from 'react'
 import { Dimensions, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { DrawerLayout, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Loading from '../components/Loading'
 import { OnboardingNudge } from '../components/OnboardingNudge'
+import OrgModal from '../components/Orgs/OrgModal'
 import ProfileModal from '../components/Profile/ProfileModal'
 import { ClubsProvider, useClubsContext } from '../contexts/ClubsContext'
 import { EventsProvider } from '../contexts/EventsContext'
 import { MessagesProvider } from '../contexts/MessagesContext'
+import { OrgModalProvider, useOrgModal } from '../contexts/OrgModalContext'
 import { ProfileModalProvider } from '../contexts/ProfileModalContext'
 import { StoriesProvider } from '../contexts/StoriesContext'
 import { UnifiedForumProvider, useUnifiedForum } from '../contexts/UnifiedForumContext'
@@ -28,10 +31,17 @@ import { ThemeProvider, useAppTheme } from './theme'
 // Web SSR doesn't have access to browser APIs during server-side rendering
 if (Platform.OS !== 'web') {
   const sentryDsn = process.env.SENTRY_DSN || process.env.EXPO_PUBLIC_SENTRY_DSN;
+  const environment = process.env.EXPO_PUBLIC_APP_ENV
+    || process.env.APP_ENV
+    || process.env.EAS_BUILD_PROFILE
+    || (__DEV__ ? 'development' : 'production')
+  const release = Constants.expoConfig?.version
   if (sentryDsn && sentryDsn !== 'your_sentry_dsn_here') {
     Sentry.init({
       dsn: sentryDsn,
       debug: __DEV__,
+      environment,
+      release,
     });
   }
 }
@@ -85,6 +95,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
   const theme = useAppTheme()
   const { user, isAuthenticated } = useAuthStore()
   const { forums, currentForum, switchToForum } = useUnifiedForum()
+  const { openOrg } = useOrgModal()
 
   // Early return if not authenticated
   if (!isAuthenticated || !user) {
@@ -100,7 +111,16 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
   // Organize forums by type
   const orgForums = forums.filter(f => f.type === 'org') // Use org forums from unified context
   const classForums = forums.filter(f => f.type === 'class')
-  const publicForums = [...forums.filter(f => f.type === 'campus' || f.type === 'public'), ...orgForums.filter(f => f.is_public)]
+  // Public forums: exclude campus/main (shown at top) and org forums (handled separately)
+  const publicForums = [
+    ...forums.filter(f => 
+      f.type === 'public' && 
+      f.type !== 'campus' && 
+      f.type !== 'main' && 
+      f.name?.toLowerCase() !== 'main'
+    ),
+    ...orgForums.filter(f => f.is_public)
+  ]
   const privateForums = [...forums.filter(f => f.type === 'private'), ...orgForums.filter(f => !f.is_public)]
 
   // console.log('DrawerContent - User clubs:', userClubs.length, userClubs.map(c => ({ id: c.id, name: c.name })))
@@ -163,6 +183,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
     profileViewers: profileViewersCount,
     socialLinks: null,
   }
+  const campusForumLabel = `${userProfileData?.university?.name || userProfileData?.university || 'University'} Forum`
 
   return (
     <Pressable
@@ -488,7 +509,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 fontWeight: '600',
               }}
             >
-              Main forum
+              {campusForumLabel}
             </Text>
           </TouchableOpacity>
 
@@ -903,7 +924,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                           justifyContent: 'center',
                         }}
                         onPress={() => {
-                          onNavigate(`/clubs/${forum.org_id}`)
+                          openOrg(forum.org_id)
                         }}
                       >
                         <Ionicons name="information-circle-outline" size={hp(2)} color={theme.colors.textSecondary} />
@@ -947,109 +968,6 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 </TouchableOpacity>
               ))}
 
-              {/* Organization forums - Only show admin organizations here since member orgs are in public/private forums */}
-              {adminClubs.length > 0 && (
-                <>
-                  <View style={{ marginTop: hp(2), marginBottom: hp(1) }}>
-                    <Text style={{
-                      fontSize: hp(1.8),
-                      color: theme.colors.textPrimary,
-                      fontFamily: theme.typography.fontFamily.body,
-                      fontWeight: '500',
-                    }}>
-                      Your Organizations
-                    </Text>
-                  </View>
-                  {adminClubs.map((club) => (
-                    <React.Fragment key={club.id}>
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingLeft: wp(12),
-                          paddingVertical: hp(1),
-                          paddingRight: wp(3),
-                          borderRadius: theme.radius.md,
-                          marginLeft: wp(3),
-                          marginBottom: hp(0.3),
-                        }}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          // Navigate to organization page instead of forum
-                          onNavigate(`/clubs/${club.id}`)
-                        }}
-                      >
-                        {/* Organization Logo */}
-                        {club.avatar ? (
-                          <Image
-                            source={{ uri: club.avatar }}
-                            style={{
-                              width: hp(3),
-                              height: hp(3),
-                              borderRadius: hp(1.5),
-                              marginRight: wp(2),
-                            }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View
-                            style={{
-                              width: hp(3),
-                              height: hp(3),
-                              borderRadius: hp(1.5),
-                              backgroundColor: theme.colors.backgroundSecondary,
-                              marginRight: wp(2),
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: hp(1.5),
-                                color: theme.colors.accent,
-                                fontFamily: theme.typography.fontFamily.heading,
-                                fontWeight: '700',
-                              }}
-                            >
-                              {club.name?.charAt(0).toUpperCase() || 'O'}
-                            </Text>
-                          </View>
-                        )}
-                        <Text
-                          style={{
-                            fontSize: hp(1.6),
-                            color: theme.colors.textSecondary,
-                            fontFamily: theme.typography.fontFamily.body,
-                            opacity: 0.85,
-                            flex: 1,
-                          }}
-                        >
-                          {club.name}
-                        </Text>
-                        {/* Message button */}
-                        <TouchableOpacity
-                          style={{
-                            padding: wp(2),
-                            borderRadius: theme.radius.sm,
-                            minWidth: hp(4),
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                          onPress={() => {
-                            const forumId = club.forumId
-                            if (forumId) {
-                              switchToForum(forumId)
-                              onNavigate('/forum')
-                            }
-                          }}
-                        >
-                          <Ionicons name="chatbubble-ellipses-outline" size={hp(2)} color={theme.colors.textSecondary} />
-                        </TouchableOpacity>
-                      </TouchableOpacity>
-                    </React.Fragment>
-                  ))}
-                </>
-              )}
             </>
           )}
         </View>
@@ -1084,7 +1002,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   <TouchableOpacity
                     key={club.id}
                     activeOpacity={0.7}
-                    onPress={() => onNavigate(`/clubs/${club.id}`)}
+                    onPress={() => openOrg(club.id)}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -1343,13 +1261,12 @@ const RootLayout = () => {
           console.log('ℹ️ No valid session found, clearing auth state')
           await logout()
           clearOnboardingUserId()
-          // Force clear any persisted state
-          await supabase.auth.signOut()
+          // Avoid signOut when there's no active session to prevent extra auth churn
         }
       } catch (error) {
         console.error('❌ Error in checkSession:', error)
         await logout()
-        await supabase.auth.signOut()
+        // Avoid signOut here; we already cleared local auth state
       } finally {
         setIsCheckingSession(false)
         // Mark initial check as complete IMMEDIATELY (no delay)
@@ -1551,8 +1468,9 @@ const RootLayout = () => {
               <ClubsProvider>
                 <UnifiedForumProvider>
                   <MessagesProvider>
-                    <ProfileModalProvider>
-                      <DrawerLayout
+                    <OrgModalProvider>
+                      <ProfileModalProvider>
+                        <DrawerLayout
                         ref={drawerRef}
                         drawerWidth={SCREEN_WIDTH * 0.75}
                         drawerPosition="left"
@@ -1569,10 +1487,12 @@ const RootLayout = () => {
                           }}
                         />
                       </DrawerLayout>
-                      {/* Global components */}
-                      <OnboardingNudge />
-                      <ProfileModal />
-                    </ProfileModalProvider>
+                        {/* Global components */}
+                        <OnboardingNudge />
+                        <OrgModal />
+                        <ProfileModal />
+                      </ProfileModalProvider>
+                    </OrgModalProvider>
                   </MessagesProvider>
                 </UnifiedForumProvider>
               </ClubsProvider>

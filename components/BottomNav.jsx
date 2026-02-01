@@ -16,7 +16,7 @@ const BottomNav = ({ scrollY = null }) => {
   const theme = useAppTheme()
   const { data: conversations = [] } = useConversations()
   const { data: messageRequests = [] } = useMessageRequests()
-  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0) + messageRequests.length
+  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0) + messageRequests.length
   const unreadLabel = totalUnread > 99 ? '99+' : String(totalUnread)
   
   // Animation for hiding/showing nav on scroll

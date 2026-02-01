@@ -16,6 +16,8 @@ import { useAcceptFriendRequest, useCancelFriendRequest, useFriendshipStatus, us
 import { useCreateConversation } from '../hooks/useMessages'
 import { useNotificationCount } from '../hooks/useNotificationCount'
 import { useProfilePhotos, useProfiles } from '../hooks/useProfiles'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { useClassMatching } from '../hooks/useClassMatching'
 import { useProfileViewTracker } from '../hooks/useProfileViews'
 import { useUserPosts } from '../hooks/useUserPosts'
 import { useAuthStore } from '../stores/authStore'
@@ -739,7 +741,7 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
           <View style={styles.locationRow}>
             <MapPin size={hp(1.8)} color={theme.colors.textSecondary} strokeWidth={2} />
             <Text style={styles.locationText}>
-              {activeProfile.location || activeProfile.university || 'University of Rhode Island'}
+              {activeProfile.location || activeProfile.university || 'University'}
             </Text>
           </View>
 
@@ -1223,6 +1225,9 @@ export default function Yearbook() {
 
   // Fetch profiles from Supabase
   const { data: profiles = [], isLoading, error, refetch } = useProfiles(filters)
+  const { data: classmates = [] } = useClassMatching()
+  const { data: currentProfile } = useCurrentUserProfile()
+  const universityName = currentProfile?.university?.name || 'Your University'
 
   const yearOptions = YEARS.map((year) => ({ value: year, label: year }))
 
@@ -1236,6 +1241,7 @@ export default function Yearbook() {
     { value: 'recent', label: 'Recently active' },
     { value: 'newest', label: 'Newest profiles' },
     { value: 'alpha', label: 'A–Z' },
+    { value: 'classmates', label: 'Classmates' },
   ]
 
   // Get current user's profile and interests for comparison
@@ -1255,9 +1261,30 @@ export default function Yearbook() {
     const currentUser = profiles.find(p => p.id === user?.id)
     let others = profiles.filter(p => p.id !== user?.id)
 
+    const classmateCounts = new Map()
+    classmates.forEach((c) => {
+      if (c?.id) {
+        classmateCounts.set(c.id, c.sharedClassCount || 0)
+      }
+    })
+
     // Apply sorting to others
     if (sortOption === 'alpha') {
       others = others.sort((a, b) => a.name.localeCompare(b.name))
+    } else if (sortOption === 'classmates') {
+      const classmatesOnly = others.filter((p) => (classmateCounts.get(p.id) || 0) > 0)
+      const nonClassmates = others.filter((p) => (classmateCounts.get(p.id) || 0) === 0)
+
+      classmatesOnly.sort((a, b) => {
+        const aCount = classmateCounts.get(a.id) || 0
+        const bCount = classmateCounts.get(b.id) || 0
+        if (aCount !== bCount) return bCount - aCount
+        return a.name.localeCompare(b.name)
+      })
+
+      nonClassmates.sort((a, b) => a.name.localeCompare(b.name))
+
+      others = [...classmatesOnly, ...nonClassmates]
     } else if (sortOption === 'recent') {
       // Already sorted by created_at DESC from query
     } else if (sortOption === 'newest') {
@@ -1270,7 +1297,7 @@ export default function Yearbook() {
     }
 
     return others
-  }, [profiles, sortOption, user?.id])
+  }, [profiles, sortOption, user?.id, classmates])
 
   // Track profile view for current user if they are in the list
   useProfileViewTracker(user?.id, 'yearbook_list', true)
@@ -1447,7 +1474,7 @@ export default function Yearbook() {
             {/* Title Row with Filter */}
             <View style={styles.titleRow}>
               <Text style={styles.universityYearTitle}>
-                University of Rhode Island
+                {universityName}
               </Text>
               <TouchableOpacity
                 style={styles.filterIconButton}

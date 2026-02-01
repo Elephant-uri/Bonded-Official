@@ -5,9 +5,12 @@ import { supabase } from '../../lib/supabase'
 
 export default function AuthCallback() {
   useEffect(() => {
+    const log = (...args: any[]) => {
+      if (__DEV__) console.log(...args)
+    }
     // Handle deep link URL manually (since detectSessionInUrl: false)
     const handleDeepLink = async (url: string) => {
-      console.log('🔗 Deep link received:', url)
+      log('🔗 Deep link received')
       
       // Parse URL to extract tokens
       const { queryParams } = Linking.parse(url)
@@ -17,7 +20,7 @@ export default function AuthCallback() {
       }
 
       if (access_token && refresh_token) {
-        console.log('🔑 Tokens found in URL, setting session...')
+        log('🔑 Tokens found in URL, setting session...')
         const { data, error } = await supabase.auth.setSession({
           access_token,
           refresh_token,
@@ -28,10 +31,7 @@ export default function AuthCallback() {
           return
         }
 
-        console.log('✅ SESSION:', data.session)
-        if (data.session?.user) {
-          console.log('✅ USER:', data.session.user.email)
-        }
+        log('✅ Session established')
       } else {
         console.warn('⚠️ No tokens found in URL')
       }
@@ -56,21 +56,17 @@ export default function AuthCallback() {
         return
       }
       if (data.session) {
-        console.log('✅ Existing SESSION:', data.session)
-        if (data.session.user) {
-          console.log('✅ Existing USER:', data.session.user.email)
-        }
+        log('✅ Existing session found')
       } else {
-        console.log('ℹ️ No existing session')
+        log('ℹ️ No existing session')
       }
     })
 
     // Listen for auth state changes
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔔 Auth Event:', event)
+      log('🔔 Auth Event:', event)
       if (session) {
-        console.log('✅ SESSION (from event):', session)
-        console.log('✅ USER (from event):', session.user.email)
+        log('✅ Session updated')
       }
     })
 
@@ -99,7 +95,6 @@ const styles = StyleSheet.create({
     color: '#000',
   },
 })
-
 
 
 

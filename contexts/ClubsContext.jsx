@@ -322,12 +322,17 @@ export function ClubsProvider({ children }) {
 
       const clubsMap = {}
       for (const org of orgsData || []) {
-        const members = (membersData || []).filter((member) => member.organization_id === org.id)
-        const memberIds = members.map((member) => member.user_id)
-        const admins = members
+        const allOrgMembers = (membersData || []).filter((member) => member.organization_id === org.id)
+        // Only include actual members (not pending) in memberIds
+        const memberIds = allOrgMembers
+          .filter((member) => member.role !== 'pending')
+          .map((member) => member.user_id)
+        const admins = allOrgMembers
           .filter((member) => member.role === 'admin' || member.role === 'owner')
           .map((member) => member.user_id)
-        const pendingRequests = members.filter((member) => member.role === 'pending').map((member) => member.user_id)
+        const pendingRequests = allOrgMembers
+          .filter((member) => member.role === 'pending')
+          .map((member) => member.user_id)
         const creatorId = org.created_by || org.owner_id || org.admin_id || null
 
         if (creatorId && !memberIds.includes(creatorId)) {

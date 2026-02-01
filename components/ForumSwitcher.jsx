@@ -3,14 +3,21 @@ import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { useAppTheme } from '../app/theme'
 import { useUnifiedForum } from '../contexts/UnifiedForumContext'
 import { hp, wp } from '../helpers/common'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 
 const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const { forums } = useUnifiedForum()
+  const { data: currentUserProfile } = useCurrentUserProfile()
 
   // Use currentForum from props or fallback to unified context
   const forum = currentForum || forums[0]
+  const universityName = currentUserProfile?.university?.name || currentUserProfile?.university || 'University'
+  const isCampusForum = forum?.type === 'main' || forum?.type === 'campus'
+  const forumDisplayName = isCampusForum
+    ? `${universityName} Forum`
+    : (forum?.name || 'Forum')
   const getForumIcon = (type) => {
     switch (type) {
       case 'main':
@@ -67,7 +74,7 @@ const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.forumName} numberOfLines={1}>
-          {forum?.name || 'Main Forum'}
+          {forumDisplayName}
         </Text>
         {hasMemberCount ? (
           <Text style={styles.memberCount}>
@@ -105,7 +112,8 @@ const createStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     minWidth: wp(40),
-    maxWidth: wp(70),
+    maxWidth: wp(75),
+    flexShrink: 1,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -135,6 +143,7 @@ const createStyles = (theme) => StyleSheet.create({
   textContainer: {
     flex: 1,
     marginRight: wp(1),
+    minWidth: 0, // Allow text to shrink below content size
   },
   forumName: {
     fontSize: hp(1.6),

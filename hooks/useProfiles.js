@@ -137,13 +137,19 @@ export function useProfilePhotos(profileId) {
     queryFn: async () => {
       if (!profileId) return []
 
-      const { data: mediaData } = await supabase
-        .from('media')
-        .select('id, path, media_type, created_at')
-        .eq('owner_id', profileId)
-        .eq('owner_type', 'user')
-        .in('media_type', ['profile_photo', 'profile_avatar'])
-        .order('created_at', { ascending: true })
+      let mediaData
+      try {
+        const { data } = await supabase
+          .from('media')
+          .select('id, path, media_type, created_at')
+          .eq('owner_id', profileId)
+          .eq('owner_type', 'user')
+          .in('media_type', ['profile_photo', 'profile_avatar'])
+          .order('created_at', { ascending: true })
+        mediaData = data
+      } catch (error) {
+        return []
+      }
 
       if (!mediaData || mediaData.length === 0) return []
 
@@ -178,28 +184,63 @@ export function useProfile(profileId) {
   return useQuery({
     queryKey: ['profile', profileId],
     queryFn: async () => {
-      if (!profileId) {
-        throw new Error('Profile ID is required')
+      if (!profileId) return null
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(`
+            *,
+            university:universities(id, name, domain)
+          `)
+          .eq('id', profileId)
+          .single()
+
+        if (error) {
+          return null
+        }
+
+        return data
+      } catch (error) {
+        // Swallow network errors so users don't see techy failures
+        return null
       }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          university:universities(id, name, domain)
-        `)
-        .eq('id', profileId)
-        .single()
-
-      if (error) {
-        console.error('Error fetching profile:', error)
-        throw error
-      }
-
-      return data
     },
     enabled: !!profileId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 0,
+  })
+}
+
+/**
+ * Hook to fetch user's organizations/clubs
+ * Returns organizations the user is a member of (excluding pending)
+ * Uses security definer RPC to bypass RLS for viewing other users' orgs
+ */
+export function useUserOrganizations(userId) {
+  return useQuery({
+    queryKey: ['userOrganizations', userId],
+    queryFn: async () => {
+      if (!userId) return []
+
+      try {
+        // Use RPC function to bypass RLS and get user's organizations
+        const { data, error } = await supabase
+          .rpc('get_user_organizations', { p_user_id: userId })
+
+        if (error) {
+          console.warn('Error fetching user organizations:', error)
+          return []
+        }
+
+        return data || []
+      } catch (error) {
+        console.warn('Exception fetching user organizations:', error)
+        return []
+      }
+    },
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
     retry: 1,
   })
 }

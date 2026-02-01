@@ -1,30 +1,31 @@
+import { Ionicons } from '@expo/vector-icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  PanResponder,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Animated,
+    Dimensions,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    PanResponder,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import BottomNav from '../components/BottomNav'
 import AnonymousMessageButton from '../components/Forum/AnonymousMessageButton'
+import CommentsModal from '../components/Forum/CommentsModal'
 import ForumPostDetail from '../components/Forum/ForumPostDetail'
 import PollRenderer from '../components/Forum/PollRenderer'
 // import PostTags from '../components/Forum/PostTags' // Removed for V1 - add back later
@@ -32,25 +33,26 @@ import PollRenderer from '../components/Forum/PollRenderer'
 import ForumSelectorModal from '../components/ForumSelectorModal'
 import ForumSwitcher from '../components/ForumSwitcher'
 import {
-  Add,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Check,
-  ChevronDown,
-  ImageIcon,
-  MessageCircle,
-  MoreHorizontal,
-  Person,
-  // Repeat, // Removed for V1
-  Share2,
-  // Video, // Removed for V1
-  X
+    Add,
+    ArrowDownCircle,
+    ArrowUpCircle,
+    Check,
+    ChevronDown,
+    ImageIcon,
+    MessageCircle,
+    MoreHorizontal,
+    Person,
+    // Repeat, // Removed for V1
+    Share2,
+    // Video, // Removed for V1
+    X
 } from '../components/Icons'
 import ShareModal from '../components/ShareModal'
 import { ForumFeedSkeleton } from '../components/SkeletonLoader'
 import StoryFlow from '../components/Stories/StoryFlow'
 import StoryViewer from '../components/Stories/StoryViewer'
 import { useClubsContext } from '../contexts/ClubsContext'
+import { useOrgModal } from '../contexts/OrgModalContext'
 import { useProfileModal } from '../contexts/ProfileModalContext'
 import { useStoriesContext } from '../contexts/StoriesContext'
 import { useUnifiedForum } from '../contexts/UnifiedForumContext'
@@ -59,11 +61,13 @@ import { resolveMediaUrls, uploadImageToBondedMedia } from '../helpers/mediaStor
 import { useComments } from '../hooks/useComments'
 import { useCreatePost } from '../hooks/useCreatePost'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { useNotificationCount } from '../hooks/useNotificationCount'
 import { usePost, usePosts } from '../hooks/usePosts'
 import { useUniversities } from '../hooks/useUniversities'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { isSuperAdminEmail } from '../utils/admin'
+import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
 import { useAppTheme } from './theme'
 
 
@@ -680,15 +684,22 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
 export default function Forum() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
+  const log = (...args) => {
+    if (__DEV__) console.log(...args)
+  }
+  const { data: notificationCount = 0 } = useNotificationCount()
+  const notificationLabel = notificationCount > 99 ? '99+' : `${notificationCount}`
   const router = useRouter()
   const params = useLocalSearchParams()
   const requestedForumId = Array.isArray(params.forumId) ? params.forumId[0] : params.forumId
   const requestedPostId = Array.isArray(params.postId) ? params.postId[0] : params.postId
+  const requestedCreatePost = Array.isArray(params.createPost) ? params.createPost[0] : params.createPost
   const insets = useSafeAreaInsets()
   const queryClient = useQueryClient()
   // Posts are now fetched from usePosts hook
   const [activePost, setActivePost] = useState(null)
   const { openProfile } = useProfileModal()
+  const { openOrg } = useOrgModal()
   const [activeAuthorPost, setActiveAuthorPost] = useState(null)
   const [postOptionsPost, setPostOptionsPost] = useState(null)
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false)
@@ -710,10 +721,7 @@ export default function Forum() {
   const [draftBody, setDraftBody] = useState('')
   const [draftIsAnon, setDraftIsAnon] = useState(true)
   const [draftMedia, setDraftMedia] = useState([])
-  const [draftTags, setDraftTags] = useState([])
-  const [selectedTag, setSelectedTag] = useState(null)
   const [showPostAsModal, setShowPostAsModal] = useState(false)
-  const [showTagSelector, setShowTagSelector] = useState(false)
 
   // Story state
   const [isStoryFlowVisible, setIsStoryFlowVisible] = useState(false)
@@ -722,7 +730,9 @@ export default function Forum() {
   const [viewerStories, setViewerStories] = useState([])
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareContent, setShareContent] = useState(null)
+  const [commentsModalPost, setCommentsModalPost] = useState(null) // For Instagram-style comments modal
   const openedPostRef = useRef(null) // Track which post was opened via deep link to avoid re-opening
+  const openedCreateRef = useRef(false)
   const [selectedUniversityId, setSelectedUniversityId] = useState(null)
 
   const { getForumStories } = useStoriesContext()
@@ -770,6 +780,16 @@ export default function Forum() {
     }
   }, [requestedForumId, forums, currentForum, switchToForum])
 
+  React.useEffect(() => {
+    const shouldOpenCreate = requestedCreatePost === '1' || requestedCreatePost === 'true'
+    if (!shouldOpenCreate || openedCreateRef.current) return
+    if (requestedForumId && forums.length === 0) return
+    if (requestedForumId && currentForum?.id !== requestedForumId) return
+
+    openedCreateRef.current = true
+    setIsCreateModalVisible(true)
+  }, [requestedCreatePost, requestedForumId, forums.length, currentForum?.id])
+
   // Also ensure forum is set if it becomes null (safety check)
   // Use ref to avoid infinite loop
   const currentForumRef = React.useRef(currentForum)
@@ -779,7 +799,7 @@ export default function Forum() {
     if (visibleForums.length > 0 && currentForumRef.current === null) {
       const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
       if (mainForum) {
-        console.log('Re-setting forum (was null):', mainForum.name, mainForum.id)
+        log('Re-setting forum (was null):', mainForum.name, mainForum.id)
         switchToForum(mainForum.id)
       }
     }
@@ -821,6 +841,12 @@ export default function Forum() {
     data: activePostComments = [],
     refetch: refetchComments,
   } = useComments(activePost?.id)
+
+  // Comments for the Instagram-style modal
+  const {
+    data: modalPostComments = [],
+    refetch: refetchModalComments,
+  } = useComments(commentsModalPost?.id)
 
   // Flatten paginated data into a single array
   const posts = useMemo(() => {
@@ -880,17 +906,26 @@ export default function Forum() {
     let cancelled = false
     const hydratePost = async () => {
       const resolvedMedia = await resolveMediaUrls(requestedPostRaw.media_urls || [])
-      const authorLabel = requestedPostRaw.is_anonymous
-        ? 'Anon'
-        : (
-          requestedPostRaw.author?.username?.trim()
-            ? requestedPostRaw.author.username
-            : (requestedPostRaw.author?.email ? requestedPostRaw.author.email.split('@')[0] : 'Anonymous')
-        )
+
+      // Determine author info (org takes precedence over user)
+      const isOrgPost = !!requestedPostRaw.org_id && !!requestedPostRaw.organization
+      const authorLabel = isOrgPost
+        ? requestedPostRaw.organization.name
+        : requestedPostRaw.is_anonymous
+          ? 'Anon'
+          : (requestedPostRaw.author?.username?.trim()
+              ? requestedPostRaw.author.username
+              : (requestedPostRaw.author?.email ? requestedPostRaw.author.email.split('@')[0] : 'Anonymous'))
+      const authorAvatar = isOrgPost
+        ? requestedPostRaw.organization.logo_url
+        : requestedPostRaw.author?.avatar_url || null
+
       const mapped = {
         id: requestedPostRaw.id,
         author: authorLabel,
         isAnon: requestedPostRaw.is_anonymous || false,
+        isOrgPost,
+        orgId: requestedPostRaw.org_id || null,
         title: requestedPostRaw.title,
         body: requestedPostRaw.body,
         forum: requestedPostRaw.forum?.name || 'Unknown',
@@ -905,7 +940,7 @@ export default function Forum() {
         media: resolvedMedia.map((url) => ({ uri: url, type: 'image' })),
         createdAt: requestedPostRaw.created_at,
         userId: requestedPostRaw.user_id,
-        authorAvatar: requestedPostRaw.author?.avatar_url || null,
+        authorAvatar,
         poll: requestedPostRaw.poll || null,
       }
       if (!cancelled) {
@@ -933,7 +968,7 @@ export default function Forum() {
         throw new Error('You must be logged in to delete posts')
       }
 
-      console.log('🗑️ Attempting to delete post:', postId, 'by user:', user.id)
+      log('🗑️ Attempting to delete post:', postId, 'by user:', user.id)
 
       // Try soft delete first (set deleted_at timestamp)
       const { data: softDeleteData, error: softDeleteError } = await supabase
@@ -955,7 +990,7 @@ export default function Forum() {
 
       // Check if update succeeded (data exists and no error)
       if (softDeleteData && softDeleteData.length > 0 && !softDeleteError) {
-        console.log('✅ Post soft deleted successfully:', postId, softDeleteData[0])
+        log('✅ Post soft deleted successfully:', postId, softDeleteData[0])
         return { id: postId, deleted: true }
       }
 
@@ -965,7 +1000,7 @@ export default function Forum() {
       }
 
       // If soft delete failed, try hard delete as fallback
-      console.log('⚠️ Soft delete failed, attempting hard delete...')
+      log('⚠️ Soft delete failed, attempting hard delete...')
       const { data: hardDeleteData, error: hardDeleteError } = await supabase
         .from('posts')
         .delete()
@@ -996,7 +1031,7 @@ export default function Forum() {
       }
 
       if (hardDeleteData || !hardDeleteError) {
-        console.log('✅ Post hard deleted successfully:', postId)
+        log('✅ Post hard deleted successfully:', postId)
         return { id: postId, deleted: true }
       }
 
@@ -1004,7 +1039,7 @@ export default function Forum() {
       throw new Error('Failed to delete post. Please check your permissions.')
     },
     onSuccess: (data) => {
-      console.log('✅ Delete mutation succeeded:', data)
+      log('✅ Delete mutation succeeded:', data)
       // Invalidate posts queries to refresh the feed
       queryClient.invalidateQueries({ queryKey: ['posts', currentForumId] })
       queryClient.invalidateQueries({ queryKey: ['posts'] })
@@ -1014,7 +1049,7 @@ export default function Forum() {
     },
     onError: (error) => {
       console.error('❌ Delete mutation error:', error)
-      Alert.alert('Error', error.message || 'Failed to delete post. Please try again.')
+      Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to delete post. Please try again.'))
     }
   })
 
@@ -1087,6 +1122,18 @@ export default function Forum() {
       }))
     }
   }, [activePost?.id, activePostComments])
+
+  // Sync comments for modal post
+  React.useEffect(() => {
+    if (!commentsModalPost?.id) return
+    const currentComments = comments[commentsModalPost.id] || []
+    if (JSON.stringify(currentComments) !== JSON.stringify(modalPostComments)) {
+      setComments((prev) => ({
+        ...prev,
+        [commentsModalPost.id]: modalPostComments,
+      }))
+    }
+  }, [commentsModalPost?.id, modalPostComments])
 
   const collectCommentIds = useCallback((postComments) => {
     const ids = []
@@ -1312,8 +1359,9 @@ export default function Forum() {
   }
 
   const getCommentOwnerId = (commentId, parentId = null) => {
-    if (!activePost?.id) return null
-    const postComments = comments[activePost.id] || []
+    const targetPostId = activePost?.id || commentsModalPost?.id
+    if (!targetPostId) return null
+    const postComments = comments[targetPostId] || []
     if (!parentId) {
       const match = postComments.find((comment) => comment.id === commentId)
       return match?.userId || null
@@ -1454,10 +1502,11 @@ export default function Forum() {
   }
 
   const getCommentCounts = (commentId, parentId = null) => {
-    if (!activePost?.id) {
+    const targetPostId = activePost?.id || commentsModalPost?.id
+    if (!targetPostId) {
       return { upvotes: 0, downvotes: 0 }
     }
-    const postComments = comments[activePost.id] || []
+    const postComments = comments[targetPostId] || []
     if (!parentId) {
       const match = postComments.find((comment) => comment.id === commentId)
       return {
@@ -1474,7 +1523,9 @@ export default function Forum() {
   }
 
   const handleCommentVote = async (commentId, parentId = null, direction = 'up') => {
-    if (!user?.id || !activePost?.id) {
+    // Support both activePost (full detail) and commentsModalPost (modal)
+    const targetPostId = activePost?.id || commentsModalPost?.id
+    if (!user?.id || !targetPostId) {
       Alert.alert('Sign in required', 'Please sign in to like comments.')
       return
     }
@@ -1519,7 +1570,7 @@ export default function Forum() {
     })
     setComments((prev) => ({
       ...prev,
-      [activePost.id]: (prev[activePost.id] || []).map((comment) => {
+      [targetPostId]: (prev[targetPostId] || []).map((comment) => {
         if (parentId && comment.id === parentId) {
           return {
             ...comment,
@@ -1612,7 +1663,7 @@ export default function Forum() {
         type: 'comment_like',
         entityType: 'comment',
         entityId: commentId,
-        data: { post_id: activePost.id, comment_id: commentId },
+        data: { post_id: targetPostId, comment_id: commentId },
       })
     }
   }
@@ -1729,12 +1780,29 @@ export default function Forum() {
     return true
   }
 
+  // Wrapper for CommentsModal to add comments
+  const handleAddComment = async (postId, body, isAnonymous, parentId = null) => {
+    const success = await submitComment({
+      postId,
+      parentId,
+      body,
+      isAnonymous,
+    })
+    if (success) {
+      // Refetch comments for modal if that's where the comment was added
+      if (commentsModalPost?.id === postId) {
+        await refetchModalComments()
+      }
+    }
+    return success
+  }
+
   const handlePickMedia = async (kind) => {
     try {
-      console.log(`Picking ${kind}...`)
+      log(`Picking ${kind}...`)
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
       if (!permission.granted) {
-        console.log('Permission not granted')
+        log('Permission not granted')
         Alert.alert('Permission Required', 'Please grant access to your media library to select images or videos.')
         return
       }
@@ -1751,17 +1819,17 @@ export default function Forum() {
       })
 
       if (result.canceled) {
-        console.log('User canceled media picker')
+        log('User canceled media picker')
         return
       }
 
       const asset = result.assets?.[0]
       if (!asset) {
-        console.log('No asset selected')
+        log('No asset selected')
         return
       }
 
-      console.log('Media selected:', asset.uri)
+      log('Media selected:', asset.uri)
       setDraftMedia((prev) => [
         ...prev,
         {
@@ -1894,6 +1962,10 @@ export default function Forum() {
                   setActiveAuthorPost(item)
                   return
                 }
+                if (item.isOrgPost && item.orgId) {
+                  openOrg(item.orgId)
+                  return
+                }
                 openProfile(item.userId)
               }}
             >
@@ -2023,7 +2095,7 @@ export default function Forum() {
               }}
             >
               <ArrowUpCircle
-                size={hp(2.4)}
+                size={hp(2.6)}
                 color={isUpvoted ? theme.statusColors.success : theme.colors.textSecondary}
                 strokeWidth={2}
                 fill={isUpvoted ? '#2ecc71' : 'none'}
@@ -2046,7 +2118,7 @@ export default function Forum() {
               }}
             >
               <ArrowDownCircle
-                size={hp(2.4)}
+                size={hp(2.6)}
                 color={isDownvoted ? theme.statusColors.error : theme.colors.textSecondary}
                 strokeWidth={2}
                 fill={isDownvoted ? '#e74c3c' : 'none'}
@@ -2058,18 +2130,16 @@ export default function Forum() {
             style={styles.postActionButton}
             activeOpacity={0.7}
             onPress={() => {
-              setActivePost(item)
-              setFocusCommentInput(true)
+              // Instagram-style: open comments modal instead of full post detail
+              setCommentsModalPost(item)
             }}
           >
             <MessageCircle
-              size={hp(2)}
+              size={hp(2.2)}
               color={theme.colors.textSecondary}
               strokeWidth={2}
             />
-            {item.commentsCount > 0 && (
-              <Text style={styles.postActionText}>{item.commentsCount}</Text>
-            )}
+            <Text style={styles.postActionText}>{item.commentsCount || 0}</Text>
           </TouchableOpacity>
 
           {/* Repost button removed for V1 - will add back later */}
@@ -2086,7 +2156,7 @@ export default function Forum() {
             }}
           >
             <Share2
-              size={hp(2)}
+              size={hp(2.2)}
               color={theme.colors.textSecondary}
               strokeWidth={2}
             />
@@ -2128,6 +2198,18 @@ export default function Forum() {
         </View>
 
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => router.push('/notifications')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="notifications-outline" size={hp(2.4)} color={theme.colors.textPrimary} />
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{notificationLabel}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           {isSuperAdmin && (
             <TouchableOpacity
               style={styles.campusSelectorButton}
@@ -2352,7 +2434,7 @@ export default function Forum() {
                           userName="Anonymous"
                           onSendMessage={async (messageData) => {
                             // TODO: Implement actual anonymous message sending
-                            console.log('Sending anonymous message:', messageData)
+                            log('Sending anonymous message:', messageData)
                           }}
                         />
                       )}
@@ -2484,11 +2566,11 @@ export default function Forum() {
                   <TouchableOpacity
                     disabled={!draftBody.trim() || createPostMutation.isPending}
                     onPress={async () => {
-                      console.log('Post button pressed')
-                      console.log('draftBody:', draftBody)
-                      console.log('currentForum:', currentForum)
-                      console.log('currentForumId:', currentForum?.id)
-                      console.log('forums available:', visibleForums.length)
+                      log('Post button pressed')
+                      log('draftBody:', draftBody)
+                      log('currentForum:', currentForum)
+                      log('currentForumId:', currentForum?.id)
+                      log('forums available:', visibleForums.length)
 
                       if (!draftBody.trim()) {
                         Alert.alert('Required', 'Please enter a post body')
@@ -2505,7 +2587,7 @@ export default function Forum() {
                         // Auto-select default forum if none selected
                         forumToUse = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
                         if (forumToUse) {
-                          console.log('Auto-selecting forum:', forumToUse.name, forumToUse.id)
+                          log('Auto-selecting forum:', forumToUse.name, forumToUse.id)
                           setCurrentForum(forumToUse)
                           forumIdToUse = forumToUse.id
                         }
@@ -2517,10 +2599,10 @@ export default function Forum() {
                         return
                       }
 
-                      console.log('Using forum for post:', forumToUse.name, forumIdToUse)
+                      log('Using forum for post:', forumToUse.name, forumIdToUse)
 
                       try {
-                        console.log('Creating post with data:', {
+                        log('Creating post with data:', {
                           forumId: forumIdToUse,
                           body: draftBody.trim(),
                           isAnonymous: draftIsAnon,
@@ -2529,23 +2611,18 @@ export default function Forum() {
                         // Extract media URLs from draftMedia
                         const mediaUrls = []
 
-                        // Prepare tags array
-                        const tags = draftTags.length > 0
-                          ? draftTags
-                          : (selectedTag ? [selectedTag] : [])
-
                         // Create the post
                         const result = await createPostMutation.mutateAsync({
                           forumId: forumIdToUse,
                           title: draftTitle.trim() || null,
                           body: draftBody.trim(),
-                          tags,
+                          tags: [],
                           mediaUrls,
                           isAnonymous: draftIsAnon,
                           poll: draftPoll || null,
                         })
 
-                        console.log('Post created successfully:', result)
+                        log('Post created successfully:', result)
 
                         // Extract post and any poll error from result
                         const createdPost = result?.post || result
@@ -2562,9 +2639,9 @@ export default function Forum() {
 
                         if (createdPost?.id && draftMedia.length > 0) {
                           try {
-                            console.log('📸 Uploading media for post:', createdPost.id)
+                            log('📸 Uploading media for post:', createdPost.id)
                             const mediaPaths = await uploadPostMedia(createdPost.id)
-                            console.log('📸 Media paths:', mediaPaths)
+                            log('📸 Media paths:', mediaPaths)
 
                             if (mediaPaths.length > 0) {
                               const { error: updateError } = await supabase
@@ -2575,7 +2652,7 @@ export default function Forum() {
                               if (updateError) {
                                 console.error('Failed to update post with media:', updateError)
                               } else {
-                                console.log('✅ Post updated with media successfully')
+                                log('✅ Post updated with media successfully')
                                 // Invalidate queries to show updated post with images
                                 // Invalidate all posts queries for the current forum
                                 queryClient.invalidateQueries({ queryKey: ['posts', currentForumId] })
@@ -2597,8 +2674,6 @@ export default function Forum() {
                         setDraftBody('')
                         setDraftIsAnon(true)
                         setDraftMedia([])
-                        setDraftTags([])
-                        setSelectedTag(null)
                         setDraftPoll(null)
                         setIsCreateModalVisible(false)
                       } catch (error) {
@@ -2608,15 +2683,7 @@ export default function Forum() {
                         console.error('Error message:', error.message)
                         console.error('Error details:', error.details)
 
-                        let errorMessage = 'Failed to create post. Please try again.'
-                        if (error.message) {
-                          errorMessage = error.message
-                        } else if (error.details) {
-                          errorMessage = error.details
-                        } else if (error.code) {
-                          errorMessage = `Error ${error.code}: ${error.message || 'Failed to create post'}`
-                        }
-
+                        const errorMessage = getFriendlyErrorMessage(error, 'Failed to create post. Please try again.')
                         Alert.alert('Error Creating Post', errorMessage)
                       }
                     }}
@@ -2730,44 +2797,6 @@ export default function Forum() {
                   )}
                 </View>
 
-                {/* Selected Tag Display - Moved above action bar */}
-                {!selectedTag ? (
-                  <TouchableOpacity
-                    style={styles.fizzAddTagButton}
-                    onPress={() => setShowTagSelector(true)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.fizzAddTagButtonText}>+ Add Tag</Text>
-                  </TouchableOpacity>
-                ) : (() => {
-                  const tagColors = {
-                    'QUESTION': '#5B8DEF',
-                    'CONFESSION': '#FF7A8A',
-                    'CRUSH': '#FF8CC8',
-                    'DM ME': '#4DD0E1',
-                    'EVENT': '#FFB84D',
-                    'PSA': '#FF6B6B',
-                    'SHOUTOUT': '#4ECDC4',
-                    'DUB': '#FFD93D',
-                    'RIP': '#95A5A6',
-                    'MEME': '#A78BFA',
-                    'LOST & FOUND': '#E67E22',
-                  }
-                  const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
-                  return (
-                    <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
-                      <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
-                      <TouchableOpacity
-                        onPress={() => setSelectedTag(null)}
-                        activeOpacity={0.8}
-                        style={styles.fizzSelectedTagClose}
-                      >
-                        <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
-                      </TouchableOpacity>
-                    </View>
-                  )
-                })()}
-
                 {/* Action Bar - Above Keyboard */}
                 <View style={styles.fizzActionBar}>
                   <View style={styles.fizzMediaIconsRow}>
@@ -2781,102 +2810,6 @@ export default function Forum() {
                     {/* Video picker removed for V1 - will add back with proper video support later */}
                   </View>
                 </View>
-                {selectedTag && (() => {
-                  const tagColors = {
-                    'QUESTION': '#5B8DEF',
-                    'CONFESSION': '#FF7A8A',
-                    'CRUSH': '#FF8CC8',
-                    'DM ME': '#4DD0E1',
-                    'EVENT': '#FFB84D',
-                    'PSA': '#FF6B6B',
-                    'SHOUTOUT': '#4ECDC4',
-                    'DUB': '#FFD93D',
-                    'RIP': '#95A5A6',
-                    'MEME': '#A78BFA',
-                    'LOST & FOUND': '#E67E22',
-                  }
-                  const tagColor = tagColors[selectedTag] || theme.colors.bondedPurple
-                  return (
-                    <View style={[styles.fizzSelectedTag, { backgroundColor: tagColor }]}>
-                      <Text style={styles.fizzSelectedTagText}>{selectedTag}</Text>
-                      <TouchableOpacity
-                        onPress={() => setSelectedTag(null)}
-                        activeOpacity={0.8}
-                        style={styles.fizzSelectedTagClose}
-                      >
-                        <X size={hp(1.6)} color={theme.colors.white} strokeWidth={2.5} />
-                      </TouchableOpacity>
-                    </View>
-                  )
-                })()}
-
-                {/* Tag Selector Overlay - Inside create post modal */}
-                {showTagSelector && (
-                  <View style={styles.tagSelectorOverlay}>
-                    <Pressable
-                      style={styles.tagSelectorOverlayBackdrop}
-                      onPress={() => setShowTagSelector(false)}
-                    >
-                      <Pressable
-                        style={styles.tagSelectorOverlayContent}
-                        onPress={(e) => e.stopPropagation()}
-                      >
-                        <View style={styles.tagModalHeader}>
-                          <Text style={styles.tagModalTitle}>Select Tag</Text>
-                          <TouchableOpacity
-                            onPress={() => setShowTagSelector(false)}
-                            activeOpacity={0.8}
-                            style={styles.tagModalCloseButton}
-                          >
-                            <X size={hp(2.2)} color={theme.colors.textSecondary} strokeWidth={2.5} />
-                          </TouchableOpacity>
-                        </View>
-                        <ScrollView
-                          style={styles.tagList}
-                          contentContainerStyle={styles.tagListContent}
-                          showsVerticalScrollIndicator={false}
-                        >
-                          {[
-                            { label: 'QUESTION', color: '#5B8DEF', gradient: ['#5B8DEF', '#4A7CE8'] },
-                            { label: 'CONFESSION', color: '#FF7A8A', gradient: ['#FF7A8A', '#FF6B7D'] },
-                            { label: 'CRUSH', color: '#FF8CC8', gradient: ['#FF8CC8', '#FF7BB8'] },
-                            { label: 'DM ME', color: '#4DD0E1', gradient: ['#4DD0E1', '#3BC5D6'] },
-                            { label: 'EVENT', color: '#FFB84D', gradient: ['#FFB84D', '#FFA733'] },
-                            { label: 'PSA', color: '#FF6B6B', gradient: ['#FF6B6B', '#FF5555'] },
-                            { label: 'SHOUTOUT', color: '#4ECDC4', gradient: ['#4ECDC4', '#3DBBB3'] },
-                            { label: 'DUB', color: '#FFD93D', gradient: ['#FFD93D', '#FFD024'] },
-                            { label: 'RIP', color: '#95A5A6', gradient: ['#95A5A6', '#839496'] },
-                            { label: 'MEME', color: '#A78BFA', gradient: ['#A78BFA', '#9675F5'] },
-                            { label: 'LOST & FOUND', color: '#E67E22', gradient: ['#E67E22', '#D35400'] },
-                          ].map((tag) => (
-                            <TouchableOpacity
-                              key={tag.label}
-                              style={[
-                                styles.fizzTagPill,
-                                selectedTag === tag.label && styles.fizzTagPillSelected,
-                              ]}
-                              onPress={() => {
-                                setSelectedTag(tag.label)
-                                setShowTagSelector(false)
-                              }}
-                              activeOpacity={0.85}
-                            >
-                              <LinearGradient
-                                colors={tag.gradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.fizzTagGradient}
-                              >
-                                <Text style={styles.fizzTagPillText}>{tag.label}</Text>
-                              </LinearGradient>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      </Pressable>
-                    </Pressable>
-                  </View>
-                )}
-
                 {/* Post As Overlay - Inside create post modal */}
                 {showPostAsModal && (
                   <View style={styles.postAsOverlay}>
@@ -2993,10 +2926,23 @@ export default function Forum() {
           }}
         />
 
+        {/* Comments Modal - Instagram/LinkedIn style */}
+        <CommentsModal
+          visible={!!commentsModalPost}
+          post={commentsModalPost}
+          comments={comments[commentsModalPost?.id] || []}
+          userVotes={userVotes}
+          commentSort={commentSort}
+          onClose={() => setCommentsModalPost(null)}
+          onCommentVote={handleCommentVote}
+          onAddComment={handleAddComment}
+          onChangeSort={setCommentSort}
+          theme={theme}
+        />
 
-        {/* Floating Create Post Button */}
+        {/* Floating Create Post FAB */}
         <TouchableOpacity
-          style={styles.floatingCreateButton}
+          style={styles.fab}
           onPress={() => {
             // All users can create posts - no onboarding gate
 
@@ -3004,7 +2950,7 @@ export default function Forum() {
             if (!currentForum && visibleForums.length > 0) {
               const mainForum = visibleForums.find(f => f.type === 'campus') || visibleForums[0]
               if (mainForum) {
-                console.log('Setting forum before opening modal:', mainForum.name, mainForum.id)
+                log('Setting forum before opening modal:', mainForum.name, mainForum.id)
                 switchToForum(mainForum.id)
               }
             }
@@ -3012,7 +2958,7 @@ export default function Forum() {
           }}
           activeOpacity={0.8}
         >
-          <Add size={hp(2.5)} color={theme.colors.white} strokeWidth={2.5} />
+          <Add size={hp(3.5)} color={theme.colors.white} strokeWidth={2.5} />
         </TouchableOpacity>
 
         <BottomNav scrollY={scrollY} />
@@ -3194,7 +3140,36 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: wp(2),
   },
   headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+  },
+  notificationButton: {
     width: hp(4.5),
+    height: hp(4.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: hp(0.3),
+    right: wp(0.6),
+    minWidth: hp(1.8),
+    height: hp(1.8),
+    borderRadius: hp(0.9),
+    paddingHorizontal: wp(0.6),
+    backgroundColor: theme.colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+  notificationBadgeText: {
+    fontSize: hp(1.1),
+    color: theme.colors.white,
+    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.body,
+    includeFontPadding: false,
   },
   searchContainer: {
     paddingHorizontal: wp(4),
@@ -3395,10 +3370,10 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: 0,
   },
   postCard: {
-    marginHorizontal: wp(4),
+    marginHorizontal: wp(3),
     marginBottom: hp(2),
-    paddingVertical: hp(1.8),
-    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+    paddingHorizontal: 0,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
@@ -3409,6 +3384,7 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: hp(1.2),
+    paddingHorizontal: wp(4),
   },
   postAuthorRow: {
     flexDirection: 'row',
@@ -3417,18 +3393,18 @@ const createStyles = (theme) => StyleSheet.create({
     marginRight: wp(2),
   },
   postAvatar: {
-    width: hp(4.5),
-    height: hp(4.5),
-    borderRadius: hp(2.25),
+    width: hp(5),
+    height: hp(5),
+    borderRadius: hp(2.5),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: wp(2.5),
+    marginRight: wp(3),
   },
   postAvatarImage: {
-    width: hp(4.5),
-    height: hp(4.5),
-    borderRadius: hp(2.25),
-    marginRight: wp(2.5),
+    width: hp(5),
+    height: hp(5),
+    borderRadius: hp(2.5),
+    marginRight: wp(3),
   },
   postAvatarText: {
     fontSize: hp(2),
@@ -3454,20 +3430,21 @@ const createStyles = (theme) => StyleSheet.create({
   },
   postBody: {
     marginBottom: hp(1),
+    paddingHorizontal: wp(4),
   },
   postTitle: {
-    fontSize: hp(2),
+    fontSize: hp(2.1),
     fontWeight: '700',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.6),
-    lineHeight: hp(2.6),
+    lineHeight: hp(2.7),
   },
   postBodyText: {
-    fontSize: hp(1.6),
+    fontSize: hp(1.7),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    lineHeight: hp(2.2),
+    lineHeight: hp(2.3),
     marginTop: hp(0.2),
   },
   postTagsContainer: {
@@ -3477,15 +3454,16 @@ const createStyles = (theme) => StyleSheet.create({
     marginTop: hp(1),
   },
   postMediaPreview: {
-    marginTop: hp(1),
+    marginTop: hp(1.5),
     borderRadius: theme.radius.md,
     overflow: 'hidden',
     backgroundColor: theme.colors.border,
+    marginHorizontal: wp(4),
   },
   postMediaImage: {
     width: '100%',
-    aspectRatio: 16 / 9,
-    maxHeight: hp(25),
+    aspectRatio: 4 / 5,
+    maxHeight: hp(45),
     resizeMode: 'cover',
   },
   postMediaVideo: {
@@ -3508,6 +3486,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: hp(1),
     paddingTop: hp(1),
+    paddingHorizontal: wp(4),
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
   },
@@ -3521,7 +3500,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: theme.radius.full,
   },
   postVoteCount: {
-    fontSize: hp(1.5),
+    fontSize: hp(1.7),
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
@@ -3542,7 +3521,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: theme.radius.full,
   },
   postActionText: {
-    fontSize: hp(1.4),
+    fontSize: hp(1.6),
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '500',
@@ -5026,29 +5005,22 @@ const createStyles = (theme) => StyleSheet.create({
   sortSegmented: {
     marginLeft: theme.spacing.sm,
   },
-  floatingCreateButton: {
+  fab: {
     position: 'absolute',
     bottom: hp(12),
-    right: wp(4),
-    width: hp(6.5),
-    height: hp(6.5),
-    borderRadius: hp(3.25),
+    right: wp(5),
+    width: hp(7),
+    height: hp(7),
+    borderRadius: hp(3.5),
     backgroundColor: theme.colors.bondedPurple,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
     elevation: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    zIndex: 100,
   },
   campusSelectorButton: {
     flexDirection: 'row',

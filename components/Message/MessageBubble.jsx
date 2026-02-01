@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { hp } from '../../helpers/common'
 import { useAuthStore } from '../../stores/authStore'
@@ -13,7 +12,10 @@ export default function MessageBubble({
     showAvatar,
     onPress,
     onLongPress,
+    onAvatarPress,
     reactions = [],
+    onReactionsPress,
+    isHighlighted,
 }) {
     const { user } = useAuthStore()
     const styles = createStyles(theme)
@@ -41,6 +43,8 @@ export default function MessageBubble({
 
     const senderAvatar = message.sender?.avatar_url
 
+    const isUnsent = message?.metadata?.unsent || message?.content === ''
+
     // Count reactions by type
     const reactionCounts = {}
     const userReactions = new Set()
@@ -61,15 +65,20 @@ export default function MessageBubble({
             {!isMe && (
                 <View style={styles.avatarContainer}>
                     {showAvatar ? (
-                        senderAvatar ? (
-                            <Image source={{ uri: senderAvatar }} style={styles.avatar} />
-                        ) : (
-                            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                                <Text style={styles.avatarText}>
-                                    {(message.sender?.full_name || message.sender?.username || '?').charAt(0).toUpperCase()}
-                                </Text>
-                            </View>
-                        )
+                        <TouchableOpacity 
+                            activeOpacity={0.7}
+                            onPress={() => onAvatarPress && message.sender?.id && onAvatarPress(message.sender.id)}
+                        >
+                            {senderAvatar ? (
+                                <Image source={{ uri: senderAvatar }} style={styles.avatar} />
+                            ) : (
+                                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                    <Text style={styles.avatarText}>
+                                        {(message.sender?.full_name || message.sender?.username || '?').charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
                     ) : (
                         <View style={{ width: 30 }} /> // Spacer to keep alignment
                     )}
@@ -84,23 +93,34 @@ export default function MessageBubble({
                     style={[
                         styles.bubble,
                         isMe ? styles.bubbleMe : styles.bubbleOther,
-                        bubbleStyle
+                        bubbleStyle,
+                        isHighlighted && styles.bubbleHighlighted
                     ]}
                 >
-                    <Text style={[styles.text, isMe ? styles.textMe : styles.textOther]}>
-                        {message.content}
+                    <Text
+                        style={[
+                            styles.text,
+                            isMe ? styles.textMe : styles.textOther,
+                            isUnsent && styles.textUnsent
+                        ]}
+                    >
+                        {isUnsent ? 'Message unsent' : message.content}
                     </Text>
 
                     {/* Rich Message Preview */}
-                    <RichMessagePreview message={message} isOwn={isMe} />
+                    {!isUnsent && <RichMessagePreview message={message} isOwn={isMe} />}
                 </TouchableOpacity>
 
                 {/* Reactions Display */}
-                {hasReactions && (
-                    <View style={[
-                        styles.reactionsContainer,
-                        isMe ? styles.reactionsContainerMe : styles.reactionsContainerOther
-                    ]}>
+                {hasReactions && !isUnsent && (
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => onReactionsPress && onReactionsPress(message)}
+                        style={[
+                            styles.reactionsContainer,
+                            isMe ? styles.reactionsContainerMe : styles.reactionsContainerOther
+                        ]}
+                    >
                         {Object.entries(reactionCounts).map(([reactionType, count]) => (
                             <View
                                 key={reactionType}
@@ -117,7 +137,7 @@ export default function MessageBubble({
                                 )}
                             </View>
                         ))}
-                    </View>
+                    </TouchableOpacity>
                 )}
             </View>
 
@@ -178,6 +198,14 @@ const createStyles = (theme) => StyleSheet.create({
     bubbleOther: {
         backgroundColor: theme.colors.backgroundSecondary || '#E5E5EA', // iMessage Gray
     },
+    bubbleHighlighted: {
+        borderWidth: 2,
+        borderColor: theme.colors.bondedPurple,
+        shadowColor: theme.colors.bondedPurple,
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+    },
     text: {
         fontSize: 16,
         lineHeight: 20,
@@ -187,6 +215,10 @@ const createStyles = (theme) => StyleSheet.create({
     },
     textOther: {
         color: theme.colors.textPrimary || '#000000',
+    },
+    textUnsent: {
+        fontStyle: 'italic',
+        color: theme.colors.textSecondary,
     },
     statusText: {
         fontSize: 10,

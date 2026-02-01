@@ -21,6 +21,13 @@ export const FEATURE_GATES = {
   
   // Paid Events - Event ticketing and payment system
   PAID_EVENTS: false,
+
+  // Circles - live rooms (backend pending)
+  CIRCLES: false,
+
+  // School discovery/search (placeholder UI)
+  BROWSE_SCHOOLS: false,
+  SEARCH_FORUMS: false,
   
   // Onboarding Steps - Gated for future expansion
   ONBOARDING_STUDY_HABITS: false,    // Study habits step (gated)

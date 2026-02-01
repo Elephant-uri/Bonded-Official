@@ -537,6 +537,8 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
                 display="spinner"
                 onChange={(event, date) => date && setTimePickerValue(date)}
                 minuteInterval={5}
+                textColor={ONBOARDING_THEME.colors.textPrimary}
+                themeVariant="light"
               />
             </View>
           </View>
@@ -551,6 +553,8 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
           display="default"
           onChange={handleTimeChange}
           minuteInterval={5}
+          textColor={ONBOARDING_THEME.colors.textPrimary}
+          themeVariant="light"
         />
       )}
     </View>

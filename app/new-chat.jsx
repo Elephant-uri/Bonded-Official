@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Alert, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { hp, wp } from '../helpers/common'
+import { useFriends } from '../hooks/useFriends'
+import { useSendMessageRequest } from '../hooks/useMessageRequests'
 import { useProfiles } from '../hooks/useProfiles'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
@@ -33,11 +35,61 @@ export default function NewChat() {
         searchQuery: debouncedSearch,
         universityId: 'current'
     })
+    const { data: friends = [], isLoading: friendsLoading } = useFriends()
+    const sendMessageRequest = useSendMessageRequest()
 
     // Filter out self
     const profiles = allProfiles.filter(p => p.id !== currentUser?.id)
 
-    const handleUserPress = (user) => {
+    const friendIds = useMemo(() => new Set(friends.map(friend => friend.id)), [friends])
+
+    const normalizedFriends = useMemo(() => {
+        return friends.map(friend => ({
+            id: friend.id,
+            name: friend.full_name || friend.username || 'User',
+            full_name: friend.full_name,
+            username: friend.username,
+            photoUrl: friend.avatar_url,
+            major: friend.major,
+            grade: friend.grade,
+        }))
+    }, [friends])
+
+    const normalizedAll = useMemo(() => {
+        return profiles.map(profile => ({
+            ...profile,
+            name: profile.name || profile.full_name || profile.username || 'User',
+        }))
+    }, [profiles])
+
+    const filteredFriends = useMemo(() => {
+        const query = debouncedSearch.trim().toLowerCase()
+        if (!query) return normalizedFriends
+        return normalizedFriends.filter(user =>
+            `${user.name} ${user.username || ''}`.toLowerCase().includes(query)
+        )
+    }, [debouncedSearch, normalizedFriends])
+
+    const filteredOthers = useMemo(() => {
+        const query = debouncedSearch.trim().toLowerCase()
+        const base = normalizedAll.filter(user => !friendIds.has(user.id))
+        if (!query) return base
+        return base.filter(user =>
+            `${user.name} ${user.username || ''}`.toLowerCase().includes(query)
+        )
+    }, [debouncedSearch, friendIds, normalizedAll])
+
+    const sections = useMemo(() => {
+        if (isGroupMode) {
+            return [{ title: 'Friends', data: filteredFriends, sectionType: 'friends' }]
+        }
+        return [
+            { title: 'Friends', data: filteredFriends, sectionType: 'friends' },
+            { title: 'All Students', data: filteredOthers, sectionType: 'others' }
+        ]
+    }, [filteredFriends, filteredOthers, isGroupMode])
+
+    const handleUserPress = async (user, sectionType) => {
         if (isGroupMode) {
             setSelectedUsers(prev => {
                 const next = new Set(prev)
@@ -48,6 +100,16 @@ export default function NewChat() {
                 }
                 return next
             })
+            return
+        }
+
+        if (sectionType === 'others') {
+            try {
+                await sendMessageRequest.mutateAsync({ receiverId: user.id })
+                Alert.alert('Message request sent', `We sent ${user.name} a message request.`)
+            } catch (error) {
+                Alert.alert('Error', error?.message || 'Unable to send message request')
+            }
             return
         }
 
@@ -74,7 +136,7 @@ export default function NewChat() {
         }
         setIsCreating(true)
         try {
-            const selectedList = profiles.filter(p => selectedUsers.has(p.id))
+            const selectedList = normalizedFriends.filter(p => selectedUsers.has(p.id))
             const defaultName = [...selectedList.slice(0, 2).map(p => p.name.split(' ')[0]), '...'].join(', ')
 
             // Create Group Conversation
@@ -113,12 +175,12 @@ export default function NewChat() {
         }
     }
 
-    const renderItem = ({ item }) => {
+    const renderItem = ({ item, section }) => {
         const isSelected = selectedUsers.has(item.id)
         return (
             <TouchableOpacity
                 style={[styles.userRow, isSelected && styles.userRowSelected]}
-                onPress={() => handleUserPress(item)}
+                onPress={() => handleUserPress(item, section?.sectionType)}
                 activeOpacity={0.7}
             >
                 <View style={styles.avatarWrapper}>
@@ -147,7 +209,12 @@ export default function NewChat() {
                     </Text>
                 </View>
 
-                {!isGroupMode && <Ionicons name="chatbubble-outline" size={hp(2.2)} color={theme.colors.bondedPurple} />}
+                {!isGroupMode && section?.sectionType === 'friends' && (
+                    <Ionicons name="chatbubble-outline" size={hp(2.2)} color={theme.colors.bondedPurple} />
+                )}
+                {!isGroupMode && section?.sectionType === 'others' && (
+                    <Ionicons name="paper-plane-outline" size={hp(2.2)} color={theme.colors.textSecondary} />
+                )}
                 {isGroupMode && (
                     <View style={[styles.radio, isSelected && styles.radioSelected]}>
                         {isSelected && <View style={styles.radioInner} />}
@@ -209,14 +276,17 @@ export default function NewChat() {
             )}
 
             {/* List */}
-            <FlatList
-                data={profiles}
-                keyExtractor={item => item.id}
+            <SectionList
+                sections={sections}
+                keyExtractor={(item) => item.id}
                 renderItem={renderItem}
+                renderSectionHeader={({ section }) => (
+                    <Text style={styles.sectionTitle}>{section.title}</Text>
+                )}
                 contentContainerStyle={styles.listContent}
                 keyboardDismissMode="on-drag"
                 ListEmptyComponent={
-                    isLoading ? (
+                    isLoading || friendsLoading ? (
                         <View style={styles.centerContainer}>
                             <ActivityIndicator size="large" color={theme.colors.bondedPurple} />
                         </View>
@@ -307,6 +377,16 @@ const createStyles = (theme) => StyleSheet.create({
     listContent: {
         paddingVertical: hp(1),
         paddingBottom: hp(5),
+    },
+    sectionTitle: {
+        paddingHorizontal: wp(4),
+        paddingTop: hp(1.2),
+        paddingBottom: hp(0.6),
+        fontSize: hp(1.6),
+        fontWeight: '600',
+        color: theme.colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     userRow: {
         flexDirection: 'row',

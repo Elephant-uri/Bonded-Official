@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { getFriendlyErrorMessage } from '../../utils/userFacingErrors'
 
 /**
  * Debug screen to test magic link callback on emulator
@@ -12,8 +14,20 @@ import { supabase } from '../../lib/supabase'
  * 4. Paste it here and click "Process Link"
  */
 export default function AuthDebug() {
+  const router = useRouter()
   const [url, setUrl] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const log = (...args) => {
+    if (__DEV__) console.log(...args)
+  }
+
+  useEffect(() => {
+    if (!__DEV__) {
+      router.replace('/')
+    }
+  }, [router])
+
+  if (!__DEV__) return null
 
   const handleProcessLink = async () => {
     if (!url.trim()) {
@@ -37,9 +51,8 @@ export default function AuthDebug() {
         return
       }
 
-      console.log('🔗 Processing magic link URL...')
-      console.log('Token:', token.substring(0, 20) + '...')
-      console.log('Type:', type)
+      log('🔗 Processing magic link URL...')
+      log('Type:', type)
 
       // Verify the OTP token with Supabase
       // This will exchange the token for a session
@@ -50,14 +63,13 @@ export default function AuthDebug() {
 
       if (error) {
         console.error('❌ Error verifying token:', error)
-        Alert.alert('Error', error.message || 'Failed to verify token')
+        Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to verify token'))
         setIsProcessing(false)
         return
       }
 
       if (data.session) {
-        console.log('✅ SESSION:', data.session)
-        console.log('✅ USER:', data.session.user.email)
+        log('✅ Session established')
         Alert.alert(
           'Success!',
           `Logged in as ${data.session.user.email}\n\nCheck console for session details.`,
@@ -68,7 +80,7 @@ export default function AuthDebug() {
       }
     } catch (error: any) {
       console.error('❌ Error processing link:', error)
-      Alert.alert('Error', error.message || 'Failed to process link')
+      Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to process link'))
     } finally {
       setIsProcessing(false)
     }

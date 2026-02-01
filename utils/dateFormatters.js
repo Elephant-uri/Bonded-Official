@@ -81,6 +81,55 @@ export function formatTimeForDisplay(timeString) {
 }
 
 /**
+ * Format message list timestamp (e.g., "Jan 27, 3:22 PM" or "Jan 27, 2024, 3:22 PM")
+ */
+export function formatMessageListTimestamp(dateString) {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const now = new Date()
+  const sameYear = date.getFullYear() === now.getFullYear()
+
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+/**
+ * Format relative time for message list (e.g., "10 min ago", "1 hour ago", "2 days ago")
+ * Falls back to "Mon DD" (and year if not current year) after 7 days.
+ */
+export function formatRelativeMessageTime(dateString) {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} min ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+
+  const sameYear = date.getFullYear() === now.getFullYear()
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  })
+}
+
+/**
  * Format relative time ago (e.g., "5m", "2h", "3d", "Just now")
  */
 export function formatTimeAgo(dateString) {

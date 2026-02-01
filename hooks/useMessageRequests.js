@@ -140,13 +140,13 @@ export function useAcceptMessageRequest() {
         if (partError) throw partError
       }
 
-      const { error: deleteError } = await supabase
+      const { error: updateError } = await supabase
         .from('message_requests')
-        .delete()
+        .update({ status: 'accepted' })
         .eq('id', requestId)
         .eq('receiver_id', user.id)
 
-      if (deleteError) throw deleteError
+      if (updateError) throw updateError
 
       return conversationId
     },

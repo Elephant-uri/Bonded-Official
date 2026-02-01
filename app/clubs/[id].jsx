@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
+import { useQueryClient } from '@tanstack/react-query'
 import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   ActivityIndicator,
@@ -21,12 +22,16 @@ import AppTopBar from '../../components/AppTopBar'
 import BottomNav from '../../components/BottomNav'
 import EventPost from '../../components/Events/EventPost'
 import InviteModal from '../../components/InviteModal'
+import ShareModal from '../../components/ShareModal'
 import { useClubsContext } from '../../contexts/ClubsContext'
+import { useOrgModal } from '../../contexts/OrgModalContext'
+import { useProfileModal } from '../../contexts/ProfileModalContext'
 import { resolveMediaUrls, uploadImageToBondedMedia } from '../../helpers/mediaStorage'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { useCreatePost } from '../../hooks/useCreatePost'
 import { hp, wp } from '../../helpers/common'
+import { getFriendlyErrorMessage } from '../../utils/userFacingErrors'
 import { useAppTheme } from '../theme'
 
 export default function ClubDetail() {
@@ -50,9 +55,17 @@ export default function ClubDetail() {
     currentUserId,
   } = useClubsContext()
   const createPostMutation = useCreatePost()
+  const queryClient = useQueryClient()
+  const { openProfile } = useProfileModal()
+  const { openOrg } = useOrgModal()
   const [activeTab, setActiveTab] = useState('posts') // Default to posts for Instagram-like view
   const [viewMode, setViewMode] = useState('member') // LinkedIn-style view switcher ('member' | 'admin')
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isHydratingClub, setIsHydratingClub] = useState(true)
   const [memberProfiles, setMemberProfiles] = useState([])
   const [adminProfiles, setAdminProfiles] = useState([])
@@ -70,8 +83,39 @@ export default function ClubDetail() {
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [campusForumId, setCampusForumId] = useState(null)
 
+  const scrollViewRef = useRef(null)
+  const postsTabPositionRef = useRef(0)
+
   const club = getClub(id)
   const isAdmin = club ? isUserAdmin(club.id) : false
+
+  // Auto-open modal for deep linking (redirect to modal)
+  useEffect(() => {
+    if (id) {
+      openOrg(id)
+      // Navigate back to previous page or home
+      setTimeout(() => {
+        if (router.canGoBack()) {
+          router.back()
+        } else {
+          router.replace('/forum')
+        }
+      }, 100)
+    }
+  }, [id, openOrg])
+
+  // Helper to scroll to posts section
+  const scrollToPosts = useCallback(() => {
+    setActiveTab('posts')
+    setTimeout(() => {
+      if (scrollViewRef.current && postsTabPositionRef.current > 0) {
+        scrollViewRef.current.scrollTo({
+          y: postsTabPositionRef.current - hp(10), // Offset for header
+          animated: true
+        })
+      }
+    }, 100) // Small delay to ensure layout is complete
+  }, [])
 
   const forumId = useMemo(() => {
     if (!club?.forumId) return null
@@ -222,12 +266,11 @@ export default function ClubDetail() {
         return
       }
 
-      const orgTag = `org:${club.id}`
       const { data, error, count } = await supabase
         .from('posts')
-        .select('id, title, body, created_at, user_id, media_urls, tags', { count: 'exact' })
+        .select('id, title, body, created_at, user_id, media_urls, org_id', { count: 'exact' })
         .eq('forum_id', targetForumId)
-        .contains('tags', [orgTag])
+        .eq('org_id', club.id)
         .order('created_at', { ascending: false })
         .limit(25)
 
@@ -325,6 +368,42 @@ export default function ClubDetail() {
     }
   }
 
+  const handleOpenEdit = () => {
+    setEditName(club.name || '')
+    setEditDescription(club.description || '')
+    setShowEditModal(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Name required', 'Please enter a name for the organization.')
+      return
+    }
+
+    setIsSavingEdit(true)
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          name: editName.trim(),
+          description: editDescription.trim(),
+        })
+        .eq('id', club.id)
+
+      if (error) throw error
+
+      Alert.alert('Success', 'Organization updated successfully')
+      setShowEditModal(false)
+      // Trigger refetch by router navigation or context update
+      router.replace(`/clubs/${club.id}`)
+    } catch (error) {
+      console.error('Error updating organization:', error)
+      Alert.alert('Error', 'Failed to update organization. Please try again.')
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
   const pickPostImage = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -335,8 +414,7 @@ export default function ClubDetail() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 5],
+        allowsEditing: false,
         quality: 0.85,
       })
 
@@ -366,27 +444,41 @@ export default function ClubDetail() {
 
     const caption = postCaption.trim()
     const body = caption.length > 0 ? caption : `${club.name} shared a photo.`
-    const tags = ['org_post', `org:${club.id}`]
-
     try {
-      const result = await createPostMutation.mutateAsync({
-        forumId: targetForumId,
+      // Create post with org_id directly
+      const postData = {
+        forum_id: targetForumId,
+        user_id: user.id,
+        org_id: club.id, // Set org_id on creation
         title: '',
         body,
-        tags,
-        mediaUrls: [],
-        isAnonymous: false,
-      })
+        tags: [],
+        media_urls: [],
+        is_anonymous: false,
+        upvotes_count: 0,
+        comments_count: 0,
+        reposts_count: 0,
+      }
 
-      const createdPost = result?.post || result
+      const { data: createdPost, error: postError } = await supabase
+        .from('posts')
+        .insert(postData)
+        .select()
+        .single()
+
+      if (postError) {
+        throw postError
+      }
 
       if (createdPost?.id) {
+
         const uploadResult = await uploadImageToBondedMedia({
           fileUri: postImage,
-          mediaType: 'post',
+          mediaType: 'org_post',
           ownerType: 'org',
           ownerId: club.id,
           userId: user.id,
+          orgId: club.id,
           postId: createdPost.id,
         })
 
@@ -396,6 +488,9 @@ export default function ClubDetail() {
             .update({ media_urls: [uploadResult.path] })
             .eq('id', createdPost.id)
         }
+
+        // Invalidate React Query cache to ensure fresh data with org info
+        queryClient.invalidateQueries(['posts', targetForumId])
       }
 
       setPostCaption('')
@@ -404,7 +499,8 @@ export default function ClubDetail() {
       // Refresh posts list
       await fetchPosts()
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Failed to create post.')
+      console.error('Failed to create post:', error)
+      Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to create post.'))
     } finally {
       setIsCreatingPost(false)
     }
@@ -445,7 +541,11 @@ export default function ClubDetail() {
     }
 
     return (
-      <View style={styles.memberItem}>
+      <TouchableOpacity
+        style={styles.memberItem}
+        onPress={() => openProfile(userId)}
+        activeOpacity={0.7}
+      >
         {profile.avatar_url ? (
           <Image source={{ uri: profile.avatar_url }} style={styles.memberAvatar} />
         ) : (
@@ -461,18 +561,25 @@ export default function ClubDetail() {
         {canRemove && (
           <TouchableOpacity
             style={styles.removeMemberButton}
-            onPress={handleRemoveMember}
+            onPress={(e) => {
+              e.stopPropagation()
+              handleRemoveMember()
+            }}
             activeOpacity={0.7}
           >
             <Ionicons name="close-circle" size={hp(1.8)} color={theme.colors.error} />
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
     )
   }
 
   const renderPost = ({ item }) => (
-    <View style={styles.orgPostCard}>
+    <TouchableOpacity
+      style={styles.orgPostCard}
+      onPress={() => router.push(`/forum?postId=${item.id}`)}
+      activeOpacity={0.8}
+    >
       {item.media?.[0] ? (
         <Image source={{ uri: item.media[0] }} style={styles.orgPostImage} />
       ) : (
@@ -488,7 +595,7 @@ export default function ClubDetail() {
           {new Date(item.created_at || item.createdAt).toLocaleDateString()}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   )
 
   return (
@@ -502,6 +609,7 @@ export default function ClubDetail() {
         />
 
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -568,23 +676,14 @@ export default function ClubDetail() {
                 </TouchableOpacity>
               )}
 
-              {isMember && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.actionButtonSecondary]}
-                  onPress={async () => {
-                    const forumId = await ensureClubForum(club.id)
-                    const destination = forumId || club.forumId
-                    if (!destination) return
-                    router.push(
-                      `/chat?forumId=${destination}&forumName=${encodeURIComponent(club.name)}&isGroupChat=true`
-                    )
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="chatbubble-ellipses-outline" size={hp(2)} color={theme.colors.textPrimary} />
-                  <Text style={styles.actionButtonText}>Message</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={[styles.actionButton, styles.actionButtonSecondary]}
+                onPress={() => setShowShareModal(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="share-outline" size={hp(2)} color={theme.colors.textPrimary} />
+                <Text style={styles.actionButtonText}>Share</Text>
+              </TouchableOpacity>
             </View>
 
             {isAdmin && (
@@ -618,7 +717,7 @@ export default function ClubDetail() {
                 <Text style={styles.statValue}>{memberCount}</Text>
                 <Text style={styles.statLabel}>Members</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.statItem} onPress={() => setActiveTab('posts')} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.statItem} onPress={scrollToPosts} activeOpacity={0.7}>
                 <Text style={styles.statValue}>{postsCount}</Text>
                 <Text style={styles.statLabel}>Posts</Text>
               </TouchableOpacity>
@@ -716,11 +815,11 @@ export default function ClubDetail() {
               <View style={styles.adminToolsRow}>
                 <TouchableOpacity
                   style={styles.adminToolButton}
-                  onPress={() => Alert.alert('Manage members', 'Member management coming soon')}
+                  onPress={handleOpenEdit}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="people-outline" size={hp(2)} color={theme.colors.bondedPurple} />
-                  <Text style={styles.adminToolText}>Members</Text>
+                  <Ionicons name="create-outline" size={hp(2)} color={theme.colors.bondedPurple} />
+                  <Text style={styles.adminToolText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.adminToolButton}
@@ -732,28 +831,14 @@ export default function ClubDetail() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.adminToolButton}
-                  onPress={() => Alert.alert('Manage posts', 'Post management coming soon')}
+                  onPress={() => setShowMembersModal(true)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="albums-outline" size={hp(2)} color={theme.colors.bondedPurple} />
-                  <Text style={styles.adminToolText}>Posts</Text>
+                  <Ionicons name="people-outline" size={hp(2)} color={theme.colors.bondedPurple} />
+                  <Text style={styles.adminToolText}>Members</Text>
                 </TouchableOpacity>
               </View>
             </View>
-          )}
-          {/* Create Post Button - Admin only */}
-          {isAdmin && (
-            <TouchableOpacity
-              style={styles.createPostButton}
-              onPress={() => {
-                // TODO: Navigate to create post
-                Alert.alert('Create Post', 'Post creation coming soon')
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add-circle" size={hp(2.5)} color={theme.colors.white} />
-              <Text style={styles.createPostButtonText}>Create Post</Text>
-            </TouchableOpacity>
           )}
 
           {/* Tabs - Instagram style */}
@@ -766,7 +851,13 @@ export default function ClubDetail() {
                       styles.tab,
                       activeTab === tab && styles.tabActive,
                     ]}
-                    onPress={() => setActiveTab(tab)}
+                    onPress={() => {
+                      if (tab === 'posts') {
+                        scrollToPosts()
+                      } else {
+                        setActiveTab(tab)
+                      }
+                    }}
                     activeOpacity={0.7}
                   >
                     <Ionicons
@@ -797,7 +888,13 @@ export default function ClubDetail() {
                       styles.tab,
                       activeTab === tab && styles.tabActive,
                     ]}
-                    onPress={() => setActiveTab(tab)}
+                    onPress={() => {
+                      if (tab === 'posts') {
+                        scrollToPosts()
+                      } else {
+                        setActiveTab(tab)
+                      }
+                    }}
                     activeOpacity={0.7}
                   >
                     <Ionicons
@@ -861,7 +958,12 @@ export default function ClubDetail() {
           )}
 
           {activeTab === 'posts' && (
-            <View style={styles.tabContent}>
+            <View
+              style={styles.tabContent}
+              onLayout={(event) => {
+                postsTabPositionRef.current = event.nativeEvent.layout.y
+              }}
+            >
               {postsLoading ? (
                 <View style={styles.loadingBlock}>
                   <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
@@ -1000,6 +1102,59 @@ export default function ClubDetail() {
             Alert.alert('Success', `Invited ${userIds.length} people to ${club.name}`)
           }}
         />
+
+        {/* Share Modal */}
+        <ShareModal
+          visible={showShareModal}
+          content={{
+            type: 'club',
+            data: {
+              id: club.id,
+              name: club.name,
+              category: club.category,
+              members: club.members,
+            }
+          }}
+          onClose={() => setShowShareModal(false)}
+        />
+
+        {/* Edit Modal */}
+        <Modal visible={showEditModal} animationType="slide" onRequestClose={() => setShowEditModal(false)}>
+          <SafeAreaView style={styles.createPostModalSafeArea} edges={['top', 'bottom']}>
+            <View style={[styles.createPostHeader, { paddingTop: Math.max(hp(1.5), insets.top * 0.6) }]}>
+              <TouchableOpacity onPress={() => setShowEditModal(false)} style={styles.createPostClose}>
+                <Ionicons name="close" size={hp(3)} color={theme.colors.charcoal} />
+              </TouchableOpacity>
+              <Text style={styles.createPostTitle}>Edit Organization</Text>
+              <TouchableOpacity onPress={handleSaveEdit} disabled={isSavingEdit} style={styles.createPostSubmit}>
+                <Text style={styles.createPostSubmitText}>{isSavingEdit ? 'Saving...' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.createPostBody} contentContainerStyle={{ padding: wp(4), gap: hp(2) }}>
+              <View>
+                <Text style={styles.messageLabel}>Name</Text>
+                <TextInput
+                  style={[styles.createPostCaption, { minHeight: hp(5.5), paddingVertical: hp(1.5) }]}
+                  placeholder="Organization name"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  value={editName}
+                  onChangeText={setEditName}
+                />
+              </View>
+              <View>
+                <Text style={styles.messageLabel}>Description</Text>
+                <TextInput
+                  style={styles.createPostCaption}
+                  placeholder="Describe your organization..."
+                  placeholderTextColor={theme.colors.textSecondary}
+                  value={editDescription}
+                  onChangeText={setEditDescription}
+                  multiline
+                />
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
 
         <Modal visible={showCreatePostModal} animationType="slide" onRequestClose={() => setShowCreatePostModal(false)}>
           <SafeAreaView style={styles.createPostModalSafeArea} edges={['top', 'bottom']}>
@@ -1361,6 +1516,13 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textPrimary,
     textAlignVertical: 'top',
   },
+  messageLabel: {
+    fontSize: hp(1.6),
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: hp(0.8),
+    fontFamily: theme.typography.fontFamily.body,
+  },
   orgPostCard: {
     backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: theme.radius.lg,
@@ -1424,23 +1586,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
     fontWeight: '600',
     color: theme.colors.textPrimary,
-  },
-  createPostButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.bondedPurple,
-    paddingVertical: hp(1.8),
-    marginHorizontal: wp(4),
-    marginBottom: hp(2),
-    borderRadius: theme.radius.xl,
-    gap: wp(2),
-  },
-  createPostButtonText: {
-    fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
-    color: theme.colors.white,
   },
   createOrgPostButton: {
     marginBottom: hp(2),

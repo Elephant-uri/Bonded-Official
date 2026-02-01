@@ -72,6 +72,7 @@ export function useCurrentUserProfile() {
           personality_answers,
           class_schedule,
           yearbook_quote,
+          friends_visibility,
           created_at,
           updated_at,
           onboarding_step,
@@ -108,6 +109,7 @@ export function useCurrentUserProfile() {
             grade: null,
             graduation_year: null,
             interests: null,
+            friends_visibility: 'school',
           }
         }
         
@@ -133,6 +135,7 @@ export function useCurrentUserProfile() {
             grade: null,
             graduation_year: null,
             interests: null,
+            friends_visibility: 'school',
           }
         }
         
@@ -162,6 +165,7 @@ export function useCurrentUserProfile() {
           photos: [defaultAvatar],
           yearbookPhotoUrl: defaultAvatar,
           avatarUrl: defaultAvatar,
+          friends_visibility: 'school',
         }
       }
 
@@ -300,4 +304,3 @@ export function useCurrentUserProfile() {
     refetchOnWindowFocus: false, // Don't refetch on focus to prevent crashes
   })
 }
-

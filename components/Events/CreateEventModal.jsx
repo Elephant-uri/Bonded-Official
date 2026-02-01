@@ -683,7 +683,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                       }
                     }}
                     minimumDate={new Date()}
-                    textColor="#000000"
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -726,7 +727,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                         setStartDate(newDate)
                       }
                     }}
-                    textColor="#000000"
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -770,7 +772,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                       }
                     }}
                     minimumDate={startDate}
-                    textColor="#000000"
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -813,7 +816,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                         setEndDate(newDate)
                       }
                     }}
-                    textColor="#000000"
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -854,7 +858,8 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
                       }
                     }}
                     minimumDate={startDate}
-                    textColor="#000000"
+                    textColor={theme.colors.textPrimary}
+                    themeVariant={theme.mode}
                   />
                 </View>
               </View>
@@ -1192,4 +1197,3 @@ const createStyles = (theme) => StyleSheet.create({
     overflow: 'hidden',
   },
 })
-

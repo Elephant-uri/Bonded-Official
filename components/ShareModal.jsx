@@ -26,12 +26,7 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
   const styles = createStyles(theme)
   const insets = useSafeAreaInsets()
 
-  // Debug: Log what content we receive
-  console.log('🔍 ShareModal received content:', {
-    type: content?.type,
-    data: content?.data,
-    fullContent: content
-  })
+  // Removed excessive debug logging
   const allowTransparent = transparent && (presentationStyle === 'overFullScreen' || presentationStyle === 'fullScreen')
   const modalTransparentProps = allowTransparent ? { transparent: true } : {}
   const router = useRouter()
@@ -141,52 +136,53 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
           shareData: shareData,
         }
         // Include metadata for shared posts/comments so they can be displayed properly
+        // Use camelCase keys to match what SharedContentPreview expects
         const messageMetadata = content.type === 'post' ? {
           ...baseMetadata,
-          post_id: content.data.id,
-          forum_id: content.data.forumId || content.data.forum_id || null,
+          postId: content.data.id,
+          forumId: content.data.forumId || content.data.forum_id || content.data.forum?.id || null,
           title: content.data.title || '',
           body: content.data.body || '',
-          forum_name: content.data.forum?.name || 'Forum',
-          comments_count: content.data.comments_count || 0,
-          upvotes_count: content.data.upvotes_count || 0,
-          image_url: content.data.media_urls?.[0] || content.data.image_url || null,
+          forumName: content.data.forum?.name || 'Forum',
+          commentsCount: content.data.comments_count || content.data.commentsCount || 0,
+          upvotesCount: content.data.upvotes_count || content.data.upvotesCount || 0,
+          imageUrl: content.data.media_urls?.[0] || content.data.image_url || content.data.media?.[0] || null,
         } : content.type === 'comment' ? {
           ...baseMetadata,
-          comment_id: content.data.id,
-          post_id: content.data.postId,
-          forum_id: content.data.forumId || null,
+          commentId: content.data.id,
+          postId: content.data.postId,
+          forumId: content.data.forumId || null,
           body: content.data.body || '',
-          post_title: content.data.postTitle || '',
+          postTitle: content.data.postTitle || '',
         } : content.type === 'event' ? {
           ...baseMetadata,
-          event_id: content.data.id,
+          eventId: content.data.id,
           title: content.data.title || '',
-          image_url: content.data.image_url || null,
-          start_at: content.data.start_at || '',
-          location_name: content.data.location_name || content.data.location || '',
-          attendee_count: content.data.attendee_count || 0,
+          imageUrl: content.data.image_url || null,
+          startAt: content.data.start_at || '',
+          locationName: content.data.location_name || content.data.location || '',
+          attendeeCount: content.data.attendee_count || 0,
         } : content.type === 'organization' || content.type === 'org' ? {
           ...baseMetadata,
-          org_id: content.data.id,
+          orgId: content.data.id,
           name: content.data.name || '',
-          logo_url: content.data.logo_url || null,
+          logoUrl: content.data.logo_url || null,
           category: content.data.category || '',
-          member_count: content.data.member_count || 0,
+          memberCount: content.data.member_count || 0,
         } : content.type === 'class' || content.type === 'club' ? {
           ...baseMetadata,
-          class_id: content.data.id,
+          classId: content.data.id,
           name: content.data.name || content.data.course_name || '',
           description: content.data.description || '',
-          professor_name: content.data.professor_name || '',
+          professorName: content.data.professor_name || '',
         } : content.type === 'profile' ? {
           ...baseMetadata,
-          user_id: content.data.id,
-          full_name: content.data.full_name || content.data.username || '',
+          profileId: content.data.id,
+          fullName: content.data.full_name || content.data.username || '',
           username: content.data.username || '',
-          avatar_url: content.data.avatar_url || null,
+          avatarUrl: content.data.avatar_url || null,
           major: content.data.major || '',
-          graduation_year: content.data.graduation_year || null,
+          graduationYear: content.data.graduation_year || null,
         } : baseMetadata
         
         // Debug: Log the final metadata
@@ -209,28 +205,19 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
         conversationIds.push({ friendId, conversationId })
       }
 
-      if (selectedFriends.length === 1) {
-        const recipient = friendOptions.find((friend) => friend.id === selectedFriends[0])
-        const conversationId = conversationIds[0]?.conversationId
-        if (conversationId) {
-          console.log('📱 Navigating to chat after sharing:', { conversationId, recipient })
-          router.push({
-            pathname: '/chat',
-            params: {
-              conversationId,
-              userId: selectedFriends[0],
-              userName: recipient?.name || recipient?.full_name || 'User',
-            },
-          })
-        } else {
-          console.warn('⚠️ No conversationId found after sharing')
-          router.push('/messages')
-        }
-      } else {
-        console.log('📱 Shared to multiple friends, navigating to messages list')
-        router.push('/messages')
-      }
-
+      // Just close the modal - don't navigate anywhere
+      // The user can manually go to messages if they want to see the sent message
+      Alert.alert(
+        'Sent!',
+        selectedFriends.length === 1 
+          ? 'Shared successfully' 
+          : `Shared to ${selectedFriends.length} friends`
+      )
+      
+      // Reset state and close
+      setSelectedFriends([])
+      setMessage('')
+      setSearchQuery('')
       onClose()
     } catch (error) {
       console.error('Share send failed:', error)

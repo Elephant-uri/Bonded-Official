@@ -3,7 +3,9 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { Alert } from 'react-native'
+import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 
@@ -202,6 +204,99 @@ export function useFriendshipStatus(otherUserId) {
 }
 
 /**
+ * Hook to get friend count for a user
+ */
+export function useFriendCount(profileId) {
+  return useQuery({
+    queryKey: ['friendCount', profileId],
+    queryFn: async () => {
+      if (!profileId) return 0
+      const { data, error } = await supabase
+        .rpc('get_profile_friend_count', { target_profile_id: profileId })
+
+      if (error) throw error
+      return data || 0
+    },
+    enabled: !!profileId,
+    staleTime: 60 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Hook to get friends for a given profile
+ */
+export function useFriendsForProfile(profileId) {
+  return useQuery({
+    queryKey: ['friends-for-profile', profileId],
+    queryFn: async () => {
+      if (!profileId) return []
+      const { data, error } = await supabase
+        .rpc('get_profile_friends', { target_profile_id: profileId })
+
+      if (error) throw error
+      return data || []
+    },
+    enabled: !!profileId,
+    staleTime: 60 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Realtime subscription to keep friend count and list fresh for a profile
+ */
+export function useFriendsRealtime(profileId) {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!profileId) return undefined
+
+    const channel = supabase
+      .channel(`friendships-profile-${profileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendships',
+          filter: `user1_id=eq.${profileId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['friendCount', profileId] })
+          queryClient.invalidateQueries({ queryKey: ['friends-for-profile', profileId] })
+          queryClient.invalidateQueries({ queryKey: ['friends', profileId] })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendships',
+          filter: `user2_id=eq.${profileId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['friendCount', profileId] })
+          queryClient.invalidateQueries({ queryKey: ['friends-for-profile', profileId] })
+          queryClient.invalidateQueries({ queryKey: ['friends', profileId] })
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Friends realtime subscription error:', err)
+        }
+      })
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [profileId, queryClient])
+}
+
+/**
  * Hook to send a friend request
  */
 export function useSendFriendRequest() {
@@ -290,7 +385,7 @@ export function useSendFriendRequest() {
     },
     onError: (error) => {
       console.error('❌ Error sending friend request:', error)
-      Alert.alert('Error', error.message || 'Failed to send friend request')
+      Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send friend request'))
     },
   })
 }

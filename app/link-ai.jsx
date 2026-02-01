@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -17,149 +17,9 @@ import AppHeader from '../components/AppHeader'
 import { isFeatureEnabled } from '../utils/featureGates'
 import { useAppTheme } from './theme'
 import { hp, wp } from '../helpers/common'
-
-// Mock AI responses based on queries
-const generateAIResponse = (query) => {
-  const lowerQuery = query.toLowerCase()
-  
-  if (lowerQuery.includes('golf') || lowerQuery.includes('golfing')) {
-    return {
-      type: 'people',
-      message: "I found 12 people on campus who love golf! Here are some great matches:",
-      results: [
-        {
-          id: '1',
-          name: 'Jordan Miller',
-          major: 'Business',
-          year: '2025',
-          avatar: 'https://randomuser.me/api/portraits/men/22.jpg',
-          bio: 'Golf enthusiast, play every weekend at Newport Country Club',
-          groupjamScore: 92,
-        },
-        {
-          id: '2',
-          name: 'Sarah Chen',
-          major: 'Finance',
-          year: '2024',
-          avatar: 'https://randomuser.me/api/portraits/women/28.jpg',
-          bio: 'Love golf! Always looking for playing partners',
-          groupjamScore: 88,
-        },
-        {
-          id: '3',
-          name: 'Mike Thompson',
-          major: 'Sports Management',
-          year: '2026',
-          avatar: 'https://randomuser.me/api/portraits/men/45.jpg',
-          bio: 'Golf team member, happy to play with anyone',
-          groupjamScore: 85,
-        },
-      ],
-    }
-  }
-  
-  if (lowerQuery.includes('startup') || lowerQuery.includes('co-founder') || lowerQuery.includes('founder')) {
-    return {
-      type: 'people',
-      message: "I found 8 potential co-founders interested in startups! Here are top matches:",
-      results: [
-        {
-          id: '4',
-          name: 'Emma Rodriguez',
-          major: 'Computer Science',
-          year: '2024',
-          avatar: 'https://randomuser.me/api/portraits/women/35.jpg',
-          bio: 'Building a fintech startup, looking for a technical co-founder',
-          groupjamScore: 95,
-        },
-        {
-          id: '5',
-          name: 'David Kim',
-          major: 'Business',
-          year: '2025',
-          avatar: 'https://randomuser.me/api/portraits/men/38.jpg',
-          bio: 'Entrepreneur, have 2 startup ideas ready to launch',
-          groupjamScore: 90,
-        },
-        {
-          id: '6',
-          name: 'Alex Patel',
-          major: 'Engineering',
-          year: '2024',
-          avatar: 'https://randomuser.me/api/portraits/men/42.jpg',
-          bio: 'Tech entrepreneur, looking for business-minded co-founder',
-          groupjamScore: 87,
-        },
-      ],
-    }
-  }
-  
-  if (lowerQuery.includes('club') || lowerQuery.includes('organization') || lowerQuery.includes('org')) {
-    return {
-      type: 'clubs',
-      message: "I found 15 clubs and organizations that might interest you! Here are the top matches:",
-      results: [
-        {
-          id: 'club1',
-          name: 'Entrepreneurship Club',
-          category: 'Business',
-          members: 145,
-          description: 'For students interested in startups and business',
-          image: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=400',
-        },
-        {
-          id: 'club2',
-          name: 'Golf Club',
-          category: 'Sports',
-          members: 32,
-          description: 'Weekly golf outings and tournaments',
-          image: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=400',
-        },
-        {
-          id: 'club3',
-          name: 'Tech Innovation Society',
-          category: 'Technology',
-          members: 89,
-          description: 'Building projects and networking with tech professionals',
-          image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400',
-        },
-      ],
-    }
-  }
-  
-  if (lowerQuery.includes('study') || lowerQuery.includes('study group') || lowerQuery.includes('study buddy')) {
-    return {
-      type: 'people',
-      message: "I found 20 people looking for study partners! Here are great matches:",
-      results: [
-        {
-          id: '7',
-          name: 'Jessica Wang',
-          major: 'Computer Science',
-          year: '2025',
-          avatar: 'https://randomuser.me/api/portraits/women/32.jpg',
-          bio: 'Looking for study buddies for CS 201 and MATH 150',
-          groupjamScore: 93,
-        },
-        {
-          id: '8',
-          name: 'Ryan O\'Connor',
-          major: 'Engineering',
-          year: '2024',
-          avatar: 'https://randomuser.me/api/portraits/men/29.jpg',
-          bio: 'Study group organizer, meet at library every Tuesday',
-          groupjamScore: 89,
-        },
-      ],
-    }
-  }
-  
-  // Default response
-  return {
-    type: 'text',
-    message: "I can help you find people, clubs, study groups, co-founders, and more on campus! Try asking me:\n\n• \"I'm looking for friends who golf\"\n• \"I need a startup co-founder\"\n• \"Show me clubs related to tech\"\n• \"Find me a study buddy for CS 201\"\n\nWhat are you looking for?",
-  }
-}
+import { queryLink } from '../services/linkService'
+import { useAuthStore } from '../stores/authStore'
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 
 // Quick suggestion prompts
 const QUICK_SUGGESTIONS = [
@@ -183,6 +43,8 @@ export default function LinkAI() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
+  const { user } = useAuthStore()
+  const { data: currentUserProfile } = useCurrentUserProfile()
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -203,7 +65,37 @@ export default function LinkAI() {
     }, 100)
   }, [messages])
 
-  const handleSend = (text) => {
+  const normalizeLinkResponse = useCallback((payload) => {
+    const message =
+      payload?.message ||
+      payload?.response ||
+      payload?.text ||
+      payload?.answer ||
+      'Link is thinking...'
+
+    const resultsPayload = payload?.results || payload?.matches || payload?.data?.results || null
+    const explicitType = payload?.type || payload?.data?.type || null
+
+    if (Array.isArray(resultsPayload) && explicitType) {
+      return { message, data: { type: explicitType, results: resultsPayload } }
+    }
+
+    if (resultsPayload && typeof resultsPayload === 'object') {
+      if (Array.isArray(resultsPayload.people)) {
+        return { message, data: { type: 'people', results: resultsPayload.people } }
+      }
+      if (Array.isArray(resultsPayload.clubs)) {
+        return { message, data: { type: 'clubs', results: resultsPayload.clubs } }
+      }
+      if (Array.isArray(resultsPayload.organizations)) {
+        return { message, data: { type: 'clubs', results: resultsPayload.organizations } }
+      }
+    }
+
+    return { message, data: null }
+  }, [])
+
+  const handleSend = useCallback(async (text) => {
     const messageText = text || inputText
     if (!messageText.trim()) return
 
@@ -220,22 +112,37 @@ export default function LinkAI() {
     setInputText('')
     setIsTyping(true)
 
-    // Simulate AI thinking
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(messageText)
+    try {
+      const response = await queryLink(
+        user?.id,
+        messageText,
+        currentUserProfile?.university_id
+      )
+
+      const normalized = normalizeLinkResponse(response)
       setIsTyping(false)
 
       const aiMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: aiResponse.message,
-        data: aiResponse,
+        content: normalized.message,
+        data: normalized.data,
         timestamp: new Date(),
       }
 
       setMessages((prev) => [...prev, aiMessage])
-    }, 1500)
-  }
+    } catch (error) {
+      console.error('Failed to query Link:', error)
+      setIsTyping(false)
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: 'Link is unavailable right now. Please try again in a moment.',
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, aiMessage])
+    }
+  }, [inputText, user?.id, currentUserProfile?.university_id, normalizeLinkResponse])
 
   const renderMessage = ({ item }) => {
     const isUser = item.type === 'user'
@@ -306,7 +213,11 @@ export default function LinkAI() {
         {isUser && (
           <View style={styles.userAvatar}>
             <Image
-              source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }}
+              source={{
+                uri: currentUserProfile?.avatar_url
+                  || currentUserProfile?.avatarUrl
+                  || 'https://randomuser.me/api/portraits/men/32.jpg',
+              }}
               style={styles.userAvatarImage}
             />
           </View>
@@ -659,4 +570,3 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
   },
 })
-

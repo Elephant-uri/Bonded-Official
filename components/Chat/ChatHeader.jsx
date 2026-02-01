@@ -10,8 +10,11 @@ export default function ChatHeader({
     userAvatar,
     userId,
     isGroup,
+    conversationType,
     groupMembersCount,
-    onPressProfile
+    onPressProfile,
+    participants = [],
+    onShowMembers
 }) {
     const router = useRouter()
     const theme = useAppTheme()
@@ -21,6 +24,8 @@ export default function ChatHeader({
     const handleProfilePress = () => {
         if (onPressProfile) {
             onPressProfile()
+        } else if (isGroup && onShowMembers) {
+            onShowMembers()
         } else if (userId && !isGroup) {
             openProfile(userId)
         }
@@ -51,9 +56,17 @@ export default function ChatHeader({
                             />
                         ) : (
                             <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                                <Text style={styles.avatarText}>
-                                    {(userName || '?').charAt(0).toUpperCase()}
-                                </Text>
+                                {isGroup ? (
+                                    <Ionicons
+                                        name={conversationType === 'org' ? 'business' : conversationType === 'class' ? 'school' : 'people'}
+                                        size={hp(2.2)}
+                                        color={theme.colors.textSecondary}
+                                    />
+                                ) : (
+                                    <Text style={styles.avatarText}>
+                                        {(userName || '?').charAt(0).toUpperCase()}
+                                    </Text>
+                                )}
                             </View>
                         )}
                     </View>

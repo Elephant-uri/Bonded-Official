@@ -13,11 +13,10 @@ import Button from '../ui/Button'
 import Text from '../ui/Text'
 import { formatDate, formatTime } from '../../utils/dateFormatters'
 
-export default function EventCard({ event, onPress, currentUserId, attendanceStatus, onAction }) {
+export default function EventCard({ event, onPress, currentUserId, attendanceStatus, onAction, isLiked, onToggleLike }) {
   const theme = useAppTheme()
   const router = useRouter()
   const { user } = useAuthStore()
-  const [isSaved, setIsSaved] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const styles = createStyles(theme)
 
@@ -53,8 +52,7 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
 
   const handleSave = (e) => {
     e.stopPropagation()
-    setIsSaved(!isSaved)
-    // In real app, save to database
+    if (onToggleLike) onToggleLike(event.id)
   }
 
 
@@ -122,7 +120,7 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
                 onPress={handleSave}
                 activeOpacity={0.7}
               >
-                {isSaved ? (
+                {isLiked ? (
                   <HeartFill size={hp(2.2)} color="#FF3B30" strokeWidth={2} fill="#FF3B30" />
                 ) : (
                   <Heart size={hp(2.2)} color={theme.colors.textSecondary} strokeWidth={2} />

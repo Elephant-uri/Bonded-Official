@@ -9,6 +9,7 @@ import { Alert, StyleSheet, View } from 'react-native'
 import { useCurrentUserProfile } from '../../../hooks/useCurrentUserProfile'
 import { useSaveSchedule } from '../../../hooks/useSaveSchedule'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
+import { getFriendlyErrorMessage } from '../../../utils/userFacingErrors'
 import ScheduleConfirmStep from './ScheduleConfirmStep'
 import ScheduleEditStep from './ScheduleEditStep'
 import ScheduleUploadStep from './ScheduleUploadStep'
@@ -90,7 +91,7 @@ export default function ClassScheduleStep({ formData, updateFormData, onScroll }
           console.error('Error saving schedule:', error)
           Alert.alert(
             'Error',
-            error instanceof Error ? error.message : 'Failed to save schedule. Please try again.'
+            getFriendlyErrorMessage(error, 'Failed to save schedule. Please try again.')
           )
         },
       }

@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ActionSheetIOS,
     ActivityIndicator,
@@ -8,7 +8,10 @@ import {
     Dimensions,
     FlatList,
     Image,
+    InteractionManager,
+    Modal,
     Platform,
+    TextInput,
     ScrollView,
     Share,
     StatusBar,
@@ -22,16 +25,25 @@ import { hp, wp } from '../../helpers/common'
 import {
     useAcceptFriendRequest,
     useCancelFriendRequest,
+    useFriendCount,
     useFriendshipStatus,
+    useFriendsForProfile,
+    useFriendsRealtime,
     useRemoveFriend,
     useSendFriendRequest,
 } from '../../hooks/useFriends'
 import { useMessageRequestStatus, useSendMessageRequest } from '../../hooks/useMessageRequests'
 import { useCreateConversation } from '../../hooks/useMessages'
-import { useProfilePhotos } from '../../hooks/useProfiles'
+import { useSharedClasses } from '../../hooks/useClassMatching'
+import { useCurrentUserProfile } from '../../hooks/useCurrentUserProfile'
+import { useProfilePhotos, useUserOrganizations } from '../../hooks/useProfiles'
 import { useUserPosts } from '../../hooks/useUserPosts'
 import { useAuthStore } from '../../stores/authStore'
 import { formatTimeAgo } from '../../utils/dateFormatters'
+import { useProfileModal } from '../../contexts/ProfileModalContext'
+import { useOrgModal } from '../../contexts/OrgModalContext'
+import { getFriendlyErrorMessage } from '../../utils/userFacingErrors'
+import { BoxSkeleton, CircleSkeleton, TextSkeleton } from '../SkeletonLoader'
 import {
     ArrowLeft,
     Calendar,
@@ -43,6 +55,7 @@ import {
     School,
     UserPlus
 } from '../Icons'
+import { Ionicons } from '@expo/vector-icons'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -56,10 +69,27 @@ const ProfileModalContent = ({
     scrollYRef,
     onClose,
     panResponder,
+    isDragging,
 }) => {
     const router = useRouter()
     const theme = useAppTheme()
     const scrollY = useRef(0)
+    const scrollViewRef = useRef(null)
+    
+    // Deferred loading - wait for animation to complete before loading heavy data
+    const [isReadyForHeavyLoad, setIsReadyForHeavyLoad] = useState(false)
+    
+    useEffect(() => {
+        // Reset ready state when profile changes
+        setIsReadyForHeavyLoad(false)
+        
+        // Defer heavy operations until after animations complete
+        const task = InteractionManager.runAfterInteractions(() => {
+            setIsReadyForHeavyLoad(true)
+        })
+        
+        return () => task.cancel()
+    }, [activeProfile?.id])
 
     const handleScroll = useCallback((event) => {
         const offsetY = event.nativeEvent.contentOffset.y
@@ -69,19 +99,60 @@ const ProfileModalContent = ({
         }
     }, [scrollYRef])
 
-    const { data: friendshipStatus, isLoading: statusLoading } = useFriendshipStatus(activeProfile?.id)
+    useEffect(() => {
+        if (!activeProfile?.id) return
+        scrollY.current = 0
+        if (scrollYRef) {
+            scrollYRef.current = 0
+        }
+        if (scrollViewRef.current?.scrollTo) {
+            scrollViewRef.current.scrollTo({ y: 0, animated: false })
+        }
+    }, [activeProfile?.id, scrollYRef])
+
+    // Auth store - always needed
     const { user } = useAuthStore()
-    const { data: messageRequestStatus } = useMessageRequestStatus(activeProfile?.id)
+    const { openProfile } = useProfileModal()
+    const { openOrg } = useOrgModal()
+    
+    // UI state
+    const [showFriendsModal, setShowFriendsModal] = useState(false)
+    const [friendsSearchQuery, setFriendsSearchQuery] = useState('')
+
+    // DEFERRED HOOKS - only run after animation completes to prevent freeze
+    const deferredProfileId = isReadyForHeavyLoad ? activeProfile?.id : null
+    
+    const { data: friendshipStatus, isLoading: statusLoading } = useFriendshipStatus(deferredProfileId)
+    const { data: friendCount = 0, isLoading: friendCountLoading } = useFriendCount(deferredProfileId)
+    const {
+        data: friends = [],
+        isLoading: friendsLoading,
+        isError: friendsError,
+        refetch: refetchFriends,
+    } = useFriendsForProfile(deferredProfileId)
+    useFriendsRealtime(deferredProfileId)
+    const { data: messageRequestStatus } = useMessageRequestStatus(deferredProfileId)
     const sendMessageRequest = useSendMessageRequest()
     const sendRequest = useSendFriendRequest()
     const acceptRequest = useAcceptFriendRequest()
     const cancelRequest = useCancelFriendRequest()
     const removeFriend = useRemoveFriend()
     const createConversation = useCreateConversation()
-    const { data: recentPosts = [], isLoading: recentPostsLoading } = useUserPosts(activeProfile?.id, 3)
+    const { data: recentPosts = [], isLoading: recentPostsLoading } = useUserPosts(deferredProfileId, 3)
+    const { data: currentUserProfile } = useCurrentUserProfile()
+    const currentUserInterests = useMemo(() => new Set(currentUserProfile?.interests || []), [currentUserProfile])
+    const {
+        data: sharedClasses = [],
+        isLoading: sharedClassesLoading,
+        isError: sharedClassesError,
+    } = useSharedClasses(deferredProfileId)
+    const {
+        data: userOrganizations = [],
+        isLoading: organizationsLoading,
+    } = useUserOrganizations(deferredProfileId)
 
-    // Fetch profile photos
-    const { data: galleryPhotos = [] } = useProfilePhotos(activeProfile?.id)
+    // Fetch profile photos - also deferred
+    const { data: galleryPhotos = [] } = useProfilePhotos(deferredProfileId)
 
     // Combine avatar with gallery photos
     const profilePhotos = useMemo(() => {
@@ -110,7 +181,7 @@ const ProfileModalContent = ({
 
     const handleClose = onClose || (() => setActiveProfile?.(null))
 
-    const handleFriendAction = () => {
+    const handleFriendAction = async () => {
         if (!user) return
         switch (friendshipStatus?.status) {
             case 'none':
@@ -131,10 +202,35 @@ const ProfileModalContent = ({
                 )
                 break
             case 'request_received':
-                acceptRequest.mutate({
-                    requestId: friendshipStatus.requestId,
-                    senderId: activeProfile.id,
-                })
+                try {
+                    await acceptRequest.mutateAsync({
+                        requestId: friendshipStatus.requestId,
+                        senderId: activeProfile.id,
+                    })
+
+                    // Open chat and prompt to wave
+                    const conversationId = await createConversation.mutateAsync({
+                        otherUserId: activeProfile.id,
+                    })
+
+                    handleClose()
+
+                    // Wait for modal to close for smooth transition
+                    await new Promise(resolve => setTimeout(resolve, 300))
+
+                    router.push({
+                        pathname: '/chat',
+                        params: {
+                            conversationId,
+                            userId: activeProfile.id,
+                            userName: activeProfile.full_name || activeProfile.name,
+                            showWavePrompt: 'true',
+                        },
+                    })
+                } catch (error) {
+                    console.error('Failed to accept friend request:', error)
+                    Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to accept friend request'))
+                }
                 break
             case 'friends':
                 Alert.alert(
@@ -170,7 +266,8 @@ const ProfileModalContent = ({
                 await sendMessageRequest.mutateAsync({ receiverId: activeProfile.id })
                 Alert.alert('Request Sent', 'Your message request has been sent.')
             } catch (error) {
-                Alert.alert('Error', error.message || 'Failed to send message request')
+                console.error('Failed to send message request:', error)
+                Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send message request'))
             }
             return
         }
@@ -262,8 +359,41 @@ const ProfileModalContent = ({
         })
     }
 
+    useEffect(() => {
+        if (showFriendsModal) {
+            refetchFriends()
+        }
+    }, [refetchFriends, showFriendsModal])
+    useEffect(() => {
+        if (!showFriendsModal) {
+            setFriendsSearchQuery('')
+        }
+    }, [showFriendsModal])
+
+    const previewFriends = friends.slice(0, 20)
+    const filteredFriends = useMemo(() => {
+        const query = friendsSearchQuery.trim().toLowerCase()
+        if (!query) return friends
+        return friends.filter((friend) => {
+            const name = `${friend.full_name || ''} ${friend.username || ''}`.toLowerCase()
+            return name.includes(query)
+        })
+    }, [friends, friendsSearchQuery])
+    const isOwnProfile = activeProfile?.id && user?.id && activeProfile.id === user.id
+    const friendsVisibility = activeProfile?.friends_visibility || 'school'
+    const viewerUniversityId = currentUserProfile?.university_id
+    const targetUniversityId = activeProfile?.university_id
+    const friendsEmptyMessage = useMemo(() => {
+        if (isOwnProfile) return 'No friends to show'
+        if (friendsVisibility === 'private') return 'Friends are private'
+        if (friendsVisibility === 'school' && viewerUniversityId && targetUniversityId && viewerUniversityId !== targetUniversityId) {
+            return 'Friends visible to same school only'
+        }
+        return 'No friends to show'
+    }, [friendsVisibility, isOwnProfile, targetUniversityId, viewerUniversityId])
+
     return (
-        <View style={styles.container}>
+        <View style={styles.container} {...panResponder?.panHandlers}>
             <StatusBar barStyle="light-content" />
 
             {panResponder && (
@@ -305,6 +435,7 @@ const ProfileModalContent = ({
             </TouchableOpacity>
 
             <ScrollView
+                ref={scrollViewRef}
                 style={styles.fullScrollView}
                 contentContainerStyle={styles.fullScrollContent}
                 showsVerticalScrollIndicator={false}
@@ -312,6 +443,7 @@ const ProfileModalContent = ({
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
                 nestedScrollEnabled={true}
+                scrollEnabled={!isDragging}
             >
                 <View style={styles.heroSection} pointerEvents="box-none">
                     {profilePhotos.length > 1 ? (
@@ -413,6 +545,12 @@ const ProfileModalContent = ({
                                 <Text style={styles.metaPillText}>Class of {activeProfile.year || activeProfile.graduation_year}</Text>
                             </View>
                         )}
+                        <TouchableOpacity style={styles.metaPill} onPress={() => setShowFriendsModal(true)}>
+                            <UserPlus size={hp(1.6)} color={theme.colors.textSecondary} />
+                            <Text style={styles.metaPillText}>
+                                {friendCountLoading ? '...' : `${friendCount} friends`}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.locationRow}>
@@ -426,12 +564,152 @@ const ProfileModalContent = ({
                         <View style={styles.tagsSection}>
                             <Text style={styles.tagsTitle}>Interests</Text>
                             <View style={styles.tagsRow}>
-                                {activeProfile.interests.slice(0, 8).map((interest, idx) => (
-                                    <View key={idx} style={styles.tag}>
-                                        <Text style={styles.tagText}>{interest}</Text>
+                                {activeProfile.interests.slice(0, 8).map((interest, idx) => {
+                                    const isShared = currentUserInterests.has(interest)
+                                    return (
+                                        <View key={idx} style={[styles.tag, isShared && styles.tagShared]}>
+                                            {isShared && (
+                                                <Ionicons
+                                                    name="checkmark-circle"
+                                                    size={hp(1.4)}
+                                                    color={theme.colors.bondedPurple}
+                                                    style={{ marginRight: wp(1) }}
+                                                />
+                                            )}
+                                            <Text style={[styles.tagText, isShared && styles.tagTextShared]}>{interest}</Text>
+                                        </View>
+                                    )
+                                })}
+                            </View>
+                            {currentUserInterests.size > 0 && (
+                                <Text style={styles.sharedHint}>Highlighted interests match yours</Text>
+                            )}
+                        </View>
+                    )}
+
+                    <View style={styles.tagsSection}>
+                        <Text style={styles.tagsTitle}>Shared classes</Text>
+                        {sharedClassesLoading ? (
+                            <View style={styles.tagsRow}>
+                                {Array.from({ length: 4 }).map((_, index) => (
+                                    <BoxSkeleton
+                                        key={`shared-class-skeleton-${index}`}
+                                        width={wp(22)}
+                                        height={hp(3)}
+                                        radius={20}
+                                        style={styles.tagSkeleton}
+                                    />
+                                ))}
+                            </View>
+                        ) : sharedClasses.length > 0 ? (
+                            <View style={styles.tagsRow}>
+                                {sharedClasses.slice(0, 6).map((cls) => (
+                                    <View key={cls.id} style={styles.tag}>
+                                        <Text style={styles.tagText}>{cls.code || cls.name || 'Class'}</Text>
                                     </View>
                                 ))}
                             </View>
+                        ) : (
+                            <Text style={styles.sharedHint}>
+                                {sharedClassesError ? 'Unable to load shared classes' : 'No shared classes yet'}
+                            </Text>
+                        )}
+                    </View>
+
+                    {userOrganizations.length > 0 && (
+                        <View style={styles.tagsSection}>
+                            <Text style={styles.tagsTitle}>Organizations</Text>
+                            {organizationsLoading ? (
+                                <View style={styles.tagsRow}>
+                                    {Array.from({ length: 3 }).map((_, index) => (
+                                        <BoxSkeleton
+                                            key={`org-skeleton-${index}`}
+                                            width={wp(22)}
+                                            height={hp(3)}
+                                            radius={20}
+                                            style={styles.tagSkeleton}
+                                        />
+                                    ))}
+                                </View>
+                            ) : (
+                                <View style={styles.tagsRow}>
+                                    {userOrganizations.slice(0, 6).map((org) => (
+                                        <TouchableOpacity
+                                            key={org.id}
+                                            style={styles.tag}
+                                            onPress={() => {
+                                                // Open org modal on top of profile modal (don't close profile)
+                                                openOrg(org.id)
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={styles.tagText}>{org.name}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {friendsLoading ? (
+                        <View style={styles.friendsSection}>
+                            <View style={styles.friendsHeader}>
+                                <Text style={styles.tagsTitle}>Friends</Text>
+                            </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendsRowScroll}>
+                                {Array.from({ length: 6 }).map((_, index) => (
+                                    <View key={`friend-skeleton-${index}`} style={styles.friendItem}>
+                                        <CircleSkeleton size={hp(6)} />
+                                        <TextSkeleton
+                                            width={wp(14)}
+                                            height={hp(1.2)}
+                                            style={styles.friendNameSkeleton}
+                                        />
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    ) : friends.length > 0 ? (
+                        <View style={styles.friendsSection}>
+                            <View style={styles.friendsHeader}>
+                                <Text style={styles.tagsTitle}>Friends</Text>
+                                {friends.length > previewFriends.length && (
+                                    <TouchableOpacity onPress={() => setShowFriendsModal(true)}>
+                                        <Text style={styles.seeAllText}>See all</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendsRowScroll}>
+                                {previewFriends.map((friend) => {
+                                    const name = friend.full_name || friend.username || 'User'
+                                    return (
+                                    <TouchableOpacity
+                                        key={friend.id}
+                                        style={styles.friendItem}
+                                        onPress={() => {
+                                            setShowFriendsModal(false)
+                                            openProfile(friend.id)
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                            {friend.avatar_url ? (
+                                                <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatar} />
+                                            ) : (
+                                                <View style={styles.friendAvatarFallback}>
+                                                    <Text style={styles.friendAvatarText}>{name.charAt(0).toUpperCase()}</Text>
+                                                </View>
+                                            )}
+                                            <Text style={styles.friendName} numberOfLines={1}>{name}</Text>
+                                        </TouchableOpacity>
+                                    )
+                                })}
+                            </ScrollView>
+                        </View>
+                    ) : (
+                        <View style={styles.friendsSection}>
+                            <Text style={styles.sharedHint}>
+                                {friendsError ? 'Unable to load friends' : friendsEmptyMessage}
+                            </Text>
                         </View>
                     )}
 
@@ -448,18 +726,112 @@ const ProfileModalContent = ({
                                     style={styles.postCard}
                                     onPress={() => handleOpenPost(post)}
                                 >
-                                    <Text style={styles.postCardTitle} numberOfLines={2}>
-                                        {post.title || post.body || 'Untitled post'}
-                                    </Text>
-                                    <Text style={styles.postCardMeta} numberOfLines={1}>
-                                        {(post.forum?.name || 'Forum')} • {formatTimeAgo(post.created_at)}
-                                    </Text>
+                                    {post.media && post.media.length > 0 && (
+                                        <Image
+                                            source={{ uri: post.media[0] }}
+                                            style={styles.postCardImage}
+                                            resizeMode="cover"
+                                        />
+                                    )}
+                                    <View style={styles.postCardContent}>
+                                        <Text style={styles.postCardTitle} numberOfLines={2}>
+                                            {post.title || post.body || 'Untitled post'}
+                                        </Text>
+                                        <Text style={styles.postCardMeta} numberOfLines={1}>
+                                            {(post.forum?.name || 'Forum')} • {formatTimeAgo(post.created_at)}
+                                        </Text>
+                                    </View>
                                 </TouchableOpacity>
                             ))
                         )}
                     </View>
                 </View>
             </ScrollView>
+
+            <Modal
+                visible={showFriendsModal}
+                transparent
+                animationType="fade"
+                presentationStyle="overFullScreen"
+                onRequestClose={() => setShowFriendsModal(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowFriendsModal(false)}
+                >
+                    <View style={styles.friendsModal}>
+                        <View style={styles.friendsModalHeader}>
+                            <Text style={styles.friendsModalTitle}>Friends</Text>
+                            <TouchableOpacity onPress={() => setShowFriendsModal(false)}>
+                                <Text style={styles.seeAllText}>Close</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {friendsLoading ? (
+                            <View style={styles.friendsModalLoading}>
+                                <ActivityIndicator size="small" color={theme.colors.bondedPurple} />
+                            </View>
+                        ) : friends.length === 0 ? (
+                            <View style={styles.friendsModalEmpty}>
+                                <Text style={styles.sharedHint}>
+                                    {friendsError ? 'Unable to load friends' : friendsEmptyMessage}
+                                </Text>
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={filteredFriends}
+                                keyExtractor={(item) => item.id}
+                                ListHeaderComponent={
+                                    <View style={styles.friendsSearchWrapper}>
+                                        <Ionicons
+                                            name="search"
+                                            size={hp(2)}
+                                            color={theme.colors.textSecondary}
+                                            style={styles.friendsSearchIcon}
+                                        />
+                                        <TextInput
+                                            style={styles.friendsSearchInput}
+                                            placeholder="Search friends"
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={friendsSearchQuery}
+                                            onChangeText={setFriendsSearchQuery}
+                                        />
+                                        {friendsSearchQuery.length > 0 && (
+                                            <TouchableOpacity onPress={() => setFriendsSearchQuery('')}>
+                                                <Ionicons name="close-circle" size={hp(2)} color={theme.colors.textSecondary} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                }
+                                renderItem={({ item }) => {
+                                    const name = item.full_name || item.username || 'User'
+                                    return (
+                                        <TouchableOpacity
+                                            style={styles.friendRow}
+                                            onPress={() => {
+                                                openProfile(item.id)
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            {item.avatar_url ? (
+                                                <Image source={{ uri: item.avatar_url }} style={styles.friendRowAvatar} />
+                                            ) : (
+                                                <View style={styles.friendRowAvatarFallback}>
+                                                    <Text style={styles.friendAvatarText}>{name.charAt(0).toUpperCase()}</Text>
+                                                </View>
+                                            )}
+                                            <View style={styles.friendRowInfo}>
+                                                <Text style={styles.friendRowName}>{name}</Text>
+                                                {item.major && <Text style={styles.friendRowMeta}>{item.major}</Text>}
+                                            </View>
+                                        </TouchableOpacity>
+                                    )
+                                }}
+                            />
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </View>
     )
 }
@@ -656,15 +1028,185 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
         flexWrap: 'wrap',
         gap: wp(2),
     },
+    friendsSection: {
+        marginBottom: hp(3),
+    },
+    friendsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: hp(1.5),
+    },
+    friendsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(3),
+    },
+    friendItem: {
+        alignItems: 'center',
+        width: wp(20),
+    },
+    friendAvatar: {
+        width: hp(6),
+        height: hp(6),
+        borderRadius: hp(3),
+        marginBottom: hp(0.6),
+    },
+    friendAvatarFallback: {
+        width: hp(6),
+        height: hp(6),
+        borderRadius: hp(3),
+        backgroundColor: theme.colors.backgroundSecondary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.6),
+    },
+    friendAvatarText: {
+        fontSize: hp(2),
+        fontWeight: '600',
+        color: theme.colors.textSecondary,
+    },
+    friendName: {
+        fontSize: hp(1.3),
+        color: theme.colors.textPrimary,
+        textAlign: 'center',
+    },
+    friendNameSkeleton: {
+        marginTop: hp(0.6),
+    },
+    seeAllText: {
+        fontSize: hp(1.4),
+        color: theme.colors.bondedPurple,
+        fontWeight: '600',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        paddingHorizontal: wp(6),
+    },
+    friendsModal: {
+        backgroundColor: theme.colors.background,
+        borderRadius: theme.radius.lg,
+        maxHeight: hp(70),
+        paddingVertical: hp(2),
+    },
+    friendsModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: wp(4),
+        paddingBottom: hp(1),
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.border,
+    },
+    friendsRowScroll: {
+        paddingHorizontal: wp(1),
+        gap: wp(3),
+    },
+    friendsSearchWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        marginHorizontal: wp(4),
+        marginBottom: hp(1),
+        marginTop: hp(1.5),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1.1),
+        borderRadius: theme.radius.lg,
+        backgroundColor: theme.colors.backgroundSecondary,
+        borderWidth: 1,
+        borderColor: theme.colors.borderSecondary,
+    },
+    friendsSearchIcon: {
+        marginRight: wp(1),
+    },
+    friendsSearchInput: {
+        flex: 1,
+        fontSize: hp(1.6),
+        color: theme.colors.textPrimary,
+        fontFamily: theme.typography.fontFamily.body,
+    },
+    friendsModalLoading: {
+        paddingVertical: hp(3),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    friendsModalEmpty: {
+        paddingVertical: hp(3),
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: wp(4),
+    },
+    friendsModalTitle: {
+        fontSize: hp(2),
+        fontWeight: '700',
+        color: theme.colors.textPrimary,
+    },
+    friendRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: wp(4),
+        paddingVertical: hp(1.2),
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.borderSecondary,
+    },
+    friendRowAvatar: {
+        width: hp(5),
+        height: hp(5),
+        borderRadius: hp(2.5),
+        marginRight: wp(3),
+    },
+    friendRowAvatarFallback: {
+        width: hp(5),
+        height: hp(5),
+        borderRadius: hp(2.5),
+        marginRight: wp(3),
+        backgroundColor: theme.colors.backgroundSecondary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    friendRowInfo: {
+        flex: 1,
+    },
+    friendRowName: {
+        fontSize: hp(1.7),
+        fontWeight: '600',
+        color: theme.colors.textPrimary,
+    },
+    friendRowMeta: {
+        fontSize: hp(1.3),
+        color: theme.colors.textSecondary,
+        marginTop: hp(0.2),
+    },
     tag: {
         backgroundColor: theme.colors.backgroundSecondary,
         paddingHorizontal: wp(3),
         paddingVertical: hp(0.6),
         borderRadius: 20,
     },
+    tagShared: {
+        backgroundColor: theme.colors.bondedPurple + '15',
+        borderWidth: 1,
+        borderColor: theme.colors.bondedPurple + '60',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     tagText: {
         fontSize: hp(1.4),
         color: theme.colors.textPrimary,
+    },
+    tagTextShared: {
+        color: theme.colors.bondedPurple,
+        fontWeight: '600',
+    },
+    tagSkeleton: {
+        marginBottom: hp(0.6),
+    },
+    sharedHint: {
+        marginTop: hp(1),
+        fontSize: hp(1.3),
+        color: theme.colors.textSecondary,
     },
     postsSection: {
         marginBottom: hp(3),
@@ -678,8 +1220,16 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     postCard: {
         backgroundColor: theme.colors.backgroundSecondary,
         borderRadius: 12,
-        padding: wp(3),
+        overflow: 'hidden',
         marginBottom: hp(1.2),
+    },
+    postCardImage: {
+        width: '100%',
+        height: hp(20),
+        backgroundColor: theme.colors.border,
+    },
+    postCardContent: {
+        padding: wp(3),
     },
     postCardTitle: {
         fontSize: hp(1.6),

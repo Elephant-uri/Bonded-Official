@@ -64,14 +64,37 @@ export function useSaveSchedule() {
 
       // Process each course
       for (const course of courses) {
-        console.log(`📚 Processing course: ${course.courseCode}, sectionId: ${course.sectionId}`)
+        // Clean course code FIRST - extract just the base code (e.g., "CSC 305")
+        // This ensures all sections of the same course use the same class_code
+        let cleanCourseCode = course.courseCode.trim()
+        // Remove duplicates like "CSC 305 – CSC 305" -> "CSC 305"
+        if (cleanCourseCode.includes(' – ')) {
+          cleanCourseCode = cleanCourseCode.split(' – ')[0].trim()
+        }
+        if (cleanCourseCode.includes(' - ')) {
+          cleanCourseCode = cleanCourseCode.split(' - ')[0].trim()
+        }
+        // Handle parenthetical duplicates like "CSC 305 (CSC 305)"
+        const parenMatch = cleanCourseCode.match(/^([A-Z]{2,4}\s*\d{3}[A-Z]?)\s*\(/)
+        if (parenMatch) {
+          cleanCourseCode = parenMatch[1].trim()
+        }
+        // Final cleanup - just get the course code pattern
+        const codeMatch = cleanCourseCode.match(/^([A-Z]{2,4}\s*\d{3}[A-Z]?)/)
+        if (codeMatch) {
+          cleanCourseCode = codeMatch[1].trim()
+        }
+        
+        console.log(`📚 Processing course: ${course.courseCode} -> cleaned: ${cleanCourseCode}, sectionId: ${course.sectionId}`)
+        
         // 1. Find or create class
-        // Using classes table (not courses) with class_code and class_name
+        // Using classes table (not courses) with CLEANED class_code
+        // This ensures all sections of the same course share one class record
         let { data: classData, error: classError } = await supabase
           .from('classes')
           .select('id')
           .eq('university_id', universityId)
-          .eq('class_code', course.courseCode.trim())
+          .eq('class_code', cleanCourseCode)
           .maybeSingle()
 
         if (classError && classError.code !== 'PGRST116') {
@@ -82,13 +105,13 @@ export function useSaveSchedule() {
 
         let classId
         if (!classData) {
-          // Create class with class_code and class_name
+          // Create class with CLEANED class_code
           const { data: newClass, error: createError } = await supabase
             .from('classes')
             .insert({
               university_id: universityId,
-              class_code: course.courseCode.trim(),
-              class_name: course.courseName || course.courseCode.trim(),
+              class_code: cleanCourseCode,
+              class_name: course.courseName || cleanCourseCode,
             })
             .select('id')
             .single()
@@ -175,6 +198,7 @@ export function useSaveSchedule() {
         }
 
         // 5. Ensure class forum exists for this course at user's university
+        // cleanCourseCode was already computed at the start of the loop
         // This is what makes the class appear in the sidebar
         // IMPORTANT: Create forum for ALL courses, not just selected sections
         // RESPECT: Check user's forum preferences before auto-joining
@@ -192,11 +216,11 @@ export function useSaveSchedule() {
             const { data: newForum, error: forumError } = await supabase
               .from('forums')
               .insert({
-                name: course.courseCode.trim(),
+                name: cleanCourseCode,
                 type: 'class',
                 university_id: universityId,
                 class_id: classId,
-                description: `Forum for ${course.courseCode.trim()}`,
+                description: `Forum for ${cleanCourseCode}`,
                 is_public: false,
               })
               .select('id')
@@ -206,7 +230,7 @@ export function useSaveSchedule() {
               console.error('Error creating class forum:', forumError)
             } else if (newForum) {
               forumId = newForum.id
-              console.log(`✅ Created class forum for ${course.courseCode.trim()} (ID: ${forumId})`)
+              console.log(`✅ Created class forum for ${cleanCourseCode} (ID: ${forumId})`)
               
               // Auto-add user to forum if preferences allow
               if (preferences.autoJoinCourseForums) {
@@ -219,14 +243,14 @@ export function useSaveSchedule() {
                   })
                   .select()
                   .single()
-                console.log(`✅ Auto-added user to course forum for ${course.courseCode.trim()}`)
+                console.log(`✅ Auto-added user to course forum for ${cleanCourseCode}`)
               } else {
-                console.log(`⚠️ User opted out of auto-joining course forum for ${course.courseCode.trim()}`)
+                console.log(`⚠️ User opted out of auto-joining course forum for ${cleanCourseCode}`)
               }
             }
           } else {
             forumId = existingForum.id
-            console.log(`✅ Class forum already exists for ${course.courseCode.trim()}`)
+            console.log(`✅ Class forum already exists for ${cleanCourseCode}`)
             
             // Add user to existing forum if preferences allow and not already member
             if (preferences.autoJoinCourseForums) {
@@ -247,7 +271,7 @@ export function useSaveSchedule() {
                   })
                   .select()
                   .single()
-                console.log(`✅ Added user to existing course forum for ${course.courseCode.trim()}`)
+                console.log(`✅ Added user to existing course forum for ${cleanCourseCode}`)
               }
             }
           }
@@ -257,6 +281,7 @@ export function useSaveSchedule() {
         }
 
         // 6. If section is selected and has a Lecture component, ensure group chat exists and user is added
+        // IMPORTANT: Use original courseCode for sectionKey to match what ScheduleConfirmStep uses
         const sectionKey = `${course.courseCode}-${course.sectionId}`
         const hasLecture = course.components.some((c) => c.type === 'Lecture')
         
@@ -267,7 +292,8 @@ export function useSaveSchedule() {
           try {
             // Create or find group conversation for this section
             // Link to section via conversations.class_section_id (recommended)
-            const chatName = `${course.courseCode.trim()} Section ${course.sectionId}`
+            // Use clean course code for chat name
+            const chatName = `${cleanCourseCode} Section ${course.sectionId}`
             
             // Check if conversation already exists
             const { data: existingConv, error: checkError } = await supabase

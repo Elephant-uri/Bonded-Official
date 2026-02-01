@@ -1,10 +1,12 @@
-import { useMemo, useRef, useState } from 'react'
-import { ActionSheetIOS, ActivityIndicator, Alert, FlatList, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, FlatList, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
 import { useConversationReactions, useToggleReaction } from '../../hooks/useMessageReactions'
+import { useUnsendMessage } from '../../hooks/useMessages'
 import { formatChatDate, isSameGroup, shouldShowDateSeparator } from '../../utils/chatHelpers'
 import MessageBubble from '../Message/MessageBubble'
+import { supabase } from '../../lib/supabase'
 
 export default function MessageList({
     messages,
@@ -13,41 +15,26 @@ export default function MessageList({
     isLoading,
     isLoadingMore,
     onLoadMore,
-    onMessagePress
+    highlightMessageId,
+    onAvatarPress,
 }) {
     const theme = useAppTheme()
     const styles = createStyles(theme)
     const listRef = useRef(null)
-    const [showReactionModal, setShowReactionModal] = useState(false)
-    const [selectedMessage, setSelectedMessage] = useState(null)
+    const lastTapMessageIdRef = useRef(null)
+    const lastTapTimeRef = useRef(0)
+    const doubleTapTimeoutRef = useRef(null)
+    const [reactionsModalVisible, setReactionsModalVisible] = useState(false)
+    const [reactionsUsers, setReactionsUsers] = useState([])
+    const [reactionsLoading, setReactionsLoading] = useState(false)
+    const [activeHighlightId, setActiveHighlightId] = useState(null)
 
     // Fetch reactions for all messages in conversation
     const messageIds = useMemo(() => messages.map(m => m.id), [messages])
     const { data: reactionsMap = {} } = useConversationReactions(conversationId, messageIds)
 
     const toggleReaction = useToggleReaction()
-
-    const handleLongPress = (message) => {
-        setSelectedMessage(message)
-
-        if (Platform.OS === 'ios') {
-            // Use ActionSheet on iOS
-            ActionSheetIOS.showActionSheetWithOptions(
-                {
-                    options: ['❤️ React with Heart', 'Cancel'],
-                    cancelButtonIndex: 1,
-                },
-                (buttonIndex) => {
-                    if (buttonIndex === 0) {
-                        handleReaction(message, 'heart')
-                    }
-                }
-            )
-        } else {
-            // Use Modal on Android
-            setShowReactionModal(true)
-        }
-    }
+    const unsendMessage = useUnsendMessage()
 
     const handleReaction = async (message, reactionType) => {
         try {
@@ -57,12 +44,114 @@ export default function MessageList({
                 reactionType,
                 existingReactions,
             })
-            setShowReactionModal(false)
         } catch (error) {
             console.error('Error toggling reaction:', error)
-            Alert.alert('Error', 'Failed to add reaction. Please try again.')
         }
     }
+
+    const handleLongPress = (message) => {
+        if (!message?.id) return
+        if (message.sender_id !== currentUserId) return
+
+        Alert.alert(
+            'Delete message?',
+            'This will remove the message for everyone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await unsendMessage.mutateAsync({ messageId: message.id, conversationId })
+                        } catch (error) {
+                            console.error('Error deleting message:', error)
+                            Alert.alert('Error', 'Failed to delete message. Please try again.')
+                        }
+                    }
+                }
+            ]
+        )
+    }
+
+    const handleMessagePress = (message) => {
+        if (!message?.id) return
+        if (message?.metadata?.unsent) return
+
+        const now = Date.now()
+        const DOUBLE_TAP_DELAY = 400
+
+        if (doubleTapTimeoutRef.current) {
+            clearTimeout(doubleTapTimeoutRef.current)
+            doubleTapTimeoutRef.current = null
+        }
+
+        const isDoubleTap =
+            message.id === lastTapMessageIdRef.current &&
+            lastTapTimeRef.current > 0 &&
+            (now - lastTapTimeRef.current) < DOUBLE_TAP_DELAY
+
+        if (isDoubleTap) {
+            handleReaction(message, 'heart')
+            lastTapMessageIdRef.current = null
+            lastTapTimeRef.current = 0
+        } else {
+            lastTapMessageIdRef.current = message.id
+            lastTapTimeRef.current = now
+            doubleTapTimeoutRef.current = setTimeout(() => {
+                lastTapMessageIdRef.current = null
+                lastTapTimeRef.current = 0
+                doubleTapTimeoutRef.current = null
+            }, DOUBLE_TAP_DELAY)
+        }
+    }
+
+    const handleReactionsPress = async (message) => {
+        if (!message?.id) return
+        const reactions = reactionsMap[message.id] || []
+        const heartReactions = reactions.filter(r => r.reaction_type === 'heart')
+        const userIds = [...new Set(heartReactions.map(r => r.user_id))].filter(Boolean)
+        if (userIds.length === 0) return
+
+        setReactionsLoading(true)
+        setReactionsModalVisible(true)
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, username, avatar_url')
+                .in('id', userIds)
+
+            if (error) throw error
+
+            const users = (data || []).sort((a, b) => {
+                const aName = a.full_name || a.username || ''
+                const bName = b.full_name || b.username || ''
+                return aName.localeCompare(bName)
+            })
+            setReactionsUsers(users)
+        } catch (error) {
+            console.error('Error loading reaction users:', error)
+            Alert.alert('Error', 'Failed to load reactions.')
+            setReactionsUsers([])
+        } finally {
+            setReactionsLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        if (!highlightMessageId || messages.length === 0) return
+        const index = messages.findIndex(m => m.id === highlightMessageId)
+        if (index === -1) return
+
+        try {
+            listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 })
+        } catch (err) {
+            // Ignore; onScrollToIndexFailed will retry
+        }
+        setActiveHighlightId(highlightMessageId)
+        const timer = setTimeout(() => setActiveHighlightId(null), 1800)
+        return () => clearTimeout(timer)
+    }, [highlightMessageId, messages])
 
     const renderItem = ({ item, index }) => {
         // Determine positioning in group
@@ -128,8 +217,11 @@ export default function MessageList({
                     showAvatar={showAvatar}
                     theme={theme}
                     reactions={reactionsMap[item.id] || []}
-                    onPress={() => onMessagePress && onMessagePress(item)}
+                    onPress={() => handleMessagePress(item)}
                     onLongPress={handleLongPress}
+                    onAvatarPress={onAvatarPress}
+                    onReactionsPress={handleReactionsPress}
+                    isHighlighted={activeHighlightId === item.id}
                 />
 
                 {/* If we need spacing between groups? */}
@@ -148,19 +240,32 @@ export default function MessageList({
                 <>
                     <FlatList
                         ref={listRef}
-                    data={messages}
-                    keyExtractor={(item) => item.id || item.created_at}
-                    renderItem={renderItem}
-                    inverted
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                    onEndReached={onLoadMore}
-                    onEndReachedThreshold={0.2}
-                    ListFooterComponent={
-                        isLoadingMore ? (
-                            <View style={styles.footerLoader}>
-                                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                            </View>
+                        data={messages}
+                        keyExtractor={(item) => item.id || item.created_at}
+                        renderItem={renderItem}
+                        inverted
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                        onEndReached={onLoadMore}
+                        onEndReachedThreshold={0.2}
+                        onScrollToIndexFailed={(info) => {
+                            // Retry after a short delay once items have rendered
+                            setTimeout(() => {
+                                if (!listRef.current) return
+                                const targetIndex = Math.min(info.index, messages.length - 1)
+                                if (targetIndex < 0) return
+                                listRef.current.scrollToIndex({
+                                    index: targetIndex,
+                                    animated: true,
+                                    viewPosition: 0.5,
+                                })
+                            }, 150)
+                        }}
+                        ListFooterComponent={
+                            isLoadingMore ? (
+                                <View style={styles.footerLoader}>
+                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                </View>
                         ) : null
                     }
                     ListEmptyComponent={
@@ -174,40 +279,54 @@ export default function MessageList({
                     }
                     />
 
-                    {/* Reaction Modal for Android */}
-                    {Platform.OS === 'android' && (
-                        <Modal
-                            visible={showReactionModal}
-                            transparent
-                            animationType="fade"
-                            onRequestClose={() => setShowReactionModal(false)}
-                        >
-                            <TouchableOpacity
-                                style={styles.modalOverlay}
-                                activeOpacity={1}
-                                onPress={() => setShowReactionModal(false)}
-                            >
-                                <View style={styles.reactionSheet}>
-                                    <Text style={styles.reactionSheetTitle}>React to message</Text>
-                                    <TouchableOpacity
-                                        style={styles.reactionOption}
-                                        onPress={() => selectedMessage && handleReaction(selectedMessage, 'heart')}
-                                    >
-                                        <Text style={styles.reactionEmoji}>❤️</Text>
-                                        <Text style={styles.reactionLabel}>Heart</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.cancelButton}
-                                        onPress={() => setShowReactionModal(false)}
-                                    >
-                                        <Text style={styles.cancelText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </TouchableOpacity>
-                        </Modal>
-                    )}
                 </>
             )}
+
+            <Modal
+                visible={reactionsModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setReactionsModalVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setReactionsModalVisible(false)}
+                >
+                    <View style={styles.reactionsModal}>
+                        <Text style={styles.reactionsTitle}>❤️ Reactions</Text>
+                        {reactionsLoading ? (
+                            <View style={styles.reactionsLoading}>
+                                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                            </View>
+                        ) : reactionsUsers.length === 0 ? (
+                            <Text style={styles.reactionsEmpty}>No reactions yet</Text>
+                        ) : (
+                            <FlatList
+                                data={reactionsUsers}
+                                keyExtractor={(item) => item.id}
+                                renderItem={({ item }) => {
+                                    const name = item.full_name || item.username || 'User'
+                                    return (
+                                        <View style={styles.reactionUserRow}>
+                                            {item.avatar_url ? (
+                                                <Image source={{ uri: item.avatar_url }} style={styles.reactionAvatar} />
+                                            ) : (
+                                                <View style={styles.reactionAvatarFallback}>
+                                                    <Text style={styles.reactionAvatarText}>
+                                                        {(name.charAt(0) || 'U').toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            <Text style={styles.reactionUserName}>{name}</Text>
+                                        </View>
+                                    )
+                                }}
+                            />
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </View>
     )
 }
@@ -260,49 +379,62 @@ const createStyles = (theme) => StyleSheet.create({
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
+        paddingHorizontal: wp(8),
     },
-    reactionSheet: {
+    reactionsModal: {
         backgroundColor: theme.colors.background,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        borderRadius: theme.radius.lg,
         padding: wp(5),
-        paddingBottom: hp(4),
+        maxHeight: hp(60),
     },
-    reactionSheetTitle: {
+    reactionsTitle: {
         fontSize: hp(2),
-        fontWeight: '600',
+        fontWeight: '700',
         color: theme.colors.textPrimary,
-        marginBottom: hp(2),
+        marginBottom: hp(1.5),
         textAlign: 'center',
     },
-    reactionOption: {
+    reactionsLoading: {
+        paddingVertical: hp(2),
+        alignItems: 'center',
+    },
+    reactionsEmpty: {
+        fontSize: hp(1.6),
+        color: theme.colors.textSecondary,
+        textAlign: 'center',
+        paddingVertical: hp(2),
+    },
+    reactionUserRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: hp(2),
+        paddingVertical: hp(1),
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.border,
+    },
+    reactionAvatar: {
+        width: hp(4),
+        height: hp(4),
+        borderRadius: hp(2),
+        marginRight: wp(3),
+    },
+    reactionAvatarFallback: {
+        width: hp(4),
+        height: hp(4),
+        borderRadius: hp(2),
+        marginRight: wp(3),
         backgroundColor: theme.colors.backgroundSecondary,
-        borderRadius: theme.radius.md,
-        marginBottom: hp(1),
-        gap: wp(3),
-    },
-    reactionEmoji: {
-        fontSize: hp(3),
-    },
-    reactionLabel: {
-        fontSize: hp(2),
-        color: theme.colors.textPrimary,
-        fontWeight: '500',
-    },
-    cancelButton: {
-        marginTop: hp(2),
-        padding: hp(2),
         alignItems: 'center',
-        backgroundColor: theme.colors.backgroundSecondary,
-        borderRadius: theme.radius.md,
+        justifyContent: 'center',
     },
-    cancelText: {
-        fontSize: hp(2),
+    reactionAvatarText: {
+        fontSize: hp(1.6),
+        fontWeight: '600',
         color: theme.colors.textSecondary,
+    },
+    reactionUserName: {
+        fontSize: hp(1.7),
+        color: theme.colors.textPrimary,
         fontWeight: '600',
     },
 })

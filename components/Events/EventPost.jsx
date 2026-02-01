@@ -4,8 +4,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { hp, wp } from '../../helpers/common'
 import { useAppTheme } from '../../app/theme'
-import { useEventsContext } from '../../contexts/EventsContext'
 import { useClubsContext } from '../../contexts/ClubsContext'
+import { useEventsContext } from '../../contexts/EventsContext'
+import { useOrgModal } from '../../contexts/OrgModalContext'
 import ShareModal from '../ShareModal'
 import { formatDate, formatTime } from '../../utils/dateFormatters'
 
@@ -15,6 +16,7 @@ export default function EventPost({ event, forumId }) {
   const router = useRouter()
   const { rsvpToEvent, getUserRSVP } = useEventsContext()
   const { getClub } = useClubsContext()
+  const { openOrg } = useOrgModal()
   const [showShareModal, setShowShareModal] = useState(false)
 
   // Mock current user - replace with real auth
@@ -60,7 +62,7 @@ export default function EventPost({ event, forumId }) {
               style={styles.clubBadge}
               onPress={(e) => {
                 e.stopPropagation()
-                router.push(`/clubs/${event.clubId}`)
+                openOrg(event.clubId)
               }}
               activeOpacity={0.7}
             >
