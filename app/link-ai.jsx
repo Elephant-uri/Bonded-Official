@@ -43,7 +43,7 @@ export default function LinkAI() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const router = useRouter()
-  const { user } = useAuthStore()
+  const { user, session } = useAuthStore()
   const { data: currentUserProfile } = useCurrentUserProfile()
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [inputText, setInputText] = useState('')
@@ -116,7 +116,8 @@ export default function LinkAI() {
       const response = await queryLink(
         user?.id,
         messageText,
-        currentUserProfile?.university_id
+        currentUserProfile?.university_id,
+        { access_token: session?.access_token }
       )
 
       const normalized = normalizeLinkResponse(response)

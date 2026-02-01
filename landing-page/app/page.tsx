@@ -25,7 +25,7 @@ export default function Home() {
     {
       id: 'events',
       image: '/img/Simulator Screenshot - iPhone 17 Pro - events.png',
-      headline: 'Never miss what\'s happening.',
+      headline: 'Never miss what&apos;s happening.',
       subline: 'Find and join events happening around campus. From club meetings to campus concerts.',
     },
     {
@@ -232,7 +232,7 @@ export default function Home() {
             transition={{ duration: 0.8, delay: 0.1 }}
             className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto"
           >
-            We're expanding to campuses with the most interest. Join the waitlist and help bring Bonded to your school.
+            We&apos;re expanding to campuses with the most interest. Join the waitlist and help bring Bonded to your school.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 30 }}

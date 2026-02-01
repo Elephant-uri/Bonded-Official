@@ -5,17 +5,17 @@ import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context'
 import BottomNav from '../components/BottomNav'
 import MessageListItem from '../components/Message/MessageListItem'
+import { useClubsContext } from '../contexts/ClubsContext'
 import { hp, wp } from '../helpers/common'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { useLinkSystemProfile, useLinkConversationPreview } from '../hooks/useLinkChat'
 import { useMessageRequests } from '../hooks/useMessageRequests'
-import { useNotificationCount } from '../hooks/useNotificationCount'
 import { useConversations, useCreateConversation, useMarkAsRead } from '../hooks/useMessages'
-import { useLinkSystemProfile } from '../hooks/useLinkChat'
+import { useNotificationCount } from '../hooks/useNotificationCount'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
-import { useAppTheme } from './theme'
-import { useClubsContext } from '../contexts/ClubsContext'
 import { formatRelativeMessageTime } from '../utils/dateFormatters'
+import { useAppTheme } from './theme'
 
 export default function Messages() {
   const router = useRouter()
@@ -25,6 +25,7 @@ export default function Messages() {
   const { data: currentUserProfile } = useCurrentUserProfile()
   const { getClub, getAllClubs } = useClubsContext()
   const { data: linkProfile } = useLinkSystemProfile()
+  const { data: linkPreview } = useLinkConversationPreview()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState({ chats: [], people: [], messages: [] })
@@ -137,7 +138,7 @@ export default function Messages() {
         return { chats: [], people: [], messages: [] }
       })
       setIsSearching((prev) => (prev ? false : prev))
-      return () => {}
+      return () => { }
     }
 
     setIsSearching(true)
@@ -261,7 +262,9 @@ export default function Messages() {
     }
 
     // Always show Link at the top of direct chats
-    const linkConversation = {
+    // Use linkPreview data (fetches actual last_message from link_conversations table)
+    // Falls back to linkProfile.bio only if user hasn't started a Link conversation yet
+    const linkConversation = linkPreview || {
       id: linkProfile?.id ? `link-${linkProfile.id}` : 'link-default',
       type: 'link',
       name: linkProfile?.display_name || 'Link',
@@ -327,7 +330,7 @@ export default function Messages() {
         groups: groupsUnread,
       }
     }
-  }, [conversations, privateForums, searchQuery, formattedConversations, messageRequests.length, linkProfile])
+  }, [conversations, privateForums, searchQuery, formattedConversations, messageRequests.length, linkProfile, linkPreview])
 
 
   // Handlers
@@ -699,7 +702,7 @@ export default function Messages() {
               const unreadCount = tabUnreadCounts[tab.key] || 0
               const showBadge = unreadCount > 0
               const badgeLabel = unreadCount > 99 ? '99+' : `${unreadCount}`
-              
+
               return (
                 <TouchableOpacity
                   key={tab.key}

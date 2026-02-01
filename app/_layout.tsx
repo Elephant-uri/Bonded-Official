@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import * as Sentry from '@sentry/react-native'
-import { Stack, usePathname, useRouter } from 'expo-router'
 import Constants from 'expo-constants'
+import { Stack, usePathname, useRouter } from 'expo-router'
 import React, { useEffect, useRef, useState } from 'react'
 import { Dimensions, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { DrawerLayout, GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -48,6 +48,7 @@ if (Platform.OS !== 'web') {
 
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const FEATURE_SHOW_SOCIALS = false // Gate LinkedIn/Instagram for hackathon presentation
 
 const DrawerItem = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => {
   const theme = useAppTheme()
@@ -113,10 +114,10 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
   const classForums = forums.filter(f => f.type === 'class')
   // Public forums: exclude campus/main (shown at top) and org forums (handled separately)
   const publicForums = [
-    ...forums.filter(f => 
-      f.type === 'public' && 
-      f.type !== 'campus' && 
-      f.type !== 'main' && 
+    ...forums.filter(f =>
+      f.type === 'public' &&
+      f.type !== 'campus' &&
+      f.type !== 'main' &&
       f.name?.toLowerCase() !== 'main'
     ),
     ...orgForums.filter(f => f.is_public)
@@ -178,7 +179,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
   const userProfile = {
     name: userProfileData?.full_name || userProfileData?.name || user?.email?.split('@')[0] || 'User',
     headline: userProfileData?.email || user?.email || '',
-    location: userProfileData?.university?.name || userProfileData?.university || 'University of Rhode Island',
+    location: userProfileData?.university?.name || userProfileData?.university || 'The Hackathon 2024',
     avatar: userProfileData?.avatarUrl || null,
     profileViewers: profileViewersCount,
     socialLinks: null,
@@ -339,7 +340,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
         </View>
 
         {/* Social Links Section */}
-        {userProfile.socialLinks && (
+        {FEATURE_SHOW_SOCIALS && userProfile.socialLinks && (
           <View
             style={{
               paddingVertical: hp(2),
@@ -1471,22 +1472,22 @@ const RootLayout = () => {
                     <OrgModalProvider>
                       <ProfileModalProvider>
                         <DrawerLayout
-                        ref={drawerRef}
-                        drawerWidth={SCREEN_WIDTH * 0.75}
-                        drawerPosition="left"
-                        drawerType="front"
-                        edgeWidth={SCREEN_WIDTH * 0.4}
-                        drawerLockMode="unlocked"
-                        renderNavigationView={() => <DrawerContent onNavigate={navigateAndClose} />}
-                      >
-                        <Stack
-                          screenOptions={{
-                            headerShown: false,
-                            gestureEnabled: false,
-                            animation: 'none',
-                          }}
-                        />
-                      </DrawerLayout>
+                          ref={drawerRef}
+                          drawerWidth={SCREEN_WIDTH * 0.75}
+                          drawerPosition="left"
+                          drawerType="front"
+                          edgeWidth={SCREEN_WIDTH * 0.4}
+                          drawerLockMode="unlocked"
+                          renderNavigationView={() => <DrawerContent onNavigate={navigateAndClose} />}
+                        >
+                          <Stack
+                            screenOptions={{
+                              headerShown: false,
+                              gestureEnabled: false,
+                              animation: 'none',
+                            }}
+                          />
+                        </DrawerLayout>
                         {/* Global components */}
                         <OnboardingNudge />
                         <OrgModal />

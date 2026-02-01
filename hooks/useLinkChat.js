@@ -3,9 +3,47 @@
  * Uses separate link_conversations and link_messages tables
  */
 
-import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+
+/**
+ * Hook to subscribe to realtime Link messages updates
+ * Invalidates queries when new messages arrive
+ */
+export function useLinkMessagesRealtime(conversationId) {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!conversationId) return
+
+    const channel = supabase
+      .channel(`link-messages:${conversationId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'link_messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload) => {
+        // Any message in this conversation should trigger an update
+        if (payload.new?.conversation_id === conversationId) {
+          queryClient.invalidateQueries({ queryKey: ['linkMessages', conversationId] })
+          queryClient.invalidateQueries({ queryKey: ['linkConversationPreview'] })
+          queryClient.invalidateQueries({ queryKey: ['linkConversation'] })
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Subscribed to Link messages realtime')
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [conversationId, queryClient])
+}
 
 /**
  * Hook to get Link's system profile for the current university
@@ -87,7 +125,7 @@ export function useLinkMessages(conversationId, sessionId) {
   const { user } = useAuthStore()
 
   return useInfiniteQuery({
-    queryKey: ['linkMessages', conversationId, sessionId],
+    queryKey: ['linkMessages', conversationId],
     queryFn: async ({ pageParam = 0 }) => {
       if (!conversationId || !user?.id) {
         return { messages: [], nextPage: null }
@@ -100,7 +138,6 @@ export function useLinkMessages(conversationId, sessionId) {
         .from('link_messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .eq('session_id', sessionId)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1)
 
@@ -109,8 +146,8 @@ export function useLinkMessages(conversationId, sessionId) {
         throw error
       }
 
-      // Reverse to get chronological order
-      const messages = (data || []).reverse()
+      // Return newest first for inverted list support
+      const messages = data || []
 
       return {
         messages,
@@ -118,7 +155,7 @@ export function useLinkMessages(conversationId, sessionId) {
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
-    enabled: !!conversationId && !!user?.id && !!sessionId,
+    enabled: !!conversationId && !!user?.id,
   })
 }
 
@@ -198,8 +235,8 @@ export function useLinkConversationPreview() {
         image_url: linkProfile.avatar_url,
         last_message: conversation?.last_message_preview || linkProfile.bio || 'Your campus buddy! Ask me anything.',
         last_message_at: conversation?.last_message_at,
-        sortTime: conversation?.last_message_at 
-          ? new Date(conversation.last_message_at).getTime() 
+        sortTime: conversation?.last_message_at
+          ? new Date(conversation.last_message_at).getTime()
           : Number.MAX_SAFE_INTEGER, // Keep at top if no messages
         unread_count: 0, // TODO: Track unread Link messages
         participants: [{
