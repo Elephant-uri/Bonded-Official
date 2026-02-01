@@ -9,9 +9,14 @@ interface WaitlistFormProps {
 }
 
 const SCHOOLS = [
+  'University of Toronto',
+  'McGill University',
+  'University of British Columbia',
+  'University of Waterloo',
+  'Western University',
+  'Queen\'s University',
   'University of Rhode Island',
-  'Brown Universi~ty',
-  'Rhode Island College',
+  'Brown University',
   'Other',
 ]
 
@@ -24,7 +29,7 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!email || !school) {
       setErrorMessage('Please fill in all fields')
       setStatus('error')
@@ -55,7 +60,7 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
         } else {
           const existing = JSON.parse(localStorage.getItem('bonded_waitlist') || '[]')
           const isDuplicate = existing.some((entry: any) => entry.email === email.trim().toLowerCase())
-          
+
           if (!isDuplicate) {
             existing.push({
               email: email.trim().toLowerCase(),
@@ -83,7 +88,7 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
       try {
         const existing = JSON.parse(localStorage.getItem('bonded_waitlist') || '[]')
         const isDuplicate = existing.some((entry: any) => entry.email === email.trim().toLowerCase())
-        
+
         if (!isDuplicate) {
           existing.push({
             email: email.trim().toLowerCase(),
@@ -99,7 +104,7 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
       } catch (e) {
         // localStorage might not be available
       }
-      
+
       setStatus('error')
       setErrorMessage('Something went wrong. Please try again.')
     } finally {
