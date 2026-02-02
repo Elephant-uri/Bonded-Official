@@ -9,11 +9,12 @@ import { hp, wp } from '../helpers/common'
 import { useAppTheme, useThemeMode } from './theme'
 
 const phrases = [
-  'Built in 24 hours.',
-  'Find your people.',
-  'Bond with your campus.',
-  'Born at the hackathon.',
-  'The future of campus.',
+  'New friends.',
+  'New roommates.',
+  'New clubs.',
+  'New organizations.',
+  'New classes.',
+  'New connections.',
 ];
 
 const welcome = () => {
@@ -21,12 +22,13 @@ const welcome = () => {
   const styles = createStyles(theme)
   const hoverValue = useRef(new Animated.Value(0)).current
   const phraseAnim = useRef(new Animated.Value(1)).current
-  const fadeAnim = useRef(new Animated.Value(0)).current
   const [phraseIndex, setPhraseIndex] = useState(0)
   const router = useRouter()
   const { setMode } = useThemeMode()
   const systemScheme = useColorScheme() || 'light'
 
+  // Force light mode while welcome screen is displayed, then restore system preference
+  // Use useLayoutEffect to ensure theme changes BEFORE render
   useLayoutEffect(() => {
     setMode('light')
     return () => {
@@ -35,28 +37,27 @@ const welcome = () => {
   }, [setMode, systemScheme])
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(hoverValue, {
-            toValue: 1,
-            duration: 1800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(hoverValue, {
-            toValue: 0,
-            duration: 1800,
-            useNativeDriver: true,
-          }),
-        ])
-      )
-    ]).start()
-  }, [])
+    const hoverAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hoverValue, {
+          toValue: 1,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(hoverValue, {
+          toValue: 0,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+      ])
+    )
+
+    hoverAnimation.start()
+    return () => {
+      hoverAnimation.stop()
+      hoverValue.setValue(0)
+    }
+  }, [hoverValue])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -93,19 +94,14 @@ const welcome = () => {
     >
       <ScreenWrapper bg='transparent' >
         <StatusBar style='light' />
-        <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        <View style={styles.container}>
 
-          {/* Hackathon Badge */}
-          <View style={styles.badgeContainer}>
-            <View style={styles.glassBadge}>
-              <Text style={styles.badgeText}>🚀 HACKATHON EDITION 2024</Text>
-            </View>
-          </View>
 
           {/* TITLE text */}
           <View style={styles.textGroup}>
-            <AnimatedLogo size={70} />
-            <Text style={styles.title}>Bonded: Find your people.</Text>
+            {/* welcome image */}
+            <AnimatedLogo size={60} />
+            <Text style={styles.title}>Find your people on campus.</Text>
             <Animated.Text
               style={[
                 styles.punchline,
@@ -119,10 +115,8 @@ const welcome = () => {
             </Animated.Text>
 
             <Animated.View style={[styles.metricsPill, { transform: [{ translateY: hoverTranslate }] }]}>
-              <View style={styles.metricsIcon}>
-                <Text style={styles.metricsFigure}>24h</Text>
-              </View>
-              <Text style={styles.metricsLabel}>built for the future</Text>
+              <Text style={styles.metricsFigure}>1K+</Text>
+              <Text style={styles.metricsLabel}>students already bonded</Text>
             </Animated.View>
 
           </View>
@@ -131,14 +125,14 @@ const welcome = () => {
           <View style={styles.footer}>
             <Button
               title="Get Started"
-              buttonStyle={styles.mainButton}
-              textStyle={styles.mainButtonText}
+              buttonStyle={{ marginHorizontal: wp(4) }}
               onPress={() => router.push('/login')}
             />
-            <Text style={styles.versionTag}>v1.0.0-hackathon</Text>
+
+
           </View>
 
-        </Animated.View>
+        </View>
 
       </ScreenWrapper>
     </ImageBackground>
@@ -154,108 +148,64 @@ const createStyles = (theme) => StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingHorizontal: wp(6),
-    paddingTop: hp(4),
-    paddingBottom: hp(4),
-  },
-  badgeContainer: {
-    marginTop: hp(2),
-  },
-  glassBadge: {
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(0.8),
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    backdropFilter: 'blur(10px)', // For web, but doesn't hurt native
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: hp(1.2),
-    fontWeight: '800',
-    letterSpacing: 1,
+    paddingHorizontal: wp(2),
+    paddingTop: hp(6),
+    gap: hp(4),
   },
   textGroup: {
-    gap: 20,
+    gap: 25,
     alignItems: 'center',
-    marginTop: hp(4),
+    paddingHorizontal: wp(5),
+    marginTop: hp(0),
   },
   title: {
-    color: '#FFF',
-    fontSize: hp(4.5),
-    fontWeight: '900',
+    color: theme.colors.textPrimary,
+    fontSize: hp(5),
+    fontWeight: '800',
     textAlign: 'center',
-    letterSpacing: -1,
-    fontFamily: 'System',
-    textShadowColor: 'rgba(0,0,0,0.1)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: -0.5,
+    fontFamily: theme.typography.fontFamily.heading,
   },
   punchline: {
     textAlign: 'center',
-    fontSize: hp(2.4),
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontFamily: 'System',
+    fontSize: hp(3),
+    paddingHorizontal: wp(4),
+    fontWeight: '500',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.heading,
   },
   metricsPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 5,
     paddingVertical: hp(1),
-    paddingHorizontal: wp(5),
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: wp(4),
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderRadius: 999,
-    marginTop: hp(2),
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  metricsIcon: {
-    backgroundColor: theme.colors.bondedPurple,
-    paddingHorizontal: wp(2),
-    paddingVertical: hp(0.3),
-    borderRadius: 6,
+    marginTop: hp(2.5),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    shadowColor: '#4b1b72',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 6,
   },
   metricsFigure: {
-    fontSize: hp(1.8),
-    fontWeight: '900',
-    color: '#FFF',
+    fontSize: hp(2.2),
+    fontWeight: '800',
+    color: theme.colors.bondedPurple,
+    fontFamily: theme.typography.fontFamily.heading,
   },
   metricsLabel: {
-    fontSize: hp(1.6),
-    fontWeight: '500',
+    fontSize: hp(1.8),
     color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.body,
   },
   footer: {
     width: '100%',
-    alignItems: 'center',
-    gap: hp(2),
-  },
-  mainButton: {
-    width: '100%',
-    backgroundColor: '#FFF',
-    height: hp(7),
-    borderRadius: 18,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-  },
-  mainButtonText: {
-    color: theme.colors.bondedPurple,
-    fontWeight: '800',
-    fontSize: hp(2.2),
-  },
-  versionTag: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: hp(1.2),
-    fontWeight: '600',
-    letterSpacing: 2,
+    paddingBottom: hp(4),
   },
 })
