@@ -147,18 +147,18 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
   return (
     <motion.form
       onSubmit={handleSubmit}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
-      <div className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
+      <div className="flex flex-col gap-3">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Your email"
+          placeholder="Your college email"
           required
-          className="flex-1 px-5 py-4 rounded-2xl bg-gray-50 border-2 border-purple-400/30 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-base transition-all shadow-sm"
+          className="w-full px-6 py-4 rounded-2xl bg-gray-50/50 border border-gray-100 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400/50 text-base transition-all"
           disabled={isSubmitting}
         />
         <SchoolPicker
@@ -172,7 +172,7 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-sm text-red-600 text-center"
+          className="text-sm text-red-500 text-center font-medium"
         >
           {errorMessage}
         </motion.p>
@@ -183,7 +183,7 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
         disabled={isSubmitting}
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
-        className="w-full sm:w-auto px-10 py-4 rounded-2xl font-semibold text-base text-white bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/30"
+        className="w-full px-10 py-4 rounded-2xl font-bold text-base text-white bg-gray-900 hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-gray-200"
       >
         {isSubmitting ? (
           <span className="flex items-center gap-2 justify-center">
@@ -194,12 +194,12 @@ export default function WaitlistForm({ variant = 'hero' }: WaitlistFormProps) {
             Joining...
           </span>
         ) : (
-          'Join the waitlist'
+          'Join the list'
         )}
       </motion.button>
 
-      <p className="text-sm text-center text-gray-500">
-        We&apos;ll only use your email to notify you about Bonded. No spam, ever.
+      <p className="text-[11px] text-center text-gray-400 font-medium uppercase tracking-widest">
+        Invite only • Launching soon
       </p>
     </motion.form>
   )
