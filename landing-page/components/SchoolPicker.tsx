@@ -4,48 +4,95 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 
 const COMMON_SCHOOLS = [
-  'University of Rhode Island',
-  'Brown University',
-  'Rhode Island College',
+  // Major US Universities
   'Harvard University',
+  'Stanford University',
   'MIT',
   'Yale University',
-  'Stanford University',
+  'Princeton University',
+  'Columbia University',
+  'University of Pennsylvania',
+  'Cornell University',
+  'Brown University',
+  'Dartmouth College',
+  'University of Rhode Island',
+  'Rhode Island College',
+  'Duke University',
+  'Johns Hopkins University',
+  'Northwestern University',
+  'University of Chicago',
+  'California Institute of Technology',
   'UC Berkeley',
   'UCLA',
-  'University of Michigan',
-  'University of Texas at Austin',
-  'New York University',
-  'Boston University',
-  'Northeastern University',
-  'University of Pennsylvania',
-  'Columbia University',
-  'Cornell University',
-  'Princeton University',
-  'Duke University',
-  'University of North Carolina',
-  'University of Virginia',
-  'Georgetown University',
+  'UC San Diego',
+  'UC Irvine',
+  'UC Davis',
+  'UC Santa Barbara',
   'University of Southern California',
   'University of Washington',
-  'University of Illinois',
+  'University of Michigan',
+  'Michigan State University',
+  'University of Texas at Austin',
+  'Texas A&M University',
+  'Georgia Tech',
+  'University of Georgia',
+  'University of Florida',
+  'Florida State University',
+  'University of North Carolina at Chapel Hill',
+  'North Carolina State University',
+  'University of Virginia',
+  'Virginia Tech',
+  'Georgetown University',
+  'New York University',
+  'Boston University',
+  'Boston College',
+  'Northeastern University',
+  'University of Illinois Urbana-Champaign',
   'Ohio State University',
   'Penn State University',
-  'University of Florida',
-  'University of Georgia',
-  'Arizona State University',
-  'University of Arizona',
-  'Texas A&M University',
   'Purdue University',
-  'Indiana University',
-  'University of Wisconsin',
-  'University of Minnesota',
-  'University of Colorado',
+  'Indiana University Bloomington',
+  'University of Wisconsin-Madison',
+  'University of Minnesota Twin Cities',
+  'University of Maryland, College Park',
+  'Rutgers University',
+  'University of Colorado Boulder',
   'University of Oregon',
-  'University of California, San Diego',
-  'University of California, Irvine',
-  'University of California, Davis',
-  'University of California, Santa Barbara',
+  'Oregon State University',
+  'University of Arizona',
+  'Arizona State University',
+  'University of Utah',
+  'Vanderbilt University',
+  'Rice University',
+  'Emory University',
+  'Washington University in St. Louis',
+  'Carnegie Mellon University',
+
+  // Major Canadian Universities
+  'University of Toronto',
+  'McGill University',
+  'University of British Columbia',
+  'University of Waterloo',
+  'Western University',
+  'Queen\'s University',
+  'University of Alberta',
+  'University of Calgary',
+  'McMaster University',
+  'University of Ottawa',
+  'Université de Montréal',
+  'Laval University',
+  'Simon Fraser University',
+  'University of Victoria',
+  'Dalhousie University',
+  'University of Manitoba',
+  'University of Saskatchewan',
+  'York University',
+  'Concordia University',
+  'Ryerson University',
+  'Carleton University',
+  'University of Guelph',
+  'Wilfrid Laurier University',
+  'Brock University',
   'Other',
 ]
 
@@ -56,9 +103,9 @@ interface SchoolPickerProps {
   placeholder?: string
 }
 
-export default function SchoolPicker({ 
-  value, 
-  onChange, 
+export default function SchoolPicker({
+  value,
+  onChange,
   disabled = false,
   placeholder = 'Search your school...'
 }: SchoolPickerProps) {
@@ -169,13 +216,11 @@ export default function SchoolPicker({
                     key={school}
                     type="button"
                     onClick={() => handleSelectSchool(school)}
-                    className={`w-full px-5 py-3 text-left text-base transition-colors ${
-                      school === value
+                    className={`w-full px-5 py-3 text-left text-base transition-colors ${school === value
                         ? 'bg-gradient-to-r from-purple-50 to-purple-100/50 text-purple-700 font-semibold border-l-2 border-purple-500'
                         : 'text-gray-900 hover:bg-purple-50/50'
-                    } ${index === 0 ? 'rounded-t-2xl' : ''} ${
-                      index === filteredSchools.length - 1 ? 'rounded-b-2xl' : ''
-                    }`}
+                      } ${index === 0 ? 'rounded-t-2xl' : ''} ${index === filteredSchools.length - 1 ? 'rounded-b-2xl' : ''
+                      }`}
                   >
                     {school === 'Other' ? (
                       <span className="flex items-center gap-2">
