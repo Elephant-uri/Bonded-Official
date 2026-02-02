@@ -91,7 +91,7 @@ export default function LinkChat() {
       if (!message?.id?.startsWith('local-')) return true
 
       const content = (message.content || '').trim()
-      if (!content) return true
+      if (!content) return false // Drop empty local messages
 
       const isOptimisticUser = message.id.startsWith('local-user-')
       const isOptimisticLink = message.id.startsWith('local-link-')
@@ -100,20 +100,38 @@ export default function LinkChat() {
         if (other.id?.startsWith('local-')) return false
         const typeMatch = (isOptimisticUser && other.sender_type === 'user') ||
           (isOptimisticLink && other.sender_type === 'link')
-        return typeMatch && (other.content || '').trim() === content
+
+        // Exact content match or very similar (ignore case/trailing punc for Link responses)
+        const otherContent = (other.content || '').trim()
+        if (content === otherContent) return true
+
+        if (isOptimisticLink) {
+          return content.toLowerCase().replace(/[.!?]$/, '') ===
+            otherContent.toLowerCase().replace(/[.!?]$/, '')
+        }
+
+        return false
       })
 
       return !hasMatchingDbMessage
     })
 
-    // Phase 2: Remove identical consecutive messages (handles historical DB duplicates)
+    // Phase 2: Remove identical consecutive messages (handles historical/backend duplicates)
     return finalLocalDeduped.filter((message, index, arr) => {
       if (index === 0) return true
       const prev = arr[index - 1]
-      const timeDiff = Math.abs(new Date(message.created_at).getTime() - new Date(prev.created_at).getTime())
+
+      const timeA = new Date(message.created_at || Date.now()).getTime()
+      const timeB = new Date(prev.created_at || Date.now()).getTime()
+      const timeDiff = Math.abs(timeA - timeB)
+
+      const contentA = (message.content || '').trim()
+      const contentB = (prev.content || '').trim()
+
       const isDuplicate = message.sender_type === prev.sender_type &&
-        (message.content || '').trim() === (prev.content || '').trim() &&
-        timeDiff < 2000 // Within 2 seconds
+        contentA === contentB &&
+        timeDiff < 5000 // Within 5 seconds (up from 2s)
+
       return !isDuplicate
     })
   }, [messages, localMessages])
@@ -620,11 +638,11 @@ export default function LinkChat() {
       setIsLinkTyping(true)
 
       // Query Link backend for response
-      console.log('[LinkChat] Querying Link AI backend...')
+      console.log('[LinkChat] Querying Link AI backend for university:', currentUserProfile?.university_id)
       const linkResponse = await queryLink(
         user.id,
         messageContent,
-        currentUserProfile?.university_id,
+        currentUserProfile?.university_id || 'hackathon_default',
         {
           preferred_name: extractedName || preferredName || firstName,
           session_id: currentSessionId,
