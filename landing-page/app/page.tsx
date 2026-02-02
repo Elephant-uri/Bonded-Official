@@ -28,12 +28,12 @@ export default function Home() {
   }, [phrases.length]);
 
   const screens = [
-    '/img/Simulator Screenshot - iPhone 17 Pro - drawer.png',
     '/img/Simulator Screenshot - iPhone 17 Pro - yearbook.png',
-    '/img/Simulator Screenshot - iPhone 17 Pro - events.png',
+    '/img/calendar-new.png',
+    '/img/events-new.png',
+    '/img/messages-new.png',
     '/img/Simulator Screenshot - iPhone 17 Pro - clubs.png',
     '/img/Simulator Screenshot - iPhone 17 Pro - forum.png',
-    '/img/bonded-calandar.png',
     '/img/Simulator Screenshot - iPhone 17 Pro -linkai.png'
   ]
 
