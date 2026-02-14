@@ -52,6 +52,7 @@ export default function Onboarding() {
   const [showCelebration, setShowCelebration] = useState(false)
   const lastScrollY = useRef(0)
   const [hasSynced, setHasSynced] = useState(false)
+  const saveLockRef = useRef(false) // Prevents auto-save from racing with Continue button save
 
   // Sync onboarding store from profile when component mounts or profile loads
   useEffect(() => {
@@ -84,16 +85,16 @@ export default function Onboarding() {
       return // Don't save empty state
     }
 
-    // Don't trigger auto-save if a save is already in progress
-    if (isSaving) {
-      log('⏳ Skipping auto-save - save already in progress')
+    // Don't trigger auto-save if a save is already in progress or locked by Continue button
+    if (isSaving || saveLockRef.current) {
+      log('⏳ Skipping auto-save - save already in progress or locked')
       return
     }
 
     const timer = setTimeout(() => {
-      // Double-check isSaving hasn't changed during debounce period
-      if (isSaving) {
-        log('⏳ Skipping auto-save - save started during debounce')
+      // Double-check isSaving/lock hasn't changed during debounce period
+      if (isSaving || saveLockRef.current) {
+        log('⏳ Skipping auto-save - save started during debounce or locked')
         return
       }
 
@@ -136,6 +137,8 @@ export default function Onboarding() {
     // If on photos step, upload photos before continuing
     if (currentStep === ONBOARDING_STEPS.PHOTOS && formData.photos?.length > 0) {
       try {
+        // Lock auto-save while uploading photos via Continue
+        saveLockRef.current = true
         // Upload photos via saveOnboarding
         const result = await new Promise((resolve, reject) => {
           saveOnboarding(
@@ -173,6 +176,8 @@ export default function Onboarding() {
           ]
         )
         return // Don't auto-advance, let the user decide
+      } finally {
+        saveLockRef.current = false
       }
     } else {
       // Mark current step as complete

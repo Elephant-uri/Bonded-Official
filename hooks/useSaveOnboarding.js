@@ -47,6 +47,20 @@ export const useSaveOnboarding = () => {
         }
       }
 
+      // Fallback: if universityId still null, try fetching from existing profile
+      if (!universityId) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('university_id')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (existingProfile?.university_id) {
+          universityId = existingProfile.university_id
+          console.log('✅ Resolved university_id from existing profile:', universityId)
+        }
+      }
+
       // Upload photos if present and not already uploaded
       let uploadedPhotos = formData.photos || []
       let photoUploadError = null

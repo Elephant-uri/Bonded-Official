@@ -37,7 +37,7 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
       const { data: conversation, error } = await supabase
         .from('conversations')
         .select('id')
-        .eq('type', 'group')
+        .eq('type', 'class')
         .eq('class_section_id', item.class_section_id)
         .maybeSingle()
 
@@ -68,13 +68,13 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
     const privateForums = forums.filter((f) => f.type === 'private')
     // Filter out campus, class, org, private AND main forums (Main is already shown at top)
     const other = forums.filter(
-      (f) => !f.isPinned && 
-             f.type !== 'class' && 
-             f.type !== 'org' && 
-             f.type !== 'private' && 
-             f.type !== 'campus' &&
-             f.type !== 'main' &&
-             f.name?.toLowerCase() !== 'main' // Also filter by name in case type isn't set
+      (f) => !f.isPinned &&
+        f.type !== 'class' &&
+        f.type !== 'org' &&
+        f.type !== 'private' &&
+        f.type !== 'campus' &&
+        f.type !== 'main' &&
+        f.name?.toLowerCase() !== 'main' // Also filter by name in case type isn't set
     )
 
     return { campus: campusForums, pinned, classes, orgs, private: privateForums, other }
@@ -108,13 +108,13 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
       orgs: filtered.filter((f) => f.type === 'org'),
       private: filtered.filter((f) => f.type === 'private'),
       other: filtered.filter(
-        (f) => !f.isPinned && 
-               f.type !== 'class' && 
-               f.type !== 'org' && 
-               f.type !== 'private' &&
-               f.type !== 'campus' &&
-               f.type !== 'main' &&
-               f.name?.toLowerCase() !== 'main'
+        (f) => !f.isPinned &&
+          f.type !== 'class' &&
+          f.type !== 'org' &&
+          f.type !== 'private' &&
+          f.type !== 'campus' &&
+          f.type !== 'main' &&
+          f.name?.toLowerCase() !== 'main'
       ),
     }
   }, [searchQuery, organizedForums])

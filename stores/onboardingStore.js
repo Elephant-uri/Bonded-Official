@@ -379,7 +379,7 @@ function getCompletedSteps(formData) {
   }
 
   // Basic Info (Required)
-  if (formData.fullName && formData.username && formData.school && formData.age && formData.grade && formData.gender && formData.major && activeSteps.includes(ONBOARDING_STEPS.BASIC_INFO)) {
+  if ((formData.fullName || (formData.firstName && formData.lastName)) && formData.username && formData.school && formData.age && formData.grade && formData.gender && formData.major && activeSteps.includes(ONBOARDING_STEPS.BASIC_INFO)) {
     completed.push(ONBOARDING_STEPS.BASIC_INFO)
   }
 
