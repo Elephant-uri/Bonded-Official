@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to create a new forum post
@@ -50,8 +51,8 @@ export function useCreatePost() {
         .single()
 
       if (postError) {
-        console.error('Error creating post:', postError)
-        console.error('Post data attempted:', postData)
+        Logger.error('Error creating post:', postError)
+        Logger.error('Post data attempted:', postData)
         // Create a more user-friendly error message
         const errorMessage = postError.message || postError.details || 'Failed to create post'
         const friendlyError = new Error(errorMessage)
@@ -75,7 +76,7 @@ export function useCreatePost() {
           .insert(pollData)
 
         if (pollError) {
-          console.error('Error creating poll:', pollError)
+          Logger.error('Error creating poll:', pollError)
           // Don't fail the whole post if poll creation fails, but track the error
           pollCreationError = pollError.message || 'Failed to create poll'
         }

@@ -4,13 +4,13 @@ import { ActivityIndicator, StyleSheet, TextInput, TouchableOpacity, View } from
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
 
-export default function ChatInputBar({ onSend, isSending, placeholder = "iMessage" }) {
+export default function ChatInputBar({ onSend, isSending, disabled = false, placeholder = "iMessage" }) {
     const theme = useAppTheme()
     const styles = createStyles(theme)
     const [text, setText] = useState('')
 
     const handleSend = () => {
-        if (!text.trim() || isSending) return
+        if (!text.trim() || isSending || disabled) return
         onSend(text.trim())
         setText('')
     }
@@ -35,10 +35,10 @@ export default function ChatInputBar({ onSend, isSending, placeholder = "iMessag
             <TouchableOpacity
                 style={[
                     styles.sendButton,
-                    (!text.trim() || isSending) && styles.sendButtonDisabled
+                    (!text.trim() || isSending || disabled) && styles.sendButtonDisabled
                 ]}
                 onPress={handleSend}
-                disabled={!text.trim() || isSending}
+                disabled={!text.trim() || isSending || disabled}
             >
                 {isSending ? (
                     <ActivityIndicator size="small" color="#FFF" />
@@ -58,20 +58,20 @@ const createStyles = (theme) => StyleSheet.create({
         paddingVertical: hp(1.5),
         backgroundColor: theme.colors.background,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: theme.colors.border || 'rgba(0,0,0,0.1)',
+        borderTopColor: theme.colors.border,
     },
     inputWrapper: {
         flex: 1,
         minHeight: hp(4.5),
         maxHeight: hp(12),
-        backgroundColor: theme.colors.backgroundSecondary || '#F2F2F7', // iMessage gray
+        backgroundColor: theme.colors.backgroundSecondary, // iMessage gray
         borderRadius: 20, // Pill shape
         paddingHorizontal: wp(3),
         paddingTop: hp(1), // Visual center text vertically
         paddingBottom: hp(1),
         marginRight: wp(2),
         borderWidth: 1,
-        borderColor: theme.colors.border || 'transparent',
+        borderColor: theme.colors.border,
     },
     input: {
         fontSize: hp(1.9),

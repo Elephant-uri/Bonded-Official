@@ -10,6 +10,7 @@ import { useSendMessageRequest } from '../hooks/useMessageRequests'
 import { useProfiles } from '../hooks/useProfiles'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 import { useAppTheme } from './theme'
 
 export default function NewChat() {
@@ -168,7 +169,7 @@ export default function NewChat() {
             navigateToChat(newConv.id, defaultName, true)
 
         } catch (error) {
-            console.error('Failed to create group:', error)
+            Logger.error('Failed to create group:', error)
             Alert.alert('Error', 'Failed to create group chat')
         } finally {
             setIsCreating(false)
@@ -317,18 +318,17 @@ const createStyles = (theme) => StyleSheet.create({
         paddingBottom: hp(1.5),
         paddingTop: hp(2),
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border || 'rgba(0,0,0,0.05)',
+        borderBottomColor: theme.colors.border,
     },
     headerTitle: {
         fontSize: hp(2.2),
-        fontFamily: theme.typography.fontFamily.heading,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     headerAction: {
         fontSize: hp(1.8),
         color: theme.colors.bondedPurple,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     backButton: {
         padding: hp(0.5),
@@ -361,7 +361,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     selectedCount: {
         fontSize: hp(1.8),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     createButton: {
@@ -372,7 +372,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     createButtonText: {
         color: '#FFF',
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     listContent: {
         paddingVertical: hp(1),
@@ -383,7 +383,7 @@ const createStyles = (theme) => StyleSheet.create({
         paddingTop: hp(1.2),
         paddingBottom: hp(0.6),
         fontSize: hp(1.6),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textSecondary,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -440,8 +440,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     userName: {
         fontSize: hp(1.9),
-        fontFamily: theme.typography.fontFamily.heading,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     userMeta: {

@@ -13,6 +13,7 @@ import CircleRoom from '../components/Circles/CircleRoom'
 import { useCirclesContext } from '../contexts/CirclesContext'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
 import { isFeatureEnabled } from '../utils/featureGates'
+import { Logger } from '../utils/logger'
 
 export default function Circles() {
   const theme = useAppTheme()
@@ -64,7 +65,7 @@ export default function Circles() {
       setCurrentRoomInfo(roomInfo)
       setShowCircleRoom(true)
     } catch (error) {
-      console.error('Failed to join circle:', error)
+      Logger.error('Failed to join circle:', error)
       Alert.alert('Error', getFriendlyErrorMessage(error, 'Unable to join the circle right now.'))
     }
   }
@@ -266,7 +267,7 @@ const createStyles = (theme) => StyleSheet.create({
   emptyTitle: {
     marginTop: hp(2),
     fontSize: hp(2.2),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   emptySubtitle: {
@@ -284,7 +285,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyButtonText: {
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   content: {
     paddingBottom: hp(12),
@@ -299,9 +300,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(3.4),
-    fontWeight: '900',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.extrabold,
     letterSpacing: -1,
     marginBottom: hp(0.5),
   },
@@ -316,9 +316,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.5),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     letterSpacing: 0.5,
     marginLeft: wp(4),
     marginBottom: hp(1.5),
@@ -344,18 +343,16 @@ const createStyles = (theme) => StyleSheet.create({
   },
   stepNumberText: {
     fontSize: hp(1.8),
-    fontWeight: '700',
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   stepContent: {
     flex: 1,
   },
   stepTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: hp(0.3),
   },
   stepText: {
@@ -381,9 +378,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   statNumber: {
     fontSize: hp(3.5),
-    fontWeight: '800',
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.extrabold,
   },
   statLabel: {
     fontSize: hp(1.4),
@@ -399,9 +395,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   insightTitle: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: hp(1),
   },
   shiftItem: {
@@ -419,15 +414,13 @@ const createStyles = (theme) => StyleSheet.create({
   shiftTo: {
     fontSize: hp(1.5),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     fontStyle: 'italic',
   },
   shiftCount: {
     fontSize: hp(1.4),
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   speakerItem: {
     flexDirection: 'row',
@@ -437,15 +430,13 @@ const createStyles = (theme) => StyleSheet.create({
   },
   speakerRank: {
     fontSize: hp(1.5),
-    fontWeight: '700',
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   speakerName: {
     fontSize: hp(1.5),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   speakerInfluence: {
     fontSize: hp(1.4),
@@ -462,9 +453,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   scheduleText: {
     fontSize: hp(1.7),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     textAlign: 'center',
     marginBottom: hp(0.5),
   },
@@ -487,8 +477,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   reminderText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
 })

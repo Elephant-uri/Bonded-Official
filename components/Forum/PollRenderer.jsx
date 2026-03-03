@@ -149,7 +149,7 @@ const createStyles = (theme) => StyleSheet.create({
   question: {
     flex: 1,
     fontSize: hp(1.8),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -204,11 +204,11 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.6),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   optionTextSelected: {
     color: theme.colors.bondedPurple,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   optionStats: {
     flexDirection: 'row',
@@ -218,7 +218,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   optionPercentage: {
     fontSize: hp(1.5),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
   },

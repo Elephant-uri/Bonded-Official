@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: hp(1.5),
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
     color: '#8E8E93',
     textTransform: 'uppercase',
     letterSpacing: 0.5,

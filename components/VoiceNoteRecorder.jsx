@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useAppTheme } from '../app/theme'
 import { hp } from '../helpers/common'
+import { Logger } from '../utils/logger'
 
 export const VoiceNoteRecorder = ({ onRecordingComplete, onCancel }) => {
   const theme = useAppTheme()
@@ -73,7 +74,7 @@ export const VoiceNoteRecorder = ({ onRecordingComplete, onCancel }) => {
         ])
       ).start()
     } catch (error) {
-      console.error('Failed to start recording:', error)
+      Logger.error('Failed to start recording:', error)
     }
   }
 
@@ -100,7 +101,7 @@ export const VoiceNoteRecorder = ({ onRecordingComplete, onCancel }) => {
       setRecording(null)
       setRecordingDuration(0)
     } catch (error) {
-      console.error('Failed to stop recording:', error)
+      Logger.error('Failed to stop recording:', error)
     }
   }
 
@@ -184,7 +185,7 @@ const createStyles = (theme) => StyleSheet.create({
   durationText: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
@@ -198,7 +199,7 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.white,
     fontSize: theme.typography.sizes.base,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   instructionText: {
     fontSize: theme.typography.sizes.sm,

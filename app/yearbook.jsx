@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { ActionSheetIOS, ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Modal, PanResponder, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActionSheetIOS, ActivityIndicator, Alert, Animated, Dimensions, FlatList, Modal, PanResponder, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../components/CachedImage'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import BottomNav from '../components/BottomNav'
@@ -22,6 +23,7 @@ import { useProfileViewTracker } from '../hooks/useProfileViews'
 import { useUserPosts } from '../hooks/useUserPosts'
 import { useAuthStore } from '../stores/authStore'
 import { formatTimeAgo } from '../utils/dateFormatters'
+import { Logger } from '../utils/logger'
 import { useAppTheme } from './theme'
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList)
@@ -470,7 +472,7 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
         }
       })
     } catch (error) {
-      console.error('Error creating conversation:', error)
+      Logger.error('Error creating conversation:', error)
       Alert.alert('Error', 'Failed to start conversation. Please try again.')
       // Reset activeProfile on error to allow retry
       setActiveProfile(null)
@@ -631,24 +633,23 @@ const ProfileModalContent = ({ activeProfile, setActiveProfile, theme, router, c
                 index,
               })}
               renderItem={({ item }) => (
-                <Image
+                <CachedImage
                   source={{ uri: item }}
                   style={{
                     width: SCREEN_WIDTH,
                     height: hp(50),
-                    resizeMode: 'cover',
                   }}
                 />
               )}
             />
           ) : (
-            <Image
+            <CachedImage
               source={{ uri: activeProfile.photoUrl }}
               style={styles.heroImage}
             />
           )}
           <LinearGradient
-            colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
+            colors={[theme.colors.overlayLight, 'transparent', 'transparent', theme.colors.overlay]}
             style={styles.heroGradient}
             pointerEvents="none"
           />
@@ -877,7 +878,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -891,7 +892,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -930,9 +931,8 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   name: {
     fontSize: hp(3.2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(0.5),
     letterSpacing: -0.3,
   },
@@ -984,9 +984,8 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   actionButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   actionButtonTextAccept: {
     color: theme.colors.white,
@@ -1003,9 +1002,8 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   actionButtonPrimaryText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   metaRow: {
     flexDirection: 'row',
@@ -1027,8 +1025,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   metaPillText: {
     fontSize: hp(1.4),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   locationRow: {
     flexDirection: 'row',
@@ -1046,7 +1043,6 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   tagsTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1.2),
@@ -1073,12 +1069,11 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   tagText: {
     fontSize: hp(1.5),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   tagTextShared: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   sharedHint: {
     fontSize: hp(1.2),
@@ -1102,7 +1097,6 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   postsTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -1152,8 +1146,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   postCardTitle: {
     fontSize: hp(1.6),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     marginBottom: hp(0.8),
     lineHeight: hp(2.2),
   },
@@ -1165,8 +1158,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   postCardAuthor: {
     fontSize: hp(1.3),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   postCardSeparator: {
     fontSize: hp(1.2),
@@ -1182,8 +1174,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   postCardForumText: {
     fontSize: hp(1.2),
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   postCardTime: {
     fontSize: hp(1.3),
@@ -1324,7 +1315,7 @@ export default function Yearbook() {
       >
         <AppCard radius="md" padding={false} style={[styles.card, isYou && styles.cardYou]}>
           <View style={styles.cardImageWrapper}>
-            <Image source={{ uri: item.photoUrl }} style={styles.cardImage} />
+            <CachedImage source={{ uri: item.photoUrl }} style={styles.cardImage} />
             <LinearGradient
               colors={['transparent', 'rgba(0, 0, 0, 0.7)']}
               style={styles.cardGradient}
@@ -1447,10 +1438,10 @@ export default function Yearbook() {
             </TouchableOpacity>
 
             <View style={styles.topBarCenter}>
-              <Image
+              <CachedImage
                 source={require('../assets/images/transparent-bonded.png')}
                 style={styles.topBarLogo}
-                resizeMode="contain"
+                contentFit="contain"
               />
               <Text style={styles.topBarTitle}>Bonded</Text>
             </View>
@@ -1727,9 +1718,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   topBarTitle: {
     fontSize: hp(2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     letterSpacing: -0.3,
   },
   notificationBadge: {
@@ -1749,8 +1739,7 @@ const createStyles = (theme) => StyleSheet.create({
   notificationBadgeText: {
     fontSize: hp(1.1),
     color: theme.colors.white,
-    fontWeight: '700',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.bold,
     includeFontPadding: false,
   },
   headerContent: {
@@ -1772,7 +1761,6 @@ const createStyles = (theme) => StyleSheet.create({
   },
   universityYearTitle: {
     fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: -0.2,
@@ -1859,9 +1847,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   youBadgeText: {
     fontSize: hp(1.1),
-    fontWeight: '600',
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   cardImageWrapper: {
     aspectRatio: 1,
@@ -1887,7 +1874,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   cardBadgeText: {
     fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.accent,
   },
   cardOverlayContent: {
@@ -1900,13 +1887,13 @@ const createStyles = (theme) => StyleSheet.create({
   },
   cardName: {
     fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#FFFFFF',
     marginBottom: theme.spacing.xs,
   },
   cardMajor: {
     fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.regular,
+    fontFamily: theme.typography.fontFamily.body,
     color: '#FFFFFF',
     opacity: 0.9,
   },
@@ -1917,7 +1904,7 @@ const createStyles = (theme) => StyleSheet.create({
   cardQuote: {
     fontSize: hp(1.2),
     color: theme.colors.textSecondary,
-    fontWeight: '400',
+    fontFamily: theme.typography.fontFamily.body,
     lineHeight: hp(1.6),
   },
   modalOverlay: {
@@ -1941,9 +1928,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalTitle: {
     fontSize: hp(2.4),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   modalCloseButton: {
     padding: hp(0.5),
@@ -1979,14 +1965,12 @@ const createStyles = (theme) => StyleSheet.create({
   modalResetText: {
     fontSize: hp(1.8),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   modalApplyText: {
     fontSize: hp(1.8),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   profileModalContainer: {
     flex: 1,
@@ -2051,9 +2035,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileModalName: {
     fontSize: hp(3.2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(0.5),
     letterSpacing: -0.3,
   },
@@ -2062,7 +2045,6 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     marginBottom: hp(2),
-    fontWeight: '400',
   },
   profileModalBio: {
     fontSize: hp(1.7),
@@ -2090,9 +2072,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileModalActionButtonSecondaryText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   profileModalActionButtonPrimary: {
     flex: 1,
@@ -2106,9 +2087,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileModalActionButtonPrimaryText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   profileModalMetaRow: {
     flexDirection: 'row',
@@ -2129,15 +2109,13 @@ const createStyles = (theme) => StyleSheet.create({
   profileModalMetaPillText: {
     fontSize: hp(1.4),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   profileModalTagsSection: {
     marginBottom: hp(2.5),
   },
   profileModalTagsTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1.2),
@@ -2158,8 +2136,7 @@ const createStyles = (theme) => StyleSheet.create({
   profileModalTagText: {
     fontSize: hp(1.5),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   profileModalTagShared: {
     backgroundColor: theme.colors.bondedPurple + '20',
@@ -2169,7 +2146,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileModalTagTextShared: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   sharedInterestsHint: {
     fontSize: hp(1.2),
@@ -2213,7 +2190,6 @@ const createStyles = (theme) => StyleSheet.create({
   emptyStateText: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.textPrimary,
     marginTop: theme.spacing.md,
     textAlign: 'center',
@@ -2235,8 +2211,7 @@ const createStyles = (theme) => StyleSheet.create({
   errorStateText: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.error || '#ef4444',
+    color: theme.colors.error,
     marginTop: theme.spacing.md,
     textAlign: 'center',
   },
@@ -2250,20 +2225,17 @@ const createStyles = (theme) => StyleSheet.create({
   retryButtonText: {
     fontSize: theme.typography.sizes.base,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.white,
   },
   groupJamScoreLabel: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
   groupJamScoreValue: {
     fontSize: hp(2),
-    fontWeight: '700',
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   groupJamScoreBar: {
     height: hp(0.6),

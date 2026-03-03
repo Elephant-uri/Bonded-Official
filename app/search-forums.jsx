@@ -121,9 +121,8 @@ const createStyles = (theme) => StyleSheet.create({
     marginTop: hp(1.5),
     marginBottom: hp(1),
     fontSize: hp(2.4),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   searchRow: {
     flexDirection: 'row',
@@ -154,7 +153,7 @@ const createStyles = (theme) => StyleSheet.create({
   emptyTitle: {
     marginTop: hp(2),
     fontSize: hp(2.2),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
   },
@@ -173,7 +172,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyButtonText: {
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   item: {
     flexDirection: 'row',

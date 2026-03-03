@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '../lib/supabase'
+import { Logger } from '../utils/logger'
 
 /**
  * Scrape events from a school's external event platform
@@ -46,7 +47,7 @@ export async function scrapeSchoolEvents(eventSourceUrl) {
     
     return events
   } catch (error) {
-    console.error('Error scraping school events:', error)
+    Logger.error('Error scraping school events:', error)
     return []
   }
 }
@@ -67,7 +68,7 @@ export async function seedSchoolEvents(userId, universityId, eventSourceUrl = nu
   const scrapedEvents = await scrapeSchoolEvents(eventSourceUrl)
   
   if (scrapedEvents.length === 0) {
-    console.warn('No events scraped from school event platform')
+    Logger.warn('No events scraped from school event platform')
     return []
   }
   
@@ -86,7 +87,7 @@ export async function seedSchoolEvents(userId, universityId, eventSourceUrl = nu
         .single()
       
       if (existing) {
-        console.log(`Event already exists: ${event.title}`)
+        Logger.info(`Event already exists: ${event.title}`)
         continue
       }
       
@@ -111,14 +112,14 @@ export async function seedSchoolEvents(userId, universityId, eventSourceUrl = nu
         .single()
       
       if (error) {
-        console.error(`Error creating event "${event.title}":`, error)
+        Logger.error(`Error creating event "${event.title}":`, error)
         continue
       }
       
       createdEvents.push(data)
-      console.log(`Created event: ${event.title}`)
+      Logger.info(`Created event: ${event.title}`)
     } catch (error) {
-      console.error(`Error processing event "${event.title}":`, error)
+      Logger.error(`Error processing event "${event.title}":`, error)
     }
   }
   
@@ -159,10 +160,10 @@ export async function runSchoolEventsSeeding(universityDomain, eventSourceUrl = 
     
     const events = await seedSchoolEvents(adminUser.id, university.id, eventSourceUrl)
     
-    console.log(`Successfully seeded ${events.length} events for ${universityDomain}`)
+    Logger.info(`Successfully seeded ${events.length} events for ${universityDomain}`)
     return events
   } catch (error) {
-    console.error('Error running school events seeding:', error)
+    Logger.error('Error running school events seeding:', error)
     throw error
   }
 }

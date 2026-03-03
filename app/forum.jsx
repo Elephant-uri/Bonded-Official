@@ -68,6 +68,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { isSuperAdminEmail } from '../utils/admin'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
+import { Logger } from '../utils/logger'
 import { useAppTheme } from './theme'
 
 
@@ -405,7 +406,7 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: theme.colors.overlayLight,
   },
   sheet: {
     position: 'absolute',
@@ -438,9 +439,8 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: hp(2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   sendButton: {
     position: 'absolute',
@@ -459,9 +459,8 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   emptyText: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   emptySubtext: {
     fontSize: hp(1.5),
@@ -484,7 +483,7 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   commentAvatarText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   commentContent: {
@@ -497,9 +496,8 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   commentAuthor: {
     fontSize: hp(1.5),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginRight: wp(2),
   },
   commentTime: {
@@ -533,8 +531,7 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   replyText: {
     fontSize: hp(1.3),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   emojiBar: {
     flexDirection: 'row',
@@ -586,7 +583,7 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   gifText: {
     fontSize: hp(1.4),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textSecondary,
   },
   postButton: {
@@ -594,9 +591,8 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   postButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   postPreview: {
     position: 'absolute',
@@ -635,7 +631,7 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   postPreviewAvatarText: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   postPreviewAuthorInfo: {
@@ -643,9 +639,8 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   postPreviewAuthorName: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   postPreviewMeta: {
     fontSize: hp(1.3),
@@ -655,9 +650,8 @@ const createCommentsSheetStyles = (theme) => StyleSheet.create({
   },
   postPreviewTitle: {
     fontSize: hp(1.8),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(1),
   },
   postPreviewBody: {
@@ -685,7 +679,7 @@ export default function Forum() {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const log = (...args) => {
-    if (__DEV__) console.log(...args)
+    Logger.info(...args)
   }
   const { data: notificationCount = 0 } = useNotificationCount()
   const notificationLabel = notificationCount > 99 ? '99+' : `${notificationCount}`
@@ -868,7 +862,7 @@ export default function Forum() {
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Error fetching post votes:', error)
+      Logger.error('Error fetching post votes:', error)
       return
     }
 
@@ -979,8 +973,8 @@ export default function Forum() {
         .select('id, deleted_at')
 
       if (softDeleteError) {
-        console.error('❌ Soft delete error:', softDeleteError)
-        console.error('Error details:', {
+        Logger.error('Soft delete error:', softDeleteError)
+        Logger.error('Error details:', {
           code: softDeleteError.code,
           message: softDeleteError.message,
           details: softDeleteError.details,
@@ -996,7 +990,7 @@ export default function Forum() {
 
       // If no data returned and no error, RLS likely blocked it
       if (!softDeleteData && !softDeleteError) {
-        console.warn('⚠️ Soft delete returned no data (RLS may have blocked it)')
+        Logger.warn('Soft delete returned no data (RLS may have blocked it)')
       }
 
       // If soft delete failed, try hard delete as fallback
@@ -1010,8 +1004,8 @@ export default function Forum() {
         .maybeSingle()
 
       if (hardDeleteError) {
-        console.error('❌ Hard delete error:', hardDeleteError)
-        console.error('Error details:', {
+        Logger.error('Hard delete error:', hardDeleteError)
+        Logger.error('Error details:', {
           code: hardDeleteError.code,
           message: hardDeleteError.message,
           details: hardDeleteError.details,
@@ -1048,7 +1042,7 @@ export default function Forum() {
       Alert.alert('Success', 'Post deleted successfully')
     },
     onError: (error) => {
-      console.error('❌ Delete mutation error:', error)
+      Logger.error('Delete mutation error:', error)
       Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to delete post. Please try again.'))
     }
   })
@@ -1169,10 +1163,10 @@ export default function Forum() {
 
       if (error) {
         if (isTableNotFoundError(error)) {
-          console.warn('forum_comment_reactions table missing - run migration to enable comment votes.')
+          Logger.warn('forum_comment_reactions table missing - run migration to enable comment votes.')
           return
         }
-        console.error('Error fetching comment votes:', error)
+        Logger.error('Error fetching comment votes:', error)
         return
       }
 
@@ -1222,7 +1216,7 @@ export default function Forum() {
       .is('deleted_at', null)
 
     if (error) {
-      console.error('Error counting comments:', error)
+      Logger.error('Error counting comments:', error)
       return
     }
 
@@ -1233,7 +1227,7 @@ export default function Forum() {
         .eq('id', postId)
 
       if (updateError) {
-        console.error('Error syncing comment count:', updateError)
+        Logger.error('Error syncing comment count:', updateError)
       }
     }
   }
@@ -1247,7 +1241,7 @@ export default function Forum() {
       .eq('reaction_type', 'upvote')
 
     if (upvoteError) {
-      console.error('Error counting upvotes:', upvoteError)
+      Logger.error('Error counting upvotes:', upvoteError)
       return
     }
 
@@ -1258,7 +1252,7 @@ export default function Forum() {
       .eq('reaction_type', 'downvote')
 
     if (downvoteError) {
-      console.error('Error counting downvotes:', downvoteError)
+      Logger.error('Error counting downvotes:', downvoteError)
       return
     }
 
@@ -1271,7 +1265,7 @@ export default function Forum() {
       .eq('id', postId)
 
     if (updateError) {
-      console.error('Error syncing vote counts:', updateError)
+      Logger.error('Error syncing vote counts:', updateError)
     }
   }
 
@@ -1286,7 +1280,7 @@ export default function Forum() {
 
     if (upvoteError) {
       if (isTableNotFoundError(upvoteError)) return
-      console.error('Error counting comment upvotes:', upvoteError)
+      Logger.error('Error counting comment upvotes:', upvoteError)
       return
     }
 
@@ -1298,7 +1292,7 @@ export default function Forum() {
 
     if (downvoteError) {
       if (isTableNotFoundError(downvoteError)) return
-      console.error('Error counting comment downvotes:', downvoteError)
+      Logger.error('Error counting comment downvotes:', downvoteError)
       return
     }
 
@@ -1311,7 +1305,7 @@ export default function Forum() {
       .eq('id', commentId)
 
     if (updateError) {
-      console.error('Error syncing comment vote counts:', updateError)
+      Logger.error('Error syncing comment vote counts:', updateError)
     }
   }
 
@@ -1354,7 +1348,7 @@ export default function Forum() {
         data,
       })
     } catch (error) {
-      console.warn('Notification insert failed:', error)
+      Logger.warn('Notification insert failed:', error)
     }
   }
 
@@ -1385,7 +1379,7 @@ export default function Forum() {
       .maybeSingle()
 
     if (error) {
-      console.error('Error loading reaction:', error)
+      Logger.error('Error loading reaction:', error)
       Alert.alert('Error', 'Failed to update vote. Please try again.')
       return
     }
@@ -1450,7 +1444,7 @@ export default function Forum() {
         .eq('id', existing.id)
 
       if (deleteError) {
-        console.error('Error removing reaction:', deleteError)
+        Logger.error('Error removing reaction:', deleteError)
         Alert.alert('Error', 'Failed to update vote. Please try again.')
         return
       }
@@ -1461,7 +1455,7 @@ export default function Forum() {
         .eq('id', existing.id)
 
       if (updateError) {
-        console.error('Error updating reaction:', updateError)
+        Logger.error('Error updating reaction:', updateError)
         Alert.alert('Error', 'Failed to update vote. Please try again.')
         return
       }
@@ -1478,7 +1472,7 @@ export default function Forum() {
         if (insertError.code === '23505') {
           setPostUserVotes((prev) => ({ ...prev, [postId]: reactionType }))
         } else {
-          console.error('Error inserting reaction:', insertError)
+          Logger.error('Error inserting reaction:', insertError)
           Alert.alert('Error', 'Failed to update vote. Please try again.')
           return
         }
@@ -1601,7 +1595,7 @@ export default function Forum() {
         Alert.alert('Update required', 'Comment votes require a database update.')
         return
       }
-      console.error('Error loading comment vote:', error)
+      Logger.error('Error loading comment vote:', error)
       Alert.alert('Error', 'Failed to update vote. Please try again.')
       await refetchComments()
       return
@@ -1616,7 +1610,7 @@ export default function Forum() {
         .eq('id', existing.id)
 
       if (deleteError) {
-        console.error('Error removing comment vote:', deleteError)
+        Logger.error('Error removing comment vote:', deleteError)
         Alert.alert('Error', 'Failed to update vote. Please try again.')
         await refetchComments()
         return
@@ -1628,7 +1622,7 @@ export default function Forum() {
         .eq('id', existing.id)
 
       if (updateError) {
-        console.error('Error updating comment vote:', updateError)
+        Logger.error('Error updating comment vote:', updateError)
         Alert.alert('Error', 'Failed to update vote. Please try again.')
         await refetchComments()
         return
@@ -1644,7 +1638,7 @@ export default function Forum() {
 
       if (insertError) {
         if (insertError.code !== '23505') {
-          console.error('Error inserting comment vote:', insertError)
+          Logger.error('Error inserting comment vote:', insertError)
           Alert.alert('Error', 'Failed to update vote. Please try again.')
           await refetchComments()
           return
@@ -1697,7 +1691,7 @@ export default function Forum() {
       .single()
 
     if (error) {
-      console.error('Error posting comment:', error)
+      Logger.error('Error posting comment:', error)
       Alert.alert('Error', 'Failed to post comment. Please try again.')
       await refetchComments()
       return false
@@ -1838,7 +1832,7 @@ export default function Forum() {
         },
       ])
     } catch (error) {
-      console.error('Media pick error:', error)
+      Logger.error('Media pick error:', error)
       Alert.alert('Error', 'Failed to pick media. Please try again.')
     }
   }
@@ -1983,7 +1977,7 @@ export default function Forum() {
                 />
               ) : (
                 <LinearGradient
-                  colors={['#6B7280', '#4B5563']}
+                  colors={[theme.colors.textSecondary, theme.colors.textSecondary]}
                   style={styles.postAvatar}
                 >
                   <Text style={styles.postAvatarText}>
@@ -2098,7 +2092,7 @@ export default function Forum() {
                 size={hp(2.6)}
                 color={isUpvoted ? theme.statusColors.success : theme.colors.textSecondary}
                 strokeWidth={2}
-                fill={isUpvoted ? '#2ecc71' : 'none'}
+                fill={isUpvoted ? theme.colors.success : 'none'}
               />
             </TouchableOpacity>
             <Text
@@ -2121,7 +2115,7 @@ export default function Forum() {
                 size={hp(2.6)}
                 color={isDownvoted ? theme.statusColors.error : theme.colors.textSecondary}
                 strokeWidth={2}
-                fill={isDownvoted ? '#e74c3c' : 'none'}
+                fill={isDownvoted ? theme.colors.destructive : 'none'}
               />
             </TouchableOpacity>
           </View>
@@ -2433,8 +2427,11 @@ export default function Forum() {
                           userId={activeAuthorPost.userId || 'user-123'}
                           userName="Anonymous"
                           onSendMessage={async (messageData) => {
-                            // TODO: Implement actual anonymous message sending
-                            log('Sending anonymous message:', messageData)
+                            log('Anonymous message blocked for privacy:', messageData)
+                            Alert.alert(
+                              'Unavailable',
+                              'Anonymous direct messages are currently disabled for privacy and moderation safety.'
+                            )
                           }}
                         />
                       )}
@@ -2487,8 +2484,10 @@ export default function Forum() {
                         style={styles.postOptionItem}
                         onPress={() => {
                           setPostOptionsPost(null)
-                          // TODO: Implement report functionality
-                          Alert.alert('Report', 'Report functionality coming soon')
+                          Alert.alert(
+                            'Report unavailable',
+                            'Reporting is temporarily unavailable in this build.'
+                          )
                         }}
                         activeOpacity={0.6}
                       >
@@ -2594,7 +2593,7 @@ export default function Forum() {
                       }
 
                       if (!forumIdToUse) {
-                        console.error('No forum selected and no forums available')
+                        Logger.error('No forum selected and no forums available')
                         Alert.alert('Error', 'Please select a forum first')
                         return
                       }
@@ -2650,7 +2649,7 @@ export default function Forum() {
                                 .eq('id', createdPost.id)
 
                               if (updateError) {
-                                console.error('Failed to update post with media:', updateError)
+                                Logger.error('Failed to update post with media:', updateError)
                               } else {
                                 log('✅ Post updated with media successfully')
                                 // Invalidate queries to show updated post with images
@@ -2661,7 +2660,7 @@ export default function Forum() {
                               }
                             }
                           } catch (mediaError) {
-                            console.error('Post media upload failed:', mediaError)
+                            Logger.error('Post media upload failed:', mediaError)
                             Alert.alert(
                               'Media Upload Failed',
                               'Your post was created but the images failed to upload. You can try editing the post to add them again.'
@@ -2677,11 +2676,11 @@ export default function Forum() {
                         setDraftPoll(null)
                         setIsCreateModalVisible(false)
                       } catch (error) {
-                        console.error('Error creating post:', error)
-                        console.error('Error details:', JSON.stringify(error, null, 2))
-                        console.error('Error code:', error.code)
-                        console.error('Error message:', error.message)
-                        console.error('Error details:', error.details)
+                        Logger.error('Error creating post:', error)
+                        Logger.error('Error details:', JSON.stringify(error, null, 2))
+                        Logger.error('Error code:', error.code)
+                        Logger.error('Error message:', error.message)
+                        Logger.error('Error details:', error.details)
 
                         const errorMessage = getFriendlyErrorMessage(error, 'Failed to create post. Please try again.')
                         Alert.alert('Error Creating Post', errorMessage)
@@ -2873,7 +2872,10 @@ export default function Forum() {
                             style={styles.postAsOption}
                             activeOpacity={0.8}
                             onPress={() => {
-                              // TODO: Set posting as org
+                              Alert.alert(
+                                'Unavailable',
+                                'Posting as organization is not enabled yet for this build.'
+                              )
                               setShowPostAsModal(false)
                             }}
                           >
@@ -3094,9 +3096,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   forumTitle: {
     fontSize: hp(2.4),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     letterSpacing: -0.3,
   },
   favoriteButton: {
@@ -3131,7 +3132,7 @@ const createStyles = (theme) => StyleSheet.create({
   headerAvatarFallbackText: {
     color: theme.colors.bondedPurple,
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   headerCenter: {
     flex: 1,
@@ -3167,8 +3168,7 @@ const createStyles = (theme) => StyleSheet.create({
   notificationBadgeText: {
     fontSize: hp(1.1),
     color: theme.colors.white,
-    fontWeight: '700',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.bold,
     includeFontPadding: false,
   },
   searchContainer: {
@@ -3209,9 +3209,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   clearButtonText: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
-    fontWeight: '600',
   },
   createPostIconButton: {
     padding: hp(0.5),
@@ -3240,8 +3239,7 @@ const createStyles = (theme) => StyleSheet.create({
   createPostText: {
     fontSize: hp(1.6),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   createEventButton: {
     flex: 1,
@@ -3258,8 +3256,7 @@ const createStyles = (theme) => StyleSheet.create({
   createEventText: {
     fontSize: hp(1.6),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   filterRow: {
     flexDirection: 'row',
@@ -3285,13 +3282,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   filterButtonText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
   },
   filterButtonTextActive: {
     color: theme.colors.textPrimary,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   storiesWrapper: {
     marginBottom: hp(1.5),
@@ -3310,7 +3306,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.heading,
     color: theme.colors.textPrimary,
-    fontWeight: '600',
   },
   storiesPlaceholderSubtitle: {
     marginTop: hp(0.3),
@@ -3353,8 +3348,7 @@ const createStyles = (theme) => StyleSheet.create({
   storyAvatarText: {
     fontSize: hp(2.2),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   storyLabel: {
     fontSize: hp(1.3),
@@ -3409,8 +3403,7 @@ const createStyles = (theme) => StyleSheet.create({
   postAvatarText: {
     fontSize: hp(2),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   postAuthorInfo: {
     flex: 1,
@@ -3419,14 +3412,12 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.7),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
   },
   postMetaText: {
     fontSize: hp(1.3),
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
     marginTop: hp(0.1),
-    fontWeight: '400',
   },
   postBody: {
     marginBottom: hp(1),
@@ -3434,9 +3425,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   postTitle: {
     fontSize: hp(2.1),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(0.6),
     lineHeight: hp(2.7),
   },
@@ -3502,8 +3492,7 @@ const createStyles = (theme) => StyleSheet.create({
   postVoteCount: {
     fontSize: hp(1.7),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     minWidth: wp(5),
     textAlign: 'center',
   },
@@ -3523,8 +3512,7 @@ const createStyles = (theme) => StyleSheet.create({
   postActionText: {
     fontSize: hp(1.6),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   modalOverlay: {
     flex: 1,
@@ -3574,8 +3562,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createPostButtonText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   fizzModalSafeArea: {
@@ -3626,7 +3613,6 @@ const createStyles = (theme) => StyleSheet.create({
   fizzAnonymousText: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   fizzPostButton: {
@@ -3641,8 +3627,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   fizzPostButtonText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   fizzContentArea: {
@@ -3654,7 +3639,6 @@ const createStyles = (theme) => StyleSheet.create({
   fizzTitleInput: {
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     paddingBottom: hp(1),
     marginBottom: hp(1),
@@ -3717,8 +3701,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   fizzSelectedTagText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
     letterSpacing: 0.3,
     flex: 1,
@@ -3737,7 +3720,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   tagSelectorOverlayBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3798,8 +3781,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   tagModalTitle: {
     fontSize: theme.typography.sizes.xl,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     letterSpacing: -0.3,
   },
@@ -3856,8 +3838,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   fizzTagPillText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
     letterSpacing: 0.2,
   },
@@ -3929,8 +3910,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   postAsModalTitle: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     paddingHorizontal: wp(4),
     marginBottom: hp(2),
@@ -3956,7 +3936,6 @@ const createStyles = (theme) => StyleSheet.create({
   postAsOptionTitle: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   postAsOptionSubtitle: {
@@ -3984,8 +3963,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   postModalHeaderTitle: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   mediaIconsRow: {
@@ -4025,8 +4003,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
@@ -4055,16 +4032,14 @@ const createStyles = (theme) => StyleSheet.create({
   },
   postFooterButtonText: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   postModalTitle: {
     flex: 1,
     fontSize: hp(2.2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     marginRight: wp(2),
   },
   postModalMeta: {
@@ -4143,13 +4118,11 @@ const createStyles = (theme) => StyleSheet.create({
   },
   commentsTitle: {
     fontSize: hp(1.8),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   commentsCount: {
     fontSize: hp(1.6),
-    fontWeight: '400',
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -4183,8 +4156,7 @@ const createStyles = (theme) => StyleSheet.create({
   commentAvatarText: {
     fontSize: hp(1.8),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   commentAuthorInfo: {
     flex: 1,
@@ -4193,7 +4165,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.6),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     marginRight: wp(1.5),
   },
   commentMetaText: {
@@ -4227,8 +4198,7 @@ const createStyles = (theme) => StyleSheet.create({
   commentLikeText: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   commentLikeTextActive: {
     color: theme.colors.info,
@@ -4236,8 +4206,7 @@ const createStyles = (theme) => StyleSheet.create({
   commentLikeLabel: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   commentLikeLabelActive: {
     color: theme.colors.info,
@@ -4249,8 +4218,7 @@ const createStyles = (theme) => StyleSheet.create({
   commentReplyText: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   repliesContainer: {
     marginTop: hp(1),
@@ -4284,8 +4252,7 @@ const createStyles = (theme) => StyleSheet.create({
   replyAvatarText: {
     fontSize: hp(1.5),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   replyAuthorInfo: {
     flex: 1,
@@ -4294,7 +4261,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.5),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     marginRight: wp(1.5),
   },
   replyMetaText: {
@@ -4363,8 +4329,7 @@ const createStyles = (theme) => StyleSheet.create({
   replySubmitText: {
     fontSize: hp(1.5),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   newCommentContainer: {
     padding: wp(4),
@@ -4415,8 +4380,7 @@ const createStyles = (theme) => StyleSheet.create({
   commentSubmitText: {
     fontSize: hp(1.6),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   anonPillSmall: {
     flexDirection: 'row',
@@ -4436,8 +4400,7 @@ const createStyles = (theme) => StyleSheet.create({
   anonPillTextSmall: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   emptyCommentsBox: {
     paddingVertical: hp(3),
@@ -4476,9 +4439,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileName: {
     fontSize: hp(2.4),
-    fontWeight: '800',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.extrabold,
   },
   profileSubText: {
     marginTop: hp(0.5),
@@ -4502,8 +4464,7 @@ const createStyles = (theme) => StyleSheet.create({
   profileAvatarLargeText: {
     fontSize: hp(3),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   profileMetaRow: {
     flexDirection: 'row',
@@ -4529,7 +4490,6 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileSectionLabel: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.6),
@@ -4562,14 +4522,12 @@ const createStyles = (theme) => StyleSheet.create({
   profileSecondaryText: {
     fontSize: hp(1.8),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   profilePrimaryText: {
     fontSize: hp(1.8),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   inputGroup: {
     marginBottom: hp(1.8),
@@ -4623,8 +4581,7 @@ const createStyles = (theme) => StyleSheet.create({
   mediaButtonText: {
     fontSize: hp(1.6),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   composeBody: {
     flex: 1,
@@ -4656,8 +4613,7 @@ const createStyles = (theme) => StyleSheet.create({
   optionalFeatureButtonText: {
     fontSize: hp(1.5),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   optionalFeatureButtonTextActive: {
     color: theme.colors.white,
@@ -4668,9 +4624,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   composeTitleInput: {
     fontSize: hp(1.8),
-    fontWeight: '500',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     marginBottom: hp(1.5),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1),
@@ -4703,8 +4658,7 @@ const createStyles = (theme) => StyleSheet.create({
   composePostButtonText: {
     fontSize: hp(1.7),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   anonPill: {
     backgroundColor: theme.colors.backgroundSecondary,
@@ -4735,10 +4689,10 @@ const createStyles = (theme) => StyleSheet.create({
     aspectRatio: 1,
     borderRadius: hp(1.2),
     overflow: 'hidden',
-    backgroundColor: theme.colors.border || '#E5E5E5',
+    backgroundColor: theme.colors.border,
     position: 'relative',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border || '#E5E5E5',
+    borderColor: theme.colors.border,
   },
   draftMediaSingleImage: {
     width: '100%',
@@ -4755,7 +4709,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(3.2),
     height: hp(3.2),
     borderRadius: hp(1.6),
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: theme.colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -4780,10 +4734,10 @@ const createStyles = (theme) => StyleSheet.create({
     aspectRatio: 1,
     borderRadius: hp(1.2),
     overflow: 'hidden',
-    backgroundColor: theme.colors.border || '#E5E5E5',
+    backgroundColor: theme.colors.border,
     position: 'relative',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border || '#E5E5E5',
+    borderColor: theme.colors.border,
   },
   draftMediaTwoImage: {
     width: '100%',
@@ -4800,7 +4754,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(2.8),
     height: hp(2.8),
     borderRadius: hp(1.4),
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: theme.colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -4826,10 +4780,10 @@ const createStyles = (theme) => StyleSheet.create({
     aspectRatio: 1,
     borderRadius: hp(1.2),
     overflow: 'hidden',
-    backgroundColor: theme.colors.border || '#E5E5E5',
+    backgroundColor: theme.colors.border,
     position: 'relative',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border || '#E5E5E5',
+    borderColor: theme.colors.border,
   },
   draftMediaGridImage: {
     width: '100%',
@@ -4848,7 +4802,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   draftMediaMoreText: {
     fontSize: hp(2.8),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
     letterSpacing: 0.5,
   },
@@ -4862,7 +4816,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(2.6),
     height: hp(2.6),
     borderRadius: hp(1.3),
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: theme.colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -4902,8 +4856,7 @@ const createStyles = (theme) => StyleSheet.create({
   errorText: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.error || '#ef4444',
+    color: theme.colors.error,
     textAlign: 'center',
     marginBottom: theme.spacing.md,
   },
@@ -4916,7 +4869,6 @@ const createStyles = (theme) => StyleSheet.create({
   retryButtonText: {
     fontSize: theme.typography.sizes.base,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.white,
   },
   emptyState: {
@@ -4929,7 +4881,6 @@ const createStyles = (theme) => StyleSheet.create({
   emptyStateText: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     marginBottom: hp(2),
@@ -4944,7 +4895,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.6),
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
   },
   draftMediaPreview: {
     marginTop: hp(1.5),
@@ -4994,8 +4944,7 @@ const createStyles = (theme) => StyleSheet.create({
   addPollText: {
     fontSize: hp(1.6),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   commentsHeaderRight: {
     flexDirection: 'row',
@@ -5036,13 +4985,12 @@ const createStyles = (theme) => StyleSheet.create({
   campusSelectorText: {
     fontSize: hp(1.3),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     maxWidth: wp(28),
   },
   campusModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     justifyContent: 'flex-end',
   },
   campusModalContent: {
@@ -5063,8 +5011,7 @@ const createStyles = (theme) => StyleSheet.create({
   campusModalTitle: {
     fontSize: hp(2),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   campusModalList: {
     paddingBottom: hp(2),
@@ -5084,8 +5031,7 @@ const createStyles = (theme) => StyleSheet.create({
   campusModalItemText: {
     fontSize: hp(1.6),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   campusModalItemTextActive: {
     color: theme.colors.bondedPurple,
@@ -5115,8 +5061,7 @@ const createStyles = (theme) => StyleSheet.create({
   emptyForumStateTitle: {
     fontSize: hp(2.2),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     textAlign: 'center',
     marginBottom: hp(1),
   },
@@ -5136,12 +5081,11 @@ const createStyles = (theme) => StyleSheet.create({
   emptyForumStateButtonText: {
     fontSize: hp(1.5),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   postOptionsOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   postOptionsBottomSheet: {
@@ -5165,7 +5109,7 @@ const createStyles = (theme) => StyleSheet.create({
   postOptionsHandle: {
     width: wp(12),
     height: hp(0.5),
-    backgroundColor: theme.colors.border || 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: theme.colors.border,
     borderRadius: hp(0.25),
     alignSelf: 'center',
     marginBottom: hp(1.5),
@@ -5179,35 +5123,32 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: wp(4),
     borderRadius: hp(1),
     marginBottom: hp(0.5),
-    backgroundColor: theme.colors.backgroundSecondary || 'rgba(0, 0, 0, 0.03)',
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   postOptionText: {
     fontSize: hp(1.9),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   postOptionTextDanger: {
     fontSize: hp(1.9),
-    color: theme.colors.error || '#FF3B30',
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    color: theme.colors.error,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   postOptionsCancel: {
     marginTop: hp(1),
     marginHorizontal: wp(4),
     paddingVertical: hp(1.8),
     borderRadius: hp(1),
-    backgroundColor: theme.colors.backgroundSecondary || 'rgba(0, 0, 0, 0.03)',
+    backgroundColor: theme.colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   postOptionsCancelText: {
     fontSize: hp(1.9),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
 })

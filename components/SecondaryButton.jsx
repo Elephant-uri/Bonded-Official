@@ -1,8 +1,8 @@
-import React from 'react'
-import { Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { hp, wp } from '../helpers/common'
+import React from 'react'
+import { Animated, Pressable, StyleSheet, Text } from 'react-native'
 import { useAppTheme } from '../app/theme'
+import { usePressScale } from '../utils/animations'
 
 const SecondaryButton = ({
   label,
@@ -14,57 +14,56 @@ const SecondaryButton = ({
   textStyle,
 }) => {
   const theme = useAppTheme()
-  const styles = createStyles(theme)
-  
+  const { scaleStyle, onPressIn, onPressOut } = usePressScale(
+    theme.motion.pressScale,
+    theme.motion.duration.fast
+  )
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-      style={[styles.button, style, disabled && styles.buttonDisabled]}
-    >
-      {icon && iconPosition === 'left' && (
-        <Ionicons
-          name={icon}
-          size={hp(2)}
-          color={theme.colors.textPrimary}
-          style={{ marginRight: wp(2) }}
-        />
-      )}
-      <Text style={[styles.label, textStyle]}>{label}</Text>
-      {icon && iconPosition === 'right' && (
-        <Ionicons
-          name={icon}
-          size={hp(2)}
-          color={theme.colors.textPrimary}
-          style={{ marginLeft: wp(2) }}
-        />
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[scaleStyle, style]}>
+      <Pressable
+        onPress={disabled ? undefined : onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={disabled}
+        style={[
+          styles.button,
+          {
+            borderRadius: theme.radius.pill,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.background,
+          },
+          disabled && styles.disabled,
+        ]}
+      >
+        {icon && iconPosition === 'left' && (
+          <Ionicons name={icon} size={18} color={theme.colors.textPrimary} style={{ marginRight: theme.spacing.sm }} />
+        )}
+        <Text style={[styles.label, { color: theme.colors.textPrimary, fontFamily: theme.typography.fontFamily.semibold }, textStyle]}>{label}</Text>
+        {icon && iconPosition === 'right' && (
+          <Ionicons name={icon} size={18} color={theme.colors.textPrimary} style={{ marginLeft: theme.spacing.sm }} />
+        )}
+      </Pressable>
+    </Animated.View>
   )
 }
 
 export default SecondaryButton
 
-const createStyles = (theme) => StyleSheet.create({
+const styles = StyleSheet.create({
   button: {
-    paddingVertical: hp(1.5),
-    paddingHorizontal: wp(5),
-    borderRadius: theme.radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  disabled: {
+    opacity: 0.45,
   },
   label: {
-    fontSize: hp(1.6),
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
+    fontSize: 15,
+    letterSpacing: -0.1,
   },
 })
-

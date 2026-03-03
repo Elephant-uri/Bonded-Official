@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Fetch reactions for a specific message
@@ -18,7 +19,7 @@ export function useMessageReactions(messageId) {
         .order('created_at', { ascending: true })
 
       if (error) {
-        console.error('Error fetching message reactions:', error)
+        Logger.error('Error fetching message reactions:', error)
         throw error
       }
 
@@ -45,7 +46,7 @@ export function useConversationReactions(conversationId, messageIds) {
         .order('created_at', { ascending: true })
 
       if (error) {
-        console.error('Error fetching conversation reactions:', error)
+        Logger.error('Error fetching conversation reactions:', error)
         throw error
       }
 
@@ -87,7 +88,7 @@ export function useAddReaction() {
         .single()
 
       if (error) {
-        console.error('Error adding reaction:', error)
+        Logger.error('Error adding reaction:', error)
         throw error
       }
 
@@ -120,7 +121,7 @@ export function useRemoveReaction() {
         .eq('reaction_type', reactionType)
 
       if (error) {
-        console.error('Error removing reaction:', error)
+        Logger.error('Error removing reaction:', error)
         throw error
       }
 

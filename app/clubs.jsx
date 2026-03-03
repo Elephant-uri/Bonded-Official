@@ -42,6 +42,8 @@ export default function Clubs() {
   const { openOrg } = useOrgModal()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [failedCoverIds, setFailedCoverIds] = useState(() => new Set())
+  const [failedAvatarIds, setFailedAvatarIds] = useState(() => new Set())
 
   const getCategoryTheme = (category) => {
     switch (category) {
@@ -96,6 +98,9 @@ export default function Clubs() {
     const memberCount = item.members?.length || 0
     const categoryTheme = getCategoryTheme(item.category)
 
+    const showCoverImage = Boolean(item.coverImage) && !failedCoverIds.has(item.id)
+    const showAvatarImage = Boolean(item.avatar) && !failedAvatarIds.has(item.id)
+
     return (
       <TouchableOpacity
         onPress={() => openOrg(item.id)}
@@ -104,8 +109,18 @@ export default function Clubs() {
       >
         <AppCard radius="lg" padding={false} style={styles.clubCard}>
           <View style={styles.clubImageWrapper}>
-            {item.coverImage ? (
-              <Image source={{ uri: item.coverImage }} style={styles.clubCover} />
+            {showCoverImage ? (
+              <Image
+                source={{ uri: item.coverImage }}
+                style={styles.clubCover}
+                onError={() =>
+                  setFailedCoverIds((prev) => {
+                    const next = new Set(prev)
+                    next.add(item.id)
+                    return next
+                  })
+                }
+              />
             ) : (
               <LinearGradient colors={categoryTheme.colors} style={styles.clubCoverPlaceholder}>
                 <View
@@ -141,8 +156,18 @@ export default function Clubs() {
               <Text style={styles.clubName}>{item.name}</Text>
             </View>
             <View style={styles.clubAvatarBadge}>
-              {item.avatar ? (
-                <Image source={{ uri: item.avatar }} style={styles.clubAvatarImage} />
+              {showAvatarImage ? (
+                <Image
+                  source={{ uri: item.avatar }}
+                  style={styles.clubAvatarImage}
+                  onError={() =>
+                    setFailedAvatarIds((prev) => {
+                      const next = new Set(prev)
+                      next.add(item.id)
+                      return next
+                    })
+                  }
+                />
               ) : (
                 <View style={styles.clubAvatarFallback}>
                   <Text style={styles.clubAvatarInitial}>
@@ -330,8 +355,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(3.5),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.extrabold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
@@ -395,8 +419,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   tabText: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   activeTabText: {
@@ -437,8 +460,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   clubCoverInitial: {
     fontSize: hp(4.5),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.extrabold,
   },
   clubCoverDot: {
     position: 'absolute',
@@ -473,7 +495,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   clubName: {
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#FFFFFF',
   },
   clubAvatarBadge: {
@@ -515,8 +537,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   clubAvatarInitial: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.extrabold,
     color: theme.colors.bondedPurple,
   },
   clubContent: {
@@ -573,8 +594,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   leadershipLabel: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   leadershipName: {
@@ -584,9 +604,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   leadershipMore: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
   },
   meetingInfo: {
     marginTop: hp(0.8),

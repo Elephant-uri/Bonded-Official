@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { hp, wp } from '../../helpers/common'
 
 export default function ChatInput({
@@ -25,13 +26,13 @@ export default function ChatInput({
             {/* Image Preview (inside input area, Instagram-style) */}
             {selectedImage && (
                 <View style={styles.inlineImagePreview}>
-                    <Image source={{ uri: selectedImage }} style={styles.inlineImagePreviewImage} />
+                    <CachedImage source={{ uri: selectedImage }} style={styles.inlineImagePreviewImage} />
                     <TouchableOpacity
                         style={styles.inlineRemoveImageButton}
                         onPress={removeSelectedImage}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="close-circle" size={hp(2.5)} color={theme.colors.error || '#FF3B30'} />
+                        <Ionicons name="close-circle" size={hp(2.5)} color={theme.colors.error} />
                     </TouchableOpacity>
                 </View>
             )}
@@ -80,7 +81,7 @@ const createStyles = (theme) => StyleSheet.create({
         padding: wp(2),
         backgroundColor: theme.colors.background,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: theme.colors.border || 'rgba(0,0,0,0.1)',
+        borderTopColor: theme.colors.border,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -104,7 +105,7 @@ const createStyles = (theme) => StyleSheet.create({
         paddingVertical: hp(1),
         backgroundColor: theme.colors.background,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: theme.colors.border || 'rgba(0,0,0,0.1)',
+        borderTopColor: theme.colors.border,
         paddingBottom: Platform.OS === 'ios' ? hp(2) : hp(1),
     },
     floatingAttachButton: {

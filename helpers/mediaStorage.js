@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy'
 import { supabase } from '../lib/supabase'
+import { Logger } from '../utils/logger'
 
 const BONDED_MEDIA_BUCKET = 'bonded-media'
 const DEFAULT_SIGNED_URL_TTL = 60 * 60 * 24 * 7
@@ -23,7 +24,7 @@ export async function getUniversityIdForUser(userId) {
     .maybeSingle()
 
   if (error) {
-    console.warn('⚠️ Error fetching university_id for media upload (this is normal for new users):', error.message)
+    Logger.warn('Error fetching university_id for media upload (this is normal for new users):', error.message)
     return null
   }
 
@@ -139,8 +140,8 @@ export async function uploadImageToBondedMedia({
     mediaId,
   })
 
-  console.log('📁 Upload path:', path)
-  console.log('🔐 Upload context:', {
+  Logger.info('Upload path:', path)
+  Logger.info('Upload context:', {
     bucket: BONDED_MEDIA_BUCKET,
     mediaType,
     userId,
@@ -157,11 +158,11 @@ export async function uploadImageToBondedMedia({
     })
 
   if (uploadError) {
-    console.error('Supabase storage upload failed:', uploadError)
+    Logger.error('Supabase storage upload failed:', uploadError)
     throw uploadError
   }
 
-  console.log('✅ File uploaded to storage successfully')
+  Logger.info('File uploaded to storage successfully')
 
   // Insert or update media record
   // If upsert=true, we need to handle the case where the record already exists
@@ -206,11 +207,11 @@ export async function uploadImageToBondedMedia({
   }
 
   if (mediaError) {
-    console.error('Failed to insert/update media record:', mediaError)
+    Logger.error('Failed to insert/update media record:', mediaError)
     throw mediaError
   }
 
-  console.log('✅ Media record saved successfully:', mediaData?.id)
+  Logger.info('Media record saved successfully:', mediaData?.id)
 
   return {
     path: uploadData?.path || path,
@@ -239,7 +240,7 @@ export async function createSignedUrlForPath(path, ttlSeconds = DEFAULT_SIGNED_U
       .createSignedUrl(path, ttlSeconds)
 
     if (error) {
-      console.warn('Failed to sign media URL:', error.message)
+      Logger.warn('Failed to sign media URL:', error.message)
       // Fallback: try to get public URL
       const { data: publicData } = supabase.storage
         .from(BONDED_MEDIA_BUCKET)
@@ -263,7 +264,7 @@ export async function createSignedUrlForPath(path, ttlSeconds = DEFAULT_SIGNED_U
 
     return signedUrl || null
   } catch (error) {
-    console.error('Failed to create signed URL:', error)
+    Logger.error('Failed to create signed URL:', error)
     return null
   }
 }
@@ -284,7 +285,7 @@ export async function resolveMediaUrls(mediaUrls, ttlSeconds = DEFAULT_SIGNED_UR
         const resolvedUrl = await createSignedUrlForPath(url, ttlSeconds)
         return resolvedUrl
       } catch (error) {
-        console.warn('Failed to resolve media URL:', url, error.message)
+        Logger.warn('Failed to resolve media URL:', url, error.message)
         return null
       }
     })

@@ -130,9 +130,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(2.6),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(0.5),
   },
   subtitle: {
@@ -171,7 +170,7 @@ const createStyles = (theme) => StyleSheet.create({
   emptyTitle: {
     marginTop: hp(2),
     fontSize: hp(2.2),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
   },
@@ -190,7 +189,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyButtonText: {
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   schoolCard: {
     flexDirection: 'row',
@@ -206,9 +205,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   schoolName: {
     fontSize: hp(2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(0.5),
   },
   schoolMeta: {

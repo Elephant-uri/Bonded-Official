@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
-import { Animated, FlatList, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Animated, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../components/CachedImage'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import AppTopBar from '../components/AppTopBar'
@@ -78,7 +79,7 @@ export default function Network() {
       >
         <AppCard radius="md" padding={false} style={styles.card}>
           <View style={styles.cardImageWrapper}>
-            <Image source={{ uri: photoUrl }} style={styles.cardImage} />
+            <CachedImage source={{ uri: photoUrl }} style={styles.cardImage} />
             <LinearGradient
               colors={['transparent', 'rgba(0, 0, 0, 0.7)']}
               style={styles.cardGradient}
@@ -315,8 +316,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: theme.typography.sizes.lg,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   loadingContainer: {
@@ -371,8 +371,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   cardName: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   cardInfo: {
@@ -395,8 +394,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   cardBadgeText: {
     fontSize: theme.typography.sizes.xs,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.accent,
   },
   emptyState: {
@@ -408,8 +406,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyStateText: {
     fontSize: theme.typography.sizes.lg,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginTop: theme.spacing.md,
     textAlign: 'center',
@@ -480,8 +477,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileModalName: {
     fontSize: theme.typography.sizes.xxl,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.xs,
   },
@@ -524,8 +520,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sharedClassText: {
     fontSize: theme.typography.sizes.xs,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#fff',
   },
   sharedClassesSection: {
@@ -533,8 +528,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sharedClassesTitle: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
@@ -559,8 +553,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   interestsTitle: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },

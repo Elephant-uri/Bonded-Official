@@ -13,13 +13,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 const MessagesContext = createContext()
 
 export const MessagesProvider = ({ children }) => {
   const { user } = useAuthStore()
   const log = (...args) => {
-    if (__DEV__) console.log(...args)
+    Logger.info(...args)
   }
   const [conversations, setConversations] = useState([])
   const [messages, setMessages] = useState({}) // { conversationId: [messages] }
@@ -82,19 +83,19 @@ export const MessagesProvider = ({ children }) => {
         .eq('user_id', user.id)
 
       if (isTableNotFoundError(error)) {
-        console.warn('Conversations table not found, using empty state')
+        Logger.warn('Conversations table not found, using empty state')
         setConversations([])
         return
       }
 
       if (isPolicyRecursionError(error)) {
-        console.warn('Conversation RLS recursion detected, using empty state')
+        Logger.warn('Conversation RLS recursion detected, using empty state')
         setConversations([])
         return
       }
 
       if (error) {
-        console.error('Error loading conversations:', error)
+        Logger.error('Error loading conversations:', error)
         throw error
       }
 
@@ -118,7 +119,7 @@ export const MessagesProvider = ({ children }) => {
           .neq('user_id', user.id)
 
         if (participantsError) {
-          console.warn('Error loading conversation participants:', participantsError)
+          Logger.warn('Error loading conversation participants:', participantsError)
         } else {
           participantsByConversation = (participantsData || []).reduce((acc, row) => {
             if (!acc[row.conversation_id]) acc[row.conversation_id] = []
@@ -139,7 +140,7 @@ export const MessagesProvider = ({ children }) => {
           .limit(limit)
 
         if (recentMessagesError) {
-          console.warn('Error loading recent messages:', recentMessagesError)
+          Logger.warn('Error loading recent messages:', recentMessagesError)
         } else {
           (recentMessages || []).forEach((msg) => {
             if (!lastMessageByConversation[msg.conversation_id]) {
@@ -196,7 +197,7 @@ export const MessagesProvider = ({ children }) => {
 
       setConversations(conversationsWithDetails)
     } catch (error) {
-      console.error('Error loading conversations:', error)
+      Logger.error('Error loading conversations:', error)
     } finally {
       setIsLoading(false)
     }
@@ -246,7 +247,7 @@ export const MessagesProvider = ({ children }) => {
 
       return newConv.id
     } catch (error) {
-      console.error('Error getting/creating conversation:', error)
+      Logger.error('Error getting/creating conversation:', error)
 
       // Fallback for when tables don't exist
       if (isTableNotFoundError(error)) {
@@ -298,7 +299,7 @@ export const MessagesProvider = ({ children }) => {
 
       return newConv.id
     } catch (error) {
-      console.error('Error creating group conversation:', error)
+      Logger.error('Error creating group conversation:', error)
       throw error
     }
   }, [user?.id, loadConversations])
@@ -339,7 +340,7 @@ export const MessagesProvider = ({ children }) => {
         .limit(limit)
 
       if (error) {
-        console.error('Error loading messages:', error)
+        Logger.error('Error loading messages:', error)
         throw error
       }
 
@@ -351,7 +352,7 @@ export const MessagesProvider = ({ children }) => {
         [conversationId]: sortedMessages,
       }))
     } catch (error) {
-      console.error('Error loading messages:', error)
+      Logger.error('Error loading messages:', error)
       setMessages(prev => ({
         ...prev,
         [conversationId]: [],
@@ -385,7 +386,7 @@ export const MessagesProvider = ({ children }) => {
       .limit(limit)
 
     if (error) {
-      console.warn('Polling messages failed:', error)
+      Logger.warn('Polling messages failed:', error)
       return
     }
 
@@ -465,7 +466,7 @@ export const MessagesProvider = ({ children }) => {
         .single()
 
       if (error) {
-        console.error('Error sending message:', error)
+        Logger.error('Error sending message:', error)
         throw error
       }
 
@@ -488,12 +489,12 @@ export const MessagesProvider = ({ children }) => {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', conversationId)
         .then(({ error }) => {
-          if (error) console.warn('Non-critical: Failed to update conversation timestamp:', error)
+          if (error) Logger.warn('Non-critical: Failed to update conversation timestamp:', error)
         })
 
       return data
     } catch (error) {
-      console.error('Error sending message:', error)
+      Logger.error('Error sending message:', error)
       throw error
     }
   }, [user?.id, user?.user_metadata])
@@ -505,7 +506,7 @@ export const MessagesProvider = ({ children }) => {
   // Subscribe to new messages in a conversation
   const subscribeToMessages = useCallback((conversationId) => {
     if (!isValidUUID(conversationId)) {
-      console.warn('⚠️ Invalid conversationId for subscription:', conversationId)
+      Logger.warn('Invalid conversationId for subscription:', conversationId)
       return
     }
 
@@ -530,7 +531,7 @@ export const MessagesProvider = ({ children }) => {
     let isSubscribed = false
     const timeoutId = setTimeout(() => {
       if (isSubscribed || realtimeDisabledRef.current) return
-      console.warn('⏳ Message subscription timed out, falling back to polling:', conversationId)
+      Logger.warn('Message subscription timed out, falling back to polling:', conversationId)
       realtimeDisabledRef.current = true
       setRealtimeDisabled(true)
       startPollingMessages(conversationId)
@@ -557,7 +558,7 @@ export const MessagesProvider = ({ children }) => {
 
           // Guard against unexpected payloads
           if (!newMessage?.id) {
-            console.warn('⚠️ Real-time payload without message id, skipping:', payload)
+            Logger.warn('Real-time payload without message id, skipping:', payload)
             return
           }
 
@@ -569,7 +570,7 @@ export const MessagesProvider = ({ children }) => {
             try {
               parsedMetadata = JSON.parse(newMessage.metadata)
             } catch (e) {
-              console.warn('Failed to parse message metadata in real-time:', e)
+              Logger.warn('Failed to parse message metadata in real-time:', e)
               parsedMetadata = {}
             }
           }
@@ -585,7 +586,7 @@ export const MessagesProvider = ({ children }) => {
                 .single()
 
               if (senderError) {
-                console.error('Error fetching sender:', senderError)
+                Logger.error('Error fetching sender:', senderError)
               } else {
                 sender = senderData
                 if (sender) {
@@ -616,7 +617,7 @@ export const MessagesProvider = ({ children }) => {
               const existing = prev[conversationId] || []
               // Avoid duplicates
               if (existing.find(m => m.id === newMessage.id)) {
-                log('⚠️ Duplicate message ignored:', newMessage.id)
+                log('Duplicate message ignored:', newMessage.id)
                 return prev
               }
               // log('✅ Adding new message to state:', newMessage.id)
@@ -675,23 +676,23 @@ export const MessagesProvider = ({ children }) => {
           }
           if (!realtimeWarnedRef.current) {
             realtimeWarnedRef.current = true
-            console.error('❌ Channel subscription error for conversation:', conversationId)
+            Logger.error('Channel subscription error for conversation:', conversationId)
             if (err) {
-              console.error('   Error details:', err)
+              Logger.error('Error details:', err)
             }
-            log('💡 This may be due to:')
-            log('   1. Real-time not enabled for messages table in Supabase')
-            log('      → Run database/enable-realtime-messaging.sql in Supabase SQL Editor')
-            log('   2. RLS policies blocking subscription')
-            log('      → Run database/check-realtime-status.sql to diagnose')
-            log('   3. Conversation not fully created yet')
-            log('   Messages will still work via polling, but real-time updates may not work')
+            log('This may be due to:')
+            log('1. Real-time not enabled for messages table in Supabase')
+            log('   Run database/enable-realtime-messaging.sql in Supabase SQL Editor')
+            log('2. RLS policies blocking subscription')
+            log('   Run database/check-realtime-status.sql to diagnose')
+            log('3. Conversation not fully created yet')
+            log('Messages will still work via polling, but real-time updates may not work')
           }
           realtimeDisabledRef.current = true
           setRealtimeDisabled(true)
           startPollingMessages(conversationId)
         } else if (status === 'TIMED_OUT') {
-          console.warn('⏱️ Channel subscription timed out for conversation:', conversationId)
+          Logger.warn('Channel subscription timed out for conversation:', conversationId)
           if (subscriptionTimeoutsRef.current[conversationId]) {
             clearTimeout(subscriptionTimeoutsRef.current[conversationId])
             delete subscriptionTimeoutsRef.current[conversationId]
@@ -888,7 +889,7 @@ export const MessagesProvider = ({ children }) => {
         )
       )
     } catch (error) {
-      console.error('Error marking as read:', error)
+      Logger.error('Error marking as read:', error)
     }
   }, [user?.id])
 
@@ -921,11 +922,11 @@ export const MessagesProvider = ({ children }) => {
         .single()
 
       if (error) {
-        console.error('Error unsending message:', error)
+        Logger.error('Error unsending message:', error)
         throw error
       }
 
-      log('✅ Message marked as unsent:', messageId)
+      log('Message marked as unsent:', messageId)
 
       // Optimistically update local state so the sender sees it immediately
       setMessages(prev => {
@@ -956,7 +957,7 @@ export const MessagesProvider = ({ children }) => {
 
       return true
     } catch (error) {
-      console.error('Error unsending message:', error)
+      Logger.error('Error unsending message:', error)
       throw error
     }
   }, [user?.id, loadConversations])

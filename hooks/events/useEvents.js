@@ -6,6 +6,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { Logger } from '../../utils/logger'
 
 /**
  * Fetch events for the current user's university
@@ -28,7 +29,7 @@ export function useEvents(filters = {}) {
         .single()
 
       if (profileError) {
-        console.error('Error fetching user profile:', profileError)
+        Logger.error('Error fetching user profile:', profileError)
         throw profileError
       }
 
@@ -60,7 +61,7 @@ export function useEvents(filters = {}) {
       const { data, error } = await query
 
       if (error) {
-        console.error('Error fetching events:', error)
+        Logger.error('Error fetching events:', error)
         throw error
       }
 
@@ -120,7 +121,7 @@ export function useEvent(eventId) {
         .single()
 
       if (error) {
-        console.error('Error fetching event:', error)
+        Logger.error('Error fetching event:', error)
         throw error
       }
 

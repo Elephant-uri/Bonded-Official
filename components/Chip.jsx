@@ -88,9 +88,9 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'center',
   },
   chipInactive: {
-    backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : theme.colors.borderSecondary,
     borderWidth: 1,
-    borderColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
+    borderColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : theme.colors.border,
   },
   gradient: {
     paddingHorizontal: wp(3),
@@ -102,8 +102,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: hp(1.4),
-    fontWeight: '500',
-    color: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.6)',
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.65)' : theme.colors.overlay,
   },
   labelActive: {
     color: theme.colors.white,

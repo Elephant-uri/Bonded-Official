@@ -264,6 +264,7 @@ function parseTime(timeStr) {
 
 import { extractTextFromImage } from '../utils/ocr/extractText'
 import { parseSchedule } from '../utils/schedule/parseSchedule'
+import { Logger } from '../utils/logger'
 
 /**
  * Parse screenshot/image using production-ready OCR and spatial parsing
@@ -273,7 +274,7 @@ import { parseSchedule } from '../utils/schedule/parseSchedule'
  */
 export async function parseScheduleImage(imageUri) {
   try {
-    console.log('🚀 Starting schedule OCR and parsing for:', imageUri)
+    Logger.info('Starting schedule OCR and parsing for:', imageUri)
 
     // 1. Extract text and blocks using ML Kit (production) or Cloud fallback
     const ocrResult = await extractTextFromImage(imageUri)
@@ -303,7 +304,7 @@ export async function parseScheduleImage(imageUri) {
     }))
 
   } catch (error) {
-    console.error('❌ Schedule parsing failed:', error)
+    Logger.error('Schedule parsing failed:', error)
     throw error
   }
 }

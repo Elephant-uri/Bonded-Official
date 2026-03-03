@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../components/CachedImage'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import BottomNav from '../components/BottomNav'
 import MessageListItem from '../components/Message/MessageListItem'
@@ -15,6 +16,7 @@ import { useNotificationCount } from '../hooks/useNotificationCount'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { formatRelativeMessageTime } from '../utils/dateFormatters'
+import { Logger } from '../utils/logger'
 import { useAppTheme } from './theme'
 
 export default function Messages() {
@@ -80,7 +82,7 @@ export default function Messages() {
 
       setPrivateForums(forumsList)
     } catch (err) {
-      console.error('Error fetching forums:', err)
+      Logger.error('Error fetching forums:', err)
     } finally {
       setIsLoadingForums(false)
     }
@@ -210,7 +212,7 @@ export default function Messages() {
           messages: messageResults
         })
       } catch (err) {
-        console.warn('Search failed:', err)
+        Logger.warn('Search failed:', err)
         setSearchResults({ chats: [], people: [], messages: [] })
       } finally {
         setIsSearching(false)
@@ -402,7 +404,7 @@ export default function Messages() {
           })
         }
       } catch (e) {
-        console.error('Error opening forum chat', e)
+        Logger.error('Error opening forum chat', e)
         Alert.alert('Error', 'Could not join organization chat')
       }
       return
@@ -552,7 +554,7 @@ export default function Messages() {
                 >
                   <View style={styles.messageResultAvatar}>
                     {item.sender_avatar ? (
-                      <Image source={{ uri: item.sender_avatar }} style={styles.messageResultAvatarImage} />
+                      <CachedImage source={{ uri: item.sender_avatar }} style={styles.messageResultAvatarImage} />
                     ) : (
                       <Text style={styles.messageResultAvatarText}>
                         {(item.sender_name || 'U').charAt(0).toUpperCase()}
@@ -580,7 +582,7 @@ export default function Messages() {
               >
                 <View style={styles.searchAvatar}>
                   {item.avatar_url ? (
-                    <Image source={{ uri: item.avatar_url }} style={styles.searchAvatarImage} />
+                    <CachedImage source={{ uri: item.avatar_url }} style={styles.searchAvatarImage} />
                   ) : (
                     <Text style={styles.searchAvatarText}>
                       {(item.full_name || item.username || 'U').charAt(0).toUpperCase()}
@@ -778,8 +780,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: hp(3.5),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   notificationButton: {
@@ -805,8 +806,7 @@ const createStyles = (theme) => StyleSheet.create({
   notificationBadgeText: {
     fontSize: hp(1.1),
     color: theme.colors.white,
-    fontWeight: '700',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.bold,
     includeFontPadding: false,
   },
   searchSection: {
@@ -850,8 +850,7 @@ const createStyles = (theme) => StyleSheet.create({
   tabText: {
     fontSize: hp(1.8),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   activeTabText: {
     color: theme.colors.textPrimary,
@@ -868,8 +867,7 @@ const createStyles = (theme) => StyleSheet.create({
   tabBadgeText: {
     fontSize: hp(1),
     color: theme.colors.white,
-    fontWeight: '700',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.bold,
     includeFontPadding: false,
   },
   listContent: {
@@ -886,7 +884,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   requestAlertText: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   searchHeader: {
     flexDirection: 'row',
@@ -899,13 +897,12 @@ const createStyles = (theme) => StyleSheet.create({
   searchHeaderTitle: {
     fontSize: hp(1.8),
     color: theme.colors.textPrimary,
-    fontWeight: '700',
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   searchSectionTitle: {
     fontSize: hp(1.6),
     color: theme.colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     paddingHorizontal: wp(4),
     paddingTop: hp(2),
     paddingBottom: hp(0.5),
@@ -934,7 +931,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   messageResultAvatarText: {
     fontSize: hp(1.8),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textSecondary,
   },
   messageResultInfo: {
@@ -943,7 +940,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   messageResultTitle: {
     fontSize: hp(1.7),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   messageResultSnippet: {
@@ -984,7 +981,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   searchAvatarText: {
     fontSize: hp(2),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textSecondary,
   },
   searchInfo: {
@@ -992,9 +989,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   searchName: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   searchUsername: {
     fontSize: hp(1.4),

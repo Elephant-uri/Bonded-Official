@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
 import { useConversationReactions, useToggleReaction } from '../../hooks/useMessageReactions'
@@ -7,6 +8,7 @@ import { useUnsendMessage } from '../../hooks/useMessages'
 import { formatChatDate, isSameGroup, shouldShowDateSeparator } from '../../utils/chatHelpers'
 import MessageBubble from '../Message/MessageBubble'
 import { supabase } from '../../lib/supabase'
+import { Logger } from '../../utils/logger'
 
 export default function MessageList({
     messages,
@@ -45,7 +47,7 @@ export default function MessageList({
                 existingReactions,
             })
         } catch (error) {
-            console.error('Error toggling reaction:', error)
+            Logger.error('Error toggling reaction:', error)
         }
     }
 
@@ -65,7 +67,7 @@ export default function MessageList({
                         try {
                             await unsendMessage.mutateAsync({ messageId: message.id, conversationId })
                         } catch (error) {
-                            console.error('Error deleting message:', error)
+                            Logger.error('Error deleting message:', error)
                             Alert.alert('Error', 'Failed to delete message. Please try again.')
                         }
                     }
@@ -130,7 +132,7 @@ export default function MessageList({
             })
             setReactionsUsers(users)
         } catch (error) {
-            console.error('Error loading reaction users:', error)
+            Logger.error('Error loading reaction users:', error)
             Alert.alert('Error', 'Failed to load reactions.')
             setReactionsUsers([])
         } finally {
@@ -310,7 +312,7 @@ export default function MessageList({
                                     return (
                                         <View style={styles.reactionUserRow}>
                                             {item.avatar_url ? (
-                                                <Image source={{ uri: item.avatar_url }} style={styles.reactionAvatar} />
+                                                <CachedImage source={{ uri: item.avatar_url }} style={styles.reactionAvatar} />
                                             ) : (
                                                 <View style={styles.reactionAvatarFallback}>
                                                     <Text style={styles.reactionAvatarText}>
@@ -357,7 +359,7 @@ const createStyles = (theme) => StyleSheet.create({
     dateText: {
         fontSize: hp(1.5),
         color: theme.colors.textSecondary,
-        fontWeight: '500',
+        fontFamily: theme.typography.fontFamily.medium,
     },
     emptyContainer: {
         flex: 1,
@@ -368,7 +370,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     emptyText: {
         fontSize: hp(2.2),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
         marginBottom: hp(1),
     },
@@ -378,7 +380,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: theme.colors.overlay,
         justifyContent: 'center',
         paddingHorizontal: wp(8),
     },
@@ -390,7 +392,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     reactionsTitle: {
         fontSize: hp(2),
-        fontWeight: '700',
+        fontFamily: theme.typography.fontFamily.bold,
         color: theme.colors.textPrimary,
         marginBottom: hp(1.5),
         textAlign: 'center',
@@ -429,12 +431,12 @@ const createStyles = (theme) => StyleSheet.create({
     },
     reactionAvatarText: {
         fontSize: hp(1.6),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textSecondary,
     },
     reactionUserName: {
         fontSize: hp(1.7),
         color: theme.colors.textPrimary,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
 })

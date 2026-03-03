@@ -106,10 +106,10 @@ const createStyles = (theme) => StyleSheet.create({
     text: {
         fontSize: hp(3.5),
         fontFamily: theme.typography.fontFamily.heading,
-        fontWeight: '700',
+        fontFamily: theme.typography.fontFamily.bold,
         color: theme.colors.white,
         letterSpacing: wp(0.5),
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowColor: theme.colors.overlayLight,
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 4,
     },

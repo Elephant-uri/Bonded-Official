@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { isFeatureEnabled } from '../utils/featureGates'
+import { Logger } from '../utils/logger'
 
 // Onboarding steps - reordered for better flow
 export const ONBOARDING_STEPS = {
@@ -263,7 +264,7 @@ export const useOnboardingStore = create(
         const state = get()
         if (state.userId && state.userId !== newUserId) {
           // User changed - reset onboarding data
-          console.log('🔄 User changed, resetting onboarding state')
+          Logger.info('User changed, resetting onboarding state')
           set({ ...initialState, userId: newUserId })
         } else if (!state.userId) {
           // First time setting user ID

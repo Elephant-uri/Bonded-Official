@@ -195,8 +195,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   eventInfo: {
@@ -207,8 +206,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   eventTitle: {
     fontSize: hp(2.2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
@@ -221,8 +219,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   mandatoryText: {
     fontSize: hp(1.3),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   statsRow: {
@@ -237,8 +234,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   statNumber: {
     fontSize: hp(2.5),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
@@ -291,14 +287,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   inviteeAvatarText: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   inviteeName: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   statusButtons: {
@@ -328,8 +322,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   statusButtonText: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   statusButtonTextActive: {
@@ -343,8 +336,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   mandatoryStatusText: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
 })

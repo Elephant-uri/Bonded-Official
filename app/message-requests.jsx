@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useProfileModal } from '../contexts/ProfileModalContext'
 import { hp, wp } from '../helpers/common'
 import { useAcceptMessageRequest, useDeclineMessageRequest, useMessageRequests } from '../hooks/useMessageRequests'
+import { Logger } from '../utils/logger'
 import { useAppTheme } from './theme'
 
 export default function MessageRequests() {
@@ -35,7 +36,7 @@ export default function MessageRequests() {
                 }
             })
         } catch (error) {
-            console.error('Failed to accept request:', error)
+            Logger.error('Failed to accept request:', error)
             Alert.alert('Error', 'Failed to accept request')
         }
     }
@@ -90,7 +91,7 @@ export default function MessageRequests() {
                     onPress={() => handleDecline(item)}
                     disabled={declineMutation.isPending}
                 >
-                    <Ionicons name="close" size={hp(2.2)} color={theme.colors.error || '#FF3B30'} />
+                    <Ionicons name="close" size={hp(2.2)} color={theme.colors.error} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -153,12 +154,11 @@ const createStyles = (theme) => StyleSheet.create({
         paddingBottom: hp(1.5),
         paddingTop: hp(2),
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border || 'rgba(0,0,0,0.05)',
+        borderBottomColor: theme.colors.border,
     },
     headerTitle: {
         fontSize: hp(2.2),
-        fontFamily: theme.typography.fontFamily.heading,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     backButton: {
@@ -175,7 +175,7 @@ const createStyles = (theme) => StyleSheet.create({
         paddingVertical: hp(1.5),
         paddingHorizontal: wp(4),
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.borderSecondary || 'rgba(0,0,0,0.05)',
+        borderBottomColor: theme.colors.borderSecondary || theme.colors.borderSecondary,
     },
     profileSection: {
         flexDirection: 'row',
@@ -209,8 +209,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     name: {
         fontSize: hp(1.9),
-        fontFamily: theme.typography.fontFamily.heading,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     username: {

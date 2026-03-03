@@ -1,8 +1,13 @@
-import { TextInput, View, Text, StyleSheet, Platform } from 'react-native'
 import React, { useState } from 'react'
+import { Platform, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useAppTheme } from '../app/theme'
-import { hp, wp } from '../helpers/common'
 
+/**
+ * MergeFund Design System — Text Input
+ *
+ * Pill-shaped with subtle background fill and 1px border.
+ * Focus ring uses brand color. Error state uses destructive red.
+ */
 const Input = ({
   value,
   onChangeText,
@@ -26,42 +31,45 @@ const Input = ({
   ...props
 }) => {
   const theme = useAppTheme()
-  const styles = createStyles(theme)
   const [isFocused, setIsFocused] = useState(false)
 
   const handleFocus = (e) => {
     setIsFocused(true)
     onFocus?.(e)
   }
-
   const handleBlur = (e) => {
     setIsFocused(false)
     onBlur?.(e)
   }
 
+  const baseInput = theme.inputVariants?.default || {}
+  const focusStyle = isFocused ? theme.inputVariants?.focused : {}
+  const errorStyle = error ? theme.inputVariants?.error : {}
+
   return (
     <View style={[styles.container, containerStyle]}>
       {label && (
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, { color: theme.colors.textPrimary, fontFamily: theme.typography.fontFamily.heading }]}>
+          {label}
+        </Text>
       )}
-      
-      <View style={[
-        styles.inputContainer,
-        isFocused && styles.inputContainerFocused,
-        error && styles.inputContainerError,
-        !editable && styles.inputContainerDisabled,
-      ]}>
-        {leftIcon && (
-          <View style={styles.leftIconContainer}>
-            {leftIcon}
-          </View>
-        )}
-        
+
+      <View
+        style={[
+          styles.inputContainer,
+          baseInput,
+          focusStyle,
+          errorStyle,
+          !editable && styles.inputDisabled,
+        ]}
+      >
+        {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={theme.colors.textSecondary + '80'} // 50% opacity
+          placeholderTextColor={theme.colors.textTertiary}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
@@ -71,25 +79,22 @@ const Input = ({
           numberOfLines={numberOfLines}
           style={[
             styles.input,
-            leftIcon && styles.inputWithLeftIcon,
-            rightIcon && styles.inputWithRightIcon,
-            multiline && styles.inputMultiline,
+            { color: theme.colors.textPrimary, fontFamily: theme.typography.fontFamily.body },
+            leftIcon && { marginLeft: theme.spacing.sm },
+            rightIcon && { marginRight: theme.spacing.sm },
+            multiline && { textAlignVertical: 'top', minHeight: 96, paddingTop: theme.spacing.sm },
             inputStyle,
           ]}
           onFocus={handleFocus}
           onBlur={handleBlur}
           {...props}
         />
-        
-        {rightIcon && (
-          <View style={styles.rightIconContainer}>
-            {rightIcon}
-          </View>
-        )}
+
+        {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
       </View>
-      
+
       {error && (
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={[styles.errorText, { color: theme.colors.destructive }]}>{error}</Text>
       )}
     </View>
   )
@@ -97,101 +102,43 @@ const Input = ({
 
 export default Input
 
-const createStyles = (theme) => StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: hp(2),
+    marginBottom: 16,
   },
   label: {
-    fontSize: hp(1.8),
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-    marginBottom: hp(1),
-    fontFamily: theme.typography.fontFamily.heading,
+    fontSize: 13,
+    marginBottom: 8,
+    letterSpacing: -0.1,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.radius.pill,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    paddingHorizontal: wp(5),
-    paddingVertical: Platform.OS === 'ios' ? hp(1.8) : hp(1.5),
-    minHeight: hp(6),
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  inputContainerFocused: {
-    borderColor: theme.colors.bondedPurple,
-    ...Platform.select({
-      ios: {
-        shadowColor: theme.colors.bondedPurple,
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  inputContainerError: {
-    borderColor: theme.colors.error,
-  },
-  inputContainerDisabled: {
-    backgroundColor: theme.colors.backgroundSecondary,
-    opacity: 0.6,
+    minHeight: 48,
   },
   input: {
     flex: 1,
-    fontSize: hp(2),
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    padding: 0, // Remove default padding
+    fontSize: 15,
+    padding: 0,
     ...Platform.select({
-      ios: {
-        paddingVertical: 0,
-      },
-      android: {
-        paddingVertical: 0,
-        textAlignVertical: 'center',
-      },
+      android: { textAlignVertical: 'center' },
     }),
   },
-  inputWithLeftIcon: {
-    marginLeft: wp(2),
+  inputDisabled: {
+    opacity: 0.5,
   },
-  inputWithRightIcon: {
-    marginRight: wp(2),
-  },
-  inputMultiline: {
-    textAlignVertical: 'top',
-    minHeight: hp(12),
-    paddingTop: hp(1),
-  },
-  leftIconContainer: {
+  iconLeft: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rightIconContainer: {
+  iconRight: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: wp(2),
+    marginLeft: 8,
   },
   errorText: {
-    fontSize: hp(1.6),
-    color: theme.colors.error,
-    marginTop: hp(0.5),
-    fontFamily: theme.typography.fontFamily.body,
+    fontSize: 12,
+    marginTop: 4,
   },
 })
-

@@ -17,6 +17,7 @@ import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { Logger } from '../utils/logger'
 
 export default function Settings() {
   const router = useRouter()
@@ -66,7 +67,7 @@ export default function Settings() {
       setFriendsVisibility(nextValue)
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile', currentUserProfile.id] })
     } catch (error) {
-      console.error('❌ Failed to update friends visibility:', error)
+      Logger.error('Failed to update friends visibility:', error)
       Alert.alert('Error', 'Unable to update friends visibility right now.')
     } finally {
       setIsUpdatingVisibility(false)
@@ -124,34 +125,34 @@ export default function Settings() {
           onPress: async () => {
             try {
               setIsSigningOut(true)
-              console.log('🚪 Signing out...')
+              Logger.info('Signing out...')
               
               // Step 1: Sign out from Supabase (clears JWT from SecureStore)
               // This removes the access_token and refresh_token from secure storage
               const { error: signOutError } = await supabase.auth.signOut()
               
               if (signOutError) {
-                console.error('❌ Error signing out from Supabase:', signOutError)
+                Logger.error('Error signing out from Supabase:', signOutError)
                 Alert.alert('Error', 'Failed to sign out. Please try again.')
                 setIsSigningOut(false)
                 return
               }
               
-              console.log('✅ Supabase session cleared (JWT removed from SecureStore)')
+              Logger.info('Supabase session cleared (JWT removed from SecureStore)')
               
               // Step 2: Clear auth store (clears Zustand state and AsyncStorage)
               // logout() now clears both Zustand state and AsyncStorage
               await logout()
               
-              console.log('✅ Signed out successfully - all tokens and auth data cleared')
-              console.log('   ✓ JWT cleared from SecureStore (via supabase.auth.signOut)')
-              console.log('   ✓ Auth state cleared from Zustand')
-              console.log('   ✓ AsyncStorage cleared')
+              Logger.info('Signed out successfully - all tokens and auth data cleared')
+              Logger.info('JWT cleared from SecureStore (via supabase.auth.signOut)')
+              Logger.info('Auth state cleared from Zustand')
+              Logger.info('AsyncStorage cleared')
               
               // Step 4: Navigate to login screen
               router.replace('/login')
             } catch (error) {
-              console.error('❌ Error during sign out:', error)
+              Logger.error('Error during sign out:', error)
               Alert.alert('Error', 'An error occurred while signing out. Please try again.')
               setIsSigningOut(false)
             }
@@ -481,7 +482,7 @@ export default function Settings() {
               <SettingItem
                 icon="log-out-outline"
                 title={isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                titleStyle={{ color: '#ED4956' }}
+                titleStyle={{ color: theme.colors.destructive }}
                 onPress={handleSignOut}
                 showArrow={!isSigningOut}
               />
@@ -537,8 +538,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   settingTitle: {
     fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.semibold,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: theme.spacing.xs,
   },
   settingSubtitle: {
@@ -571,20 +571,20 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.textSecondary,
   },
   healthPass: {
-    backgroundColor: theme.colors.success || '#2ecc71',
+    backgroundColor: theme.colors.success,
   },
   healthWarn: {
-    backgroundColor: theme.colors.warning || '#f1c40f',
+    backgroundColor: theme.colors.warning,
   },
   healthFail: {
-    backgroundColor: theme.colors.error || '#e74c3c',
+    backgroundColor: theme.colors.error,
   },
   healthTextWrap: {
     flex: 1,
   },
   healthTitle: {
     fontSize: theme.typography.sizes.base,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   healthDetail: {
     fontSize: theme.typography.sizes.sm,

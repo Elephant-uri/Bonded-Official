@@ -171,7 +171,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -184,7 +184,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   doneText: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -203,7 +203,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
@@ -211,7 +211,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   topicText: {
     fontSize: hp(2.4),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     lineHeight: hp(3),
@@ -252,7 +252,7 @@ const createStyles = (theme) => StyleSheet.create({
     textAlign: 'right',
   },
   characterCountError: {
-    color: '#EF4444',
+    color: theme.colors.destructive,
     opacity: 1,
   },
   confidenceSection: {
@@ -260,7 +260,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   confidenceValue: {
     fontSize: hp(3),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
     textAlign: 'center',
@@ -286,7 +286,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   infoTitle: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1.5),
@@ -340,7 +340,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   submitButtonText: {
     fontSize: hp(1.9),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.body,
   },

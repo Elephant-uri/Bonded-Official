@@ -27,6 +27,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { useCreateConversation } from '../../hooks/useMessages'
 import EventPost from '../Events/EventPost'
 import { ArrowLeft } from '../Icons'
+import { Logger } from '../../utils/logger'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -107,7 +108,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
     // Debug: Log admin status
     useEffect(() => {
         if (org?.id) {
-            console.log('[OrgModal] Org:', org?.name, '| isAdmin:', isAdmin, '| user:', user?.id)
+            Logger.info('[OrgModal] Org:', org?.name, '| isAdmin:', isAdmin, '| user:', user?.id)
         }
     }, [org?.id, isAdmin, user?.id])
     const activeMemberCount = useMemo(() => {
@@ -140,7 +141,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
                 .eq('organization_id', activeOrg.id)
 
             if (orgMembersError) {
-                console.error('Error fetching org_members:', orgMembersError)
+                Logger.error('Error fetching org_members:', orgMembersError)
                 // Fall through to fallback logic
             }
 
@@ -155,7 +156,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
                         .in('id', userIds)
 
                     if (profileError) {
-                        console.error('Error fetching profiles:', profileError)
+                        Logger.error('Error fetching profiles:', profileError)
                         // Fall through to fallback logic
                     } else if (profiles && profiles.length > 0) {
                         // Step 3: Combine org_members with profiles
@@ -210,7 +211,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
             // If all else fails, set empty array
             setMemberProfiles([])
         } catch (error) {
-            console.error('Error fetching members:', error)
+            Logger.error('Error fetching members:', error)
             setMemberProfiles([])
         } finally {
             setMembersLoading(false)
@@ -241,7 +242,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
                 setClubPosts(withMedia)
             }
         } catch (error) {
-            console.error('Error fetching posts:', error)
+            Logger.error('Error fetching posts:', error)
         } finally {
             setPostsLoading(false)
         }
@@ -264,7 +265,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
                 setClubEvents(data)
             }
         } catch (error) {
-            console.error('Error fetching events:', error)
+            Logger.error('Error fetching events:', error)
         } finally {
             setEventsLoading(false)
         }
@@ -365,7 +366,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
                 }
             }
         } catch (error) {
-            console.error('Error messaging admin:', error)
+            Logger.error('Error messaging admin:', error)
             Alert.alert('Error', 'Failed to start conversation. Please try again.')
         } finally {
             setMessagingAdmin(false)
@@ -449,7 +450,7 @@ const OrgModalContent = ({ org, onClose, scrollYRef, panResponder }) => {
                 refetch()
             }
         } catch (error) {
-            console.error('Error updating org:', error)
+            Logger.error('Error updating org:', error)
             Alert.alert('Error', 'Failed to update organization. Please try again.')
         } finally {
             setIsSavingEdit(false)
@@ -1060,13 +1061,11 @@ const styles = (theme) => StyleSheet.create({
     },
     orgAvatarText: {
         fontSize: hp(4),
-        fontWeight: '800',
         color: theme.colors.white,
         fontFamily: theme.typography.fontFamily.heading,
     },
     orgName: {
         fontSize: hp(2.6),
-        fontWeight: '700',
         color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.heading,
         marginBottom: hp(1),
@@ -1093,7 +1092,6 @@ const styles = (theme) => StyleSheet.create({
     },
     statValue: {
         fontSize: hp(2.4),
-        fontWeight: '700',
         color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.heading,
     },
@@ -1138,9 +1136,8 @@ const styles = (theme) => StyleSheet.create({
     },
     actionButtonText: {
         fontSize: hp(1.8),
-        fontWeight: '600',
         color: theme.colors.white,
-        fontFamily: theme.typography.fontFamily.body,
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     adminButtonsRow: {
         flexDirection: 'row',
@@ -1175,9 +1172,8 @@ const styles = (theme) => StyleSheet.create({
     },
     adminButtonText: {
         fontSize: hp(1.7),
-        fontWeight: '600',
         color: theme.colors.white,
-        fontFamily: theme.typography.fontFamily.body,
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     tabs: {
         flexDirection: 'row',
@@ -1200,12 +1196,11 @@ const styles = (theme) => StyleSheet.create({
     tabText: {
         fontSize: hp(1.6),
         color: theme.colors.textSecondary,
-        fontFamily: theme.typography.fontFamily.body,
-        fontWeight: '500',
+        fontFamily: theme.typography.fontFamily.medium,
     },
     activeTabText: {
         color: theme.colors.textPrimary,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     memberSearchWrapper: {
         flexDirection: 'row',
@@ -1243,7 +1238,6 @@ const styles = (theme) => StyleSheet.create({
     },
     pendingTitle: {
         fontSize: hp(1.7),
-        fontWeight: '700',
         color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.heading,
         marginBottom: hp(1),
@@ -1273,7 +1267,6 @@ const styles = (theme) => StyleSheet.create({
     },
     pendingAvatarText: {
         fontSize: hp(1.8),
-        fontWeight: '700',
         color: theme.colors.white,
         fontFamily: theme.typography.fontFamily.heading,
     },
@@ -1282,9 +1275,8 @@ const styles = (theme) => StyleSheet.create({
     },
     pendingName: {
         fontSize: hp(1.6),
-        fontWeight: '600',
         color: theme.colors.textPrimary,
-        fontFamily: theme.typography.fontFamily.body,
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     pendingMeta: {
         fontSize: hp(1.3),
@@ -1334,7 +1326,6 @@ const styles = (theme) => StyleSheet.create({
     },
     infoHeaderText: {
         fontSize: hp(1.8),
-        fontWeight: '600',
         color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.heading,
         marginLeft: wp(2),
@@ -1369,7 +1360,6 @@ const styles = (theme) => StyleSheet.create({
     },
     memberAvatarText: {
         fontSize: hp(2),
-        fontWeight: '700',
         color: theme.colors.white,
         fontFamily: theme.typography.fontFamily.heading,
     },
@@ -1378,9 +1368,8 @@ const styles = (theme) => StyleSheet.create({
     },
     memberName: {
         fontSize: hp(1.7),
-        fontWeight: '600',
         color: theme.colors.textPrimary,
-        fontFamily: theme.typography.fontFamily.body,
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     memberRole: {
         fontSize: hp(1.4),
@@ -1407,7 +1396,6 @@ const styles = (theme) => StyleSheet.create({
     },
     postTitle: {
         fontSize: hp(1.8),
-        fontWeight: '700',
         color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.heading,
         marginBottom: hp(0.5),
@@ -1428,7 +1416,7 @@ const styles = (theme) => StyleSheet.create({
     // Edit Modal Styles
     editModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: theme.colors.overlay,
         justifyContent: 'flex-end',
     },
     editModalContent: {
@@ -1452,7 +1440,6 @@ const styles = (theme) => StyleSheet.create({
     },
     editModalTitle: {
         fontSize: hp(2),
-        fontWeight: '700',
         color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.heading,
     },
@@ -1461,18 +1448,16 @@ const styles = (theme) => StyleSheet.create({
     },
     editModalSaveText: {
         fontSize: hp(1.8),
-        fontWeight: '600',
         color: theme.colors.bondedPurple,
-        fontFamily: theme.typography.fontFamily.body,
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     editModalBody: {
         padding: wp(4),
     },
     editLabel: {
         fontSize: hp(1.6),
-        fontWeight: '600',
         color: theme.colors.textPrimary,
-        fontFamily: theme.typography.fontFamily.body,
+        fontFamily: theme.typography.fontFamily.semibold,
         marginBottom: hp(1),
         marginTop: hp(2),
     },

@@ -3,6 +3,8 @@
  * Connects to the Link backend at link-ai-production.up.railway.app
  */
 
+import { Logger } from '../utils/logger'
+
 const LINK_API_URL = process.env.EXPO_PUBLIC_LINK_API_URL || 'https://link-ai-production.up.railway.app'
 
 /**
@@ -36,13 +38,13 @@ export async function queryLink(userId, question, universityId, context = {}) {
 
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error querying Link:', error)
+    Logger.error('Error querying Link:', error)
     throw error
   }
 }
@@ -64,13 +66,13 @@ export async function collectLinkOutreach(runId, universityId, sessionId, access
 
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link collect error body:', text)
+      Logger.error('Link collect error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error collecting outreach:', error)
+    Logger.error('Error collecting outreach:', error)
     throw error
   }
 }
@@ -87,13 +89,13 @@ export async function resolveLinkConsent(payload) {
 
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error resolving consent:', error)
+    Logger.error('Error resolving consent:', error)
     throw error
   }
 }
@@ -107,12 +109,12 @@ export async function checkLinkHealth() {
     const response = await fetch(`${LINK_API_URL}/health`)
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       return { status: 'unhealthy', error: response.status }
     }
     return await response.json()
   } catch (error) {
-    console.error('Error checking Link health:', error)
+    Logger.error('Error checking Link health:', error)
     return { status: 'unreachable', error: error.message }
   }
 }
@@ -140,13 +142,13 @@ export async function startOutreach(userId, question, universityId) {
 
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error starting outreach:', error)
+    Logger.error('Error starting outreach:', error)
     throw error
   }
 }
@@ -163,13 +165,13 @@ export async function getLinkJournal(userId, days = 7) {
     
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error fetching Link journal:', error)
+    Logger.error('Error fetching Link journal:', error)
     throw error
   }
 }
@@ -195,13 +197,13 @@ export async function learnUserStyle(userId, message) {
 
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error learning user style:', error)
+    Logger.error('Error learning user style:', error)
     // Non-critical, don't throw
     return null
   }
@@ -218,13 +220,13 @@ export async function getUserStyle(userId) {
     
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error fetching user style:', error)
+    Logger.error('Error fetching user style:', error)
     return null
   }
 }
@@ -250,13 +252,13 @@ export async function respondToCheckin(checkinId, userResponse) {
 
     if (!response.ok) {
       const text = await response.text()
-      console.error('Link API error body:', text)
+      Logger.error('Link API error body:', text)
       throw new Error(`Link API error: ${response.status}`)
     }
 
     return await response.json()
   } catch (error) {
-    console.error('Error responding to checkin:', error)
+    Logger.error('Error responding to checkin:', error)
     throw error
   }
 }

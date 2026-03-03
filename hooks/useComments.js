@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { getTimeAgo } from '../utils/dateFormatters'
+import { Logger } from '../utils/logger'
 
 export function useComments(postId) {
   const { user } = useAuthStore()
@@ -42,7 +43,7 @@ export function useComments(postId) {
         .order('created_at', { ascending: true })
 
       if (error) {
-        console.error('Error fetching comments:', error)
+        Logger.error('Error fetching comments:', error)
         throw error
       }
 
@@ -89,8 +90,8 @@ export function useComments(postId) {
       return roots
     },
     enabled: !!user && !!postId,
-    staleTime: 10 * 1000,
-    refetchInterval: 15000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
     retry: 1,
   })
 }

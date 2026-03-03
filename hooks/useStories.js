@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Fetch stories for a specific forum (or all forums)
@@ -53,7 +54,7 @@ export function useStories(forumId = null) {
       const { data, error } = await query
 
       if (error) {
-        console.error('Error fetching stories:', error)
+        Logger.error('Error fetching stories:', error)
         throw error
       }
 

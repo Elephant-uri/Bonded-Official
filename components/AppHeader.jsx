@@ -105,7 +105,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(2.4),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     letterSpacing: -0.3,
   },
   rightAction: {
@@ -117,7 +117,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   rightActionText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.accent,
   },
 })

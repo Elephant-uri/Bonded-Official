@@ -11,15 +11,15 @@ const EVENTS_PER_PAGE = 20 // Number of events to fetch per page
  * Only fetches future events, sorted by start_at ascending
  */
 export function useEventsForUser(userId) {
-  console.log('🎯 useEventsForUser hook initialized for userId:', userId)
+  Logger.info('useEventsForUser hook initialized for userId:', userId)
 
   return useInfiniteQuery({
     queryKey: ['eventsForUser', userId],
     queryFn: async ({ pageParam = 0 }) => {
-      console.log('🔍 useEventsForUser queryFn executing:', { userId, pageParam, timestamp: new Date().toISOString() })
+      Logger.info('useEventsForUser queryFn executing:', { userId, pageParam, timestamp: new Date().toISOString() })
 
       if (!userId) {
-        Logger.debug('⚠️ No userId provided to useEventsForUser')
+        Logger.debug('No userId provided to useEventsForUser')
         return { events: [], hasMore: false }
       }
 
@@ -38,12 +38,12 @@ export function useEventsForUser(userId) {
         if (profileError) {
           // If RLS recursion error, try using auth.uid() directly or skip university filter
           if (isRlsRecursionError(profileError)) {
-            console.warn('⚠️ RLS recursion error on profiles - fetching events without university filter')
-            console.warn('💡 Run fix-rls-recursion.sql in Supabase to fix this')
+            Logger.warn('RLS recursion error on profiles - fetching events without university filter')
+            Logger.warn('Run fix-rls-recursion.sql in Supabase to fix this')
             // Continue without university_id - no events returned
             universityId = null
           } else {
-            console.error('Error fetching user profile:', profileError)
+            Logger.error('Error fetching user profile:', profileError)
             throw profileError
           }
         } else {
@@ -51,7 +51,7 @@ export function useEventsForUser(userId) {
           universityId = userProfile?.university_id
         }
       } catch (error) {
-        console.error('Unexpected error fetching profile:', error)
+        Logger.error('Unexpected error fetching profile:', error)
         // Continue without university filter as fallback
         universityId = null
       }
@@ -69,7 +69,7 @@ export function useEventsForUser(userId) {
         if (orgMembershipsError) {
           // Check if it's a column doesn't exist error (42703) or RLS recursion
           if (orgMembershipsError.code === '42703') {
-            console.warn('⚠️ org_members.organization_id column may not exist, trying alternative column name')
+            Logger.warn('org_members.organization_id column may not exist, trying alternative column name')
             // Try with org_id if organization_id doesn't exist
             const { data: altMemberships } = await supabase
               .from('org_members')
@@ -82,14 +82,14 @@ export function useEventsForUser(userId) {
             logRlsFixHint(table)
             orgIds = []
           } else {
-            console.warn('⚠️ Error fetching org memberships (non-critical):', orgMembershipsError.message)
+            Logger.warn('Error fetching org memberships (non-critical):', orgMembershipsError.message)
             orgIds = []
           }
         } else {
           orgIds = orgMemberships?.map((m) => m.organization_id) || []
         }
       } catch (err) {
-        console.warn('⚠️ Failed to fetch org memberships, continuing without org filter:', err.message)
+        Logger.warn('Failed to fetch org memberships, continuing without org filter:', err.message)
         orgIds = []
       }
 
@@ -101,7 +101,7 @@ export function useEventsForUser(userId) {
         .in('status', ['going', 'approved', 'maybe', 'requested'])
 
       if (attendanceError) {
-        console.error('❌ Error fetching attendance:', attendanceError)
+        Logger.error('Error fetching attendance:', attendanceError)
         if (isRlsRecursionError(attendanceError)) {
           const table = attendanceError?.message?.match(/relation \"(.+)\"/)?.[1] || 'event_attendance'
           logRlsFixHint(table)
@@ -111,11 +111,11 @@ export function useEventsForUser(userId) {
       const attendingEventIds = attendance?.map((a) => a.event_id) || []
 
       if (!universityId) {
-        console.warn('⚠️ No university_id found - returning no events')
+        Logger.warn('No university_id found - returning no events')
         return { events: [], hasMore: false }
       }
 
-      console.log('🔍 Fetching events (university_id:', universityId, ')')
+      Logger.info('Fetching events (university_id:', universityId, ')')
 
       // Build visibility filter
       const visibilityFilter = `visibility.eq.public,visibility.eq.school,${orgIds.length > 0
@@ -125,7 +125,7 @@ export function useEventsForUser(userId) {
 
       // Query events - filter by university_id for clean campus isolation
 
-      console.log('🔍 Fetching events (page:', pageParam, ')')
+      Logger.info('Fetching events (page:', pageParam, ')')
 
       // Get current time to filter out past events
       const now = new Date().toISOString()
@@ -155,8 +155,8 @@ export function useEventsForUser(userId) {
       let { data: events, error } = await query
 
       if (error) {
-        Logger.error('❌ Error fetching events with joins:', error)
-        console.error('Error details:', {
+        Logger.error('Error fetching events with joins:', error)
+        Logger.error('Error details:', {
           code: error.code,
           message: error.message,
           details: error.details,
@@ -167,7 +167,7 @@ export function useEventsForUser(userId) {
           const table = error?.message?.match(/relation \"(.+)\"/)?.[1] || 'profiles'
           logRlsFixHint(table)
           // Try simple query without joins as fallback
-          console.warn('⚠️ RLS recursion detected, trying simple query without joins')
+          Logger.warn('RLS recursion detected, trying simple query without joins')
           const { data: simpleEvents, error: simpleError } = await supabase
             .from('events')
             .select('*')
@@ -179,7 +179,7 @@ export function useEventsForUser(userId) {
 
           if (simpleError) {
             // Last resort: just public events
-            console.warn('⚠️ Trying fallback: just public events')
+            Logger.warn('Trying fallback: just public events')
             const { data: publicEvents, error: publicError } = await supabase
               .from('events')
               .select('*')
@@ -222,7 +222,7 @@ export function useEventsForUser(userId) {
         }
 
         // For non-RLS errors, try simple query without joins
-        console.warn('⚠️ Falling back to simple query without joins')
+        Logger.warn('Falling back to simple query without joins')
         const { data: simpleEvents, error: simpleError } = await supabase
           .from('events')
           .select('*')
@@ -247,7 +247,7 @@ export function useEventsForUser(userId) {
         }
       }
 
-      console.log(`✅ Fetched ${events?.length || 0} events with joins`)
+      Logger.info(`Fetched ${events?.length || 0} events with joins`)
 
       const filteredEvents = events || []
 
@@ -286,7 +286,7 @@ export function useEventsForUser(userId) {
         const { data: inviteOnlyEvents, error: inviteError } = await inviteQuery
 
         if (inviteError) {
-          console.error('❌ Error fetching invite-only events:', inviteError)
+          Logger.error('Error fetching invite-only events:', inviteError)
           if (isRlsRecursionError(inviteError)) {
             const table = inviteError?.message?.match(/relation \"(.+)\"/)?.[1] || 'profiles'
             logRlsFixHint(table)
@@ -330,7 +330,7 @@ export function useEventsForUser(userId) {
         hasMore: transformedRegularEvents.length === EVENTS_PER_PAGE, // Check if regular events have more pages
       }
 
-      console.log('✅ Returning events page:', {
+      Logger.info('Returning events page:', {
         pageParam,
         eventsCount: allEvents.length,
         hasMore: result.hasMore,
@@ -349,10 +349,10 @@ export function useEventsForUser(userId) {
     },
     initialPageParam: 0,
     enabled: !!userId, // Only run if userId is provided
-    staleTime: 30 * 1000, // 30 seconds - events update frequently, need fresh data
-    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache for quick access
-    refetchOnMount: true, // Always refetch to get new events
-    refetchOnWindowFocus: true, // Refetch when app regains focus to catch new events
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true, // Refetch if connection was lost
     retry: 1, // Only retry once on failure
   })

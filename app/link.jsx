@@ -27,6 +27,7 @@ import { useLinkConversation, useLinkMessages, useLinkMessagesRealtime, useLinkS
 import { supabase } from '../lib/supabase'
 import { collectLinkOutreach, learnUserStyle, queryLink, resolveLinkConsent } from '../services/linkService'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 import { useAppTheme } from './theme'
 
 const LINK_LOGO = require('../assets/images/transparent-bonded.png')
@@ -377,7 +378,7 @@ export default function LinkChat() {
       .maybeSingle()
 
     if (error) {
-      console.warn('Failed to update Link memory:', error)
+      Logger.warn('Failed to update Link memory:', error)
       return null
     }
 
@@ -465,7 +466,7 @@ export default function LinkChat() {
         }
       }
     } catch (error) {
-      console.error('Error checking outreach status:', error)
+      Logger.error('Error checking outreach status:', error)
     } finally {
       setIsCollectingOutreach(false)
     }
@@ -497,7 +498,7 @@ export default function LinkChat() {
         await insertLinkMessage('No worries — I’ll keep looking.', { metadata: { consent_ack: true } })
       }
     } catch (error) {
-      console.error('Failed to resolve consent:', error)
+      Logger.error('Failed to resolve consent:', error)
     } finally {
       setConsentLoading(prev => ({ ...prev, [key]: false }))
     }
@@ -516,7 +517,7 @@ export default function LinkChat() {
 
       if (!isMounted) return
       if (error) {
-        console.warn('Failed to load Link memory:', error)
+        Logger.warn('Failed to load Link memory:', error)
         return
       }
 
@@ -543,7 +544,7 @@ export default function LinkChat() {
 
       if (!isMounted) return
       if (error) {
-        console.warn('Failed to load Link session:', error)
+        Logger.warn('Failed to load Link session:', error)
         return
       }
 
@@ -565,7 +566,7 @@ export default function LinkChat() {
 
       if (!isMounted) return
       if (createError) {
-        console.warn('Failed to create Link session:', createError)
+        Logger.warn('Failed to create Link session:', createError)
         return
       }
       setCurrentSessionId(created?.id || null)
@@ -620,16 +621,16 @@ export default function LinkChat() {
       }
 
       // Insert optimistic user message
-      console.log('[LinkChat] Inserting optimistic user message')
+      Logger.info('[LinkChat] Inserting optimistic user message')
       insertUserMessage(messageContent)
 
       // Send user message to database
-      console.log('[LinkChat] Sending message to DB for conversation:', conversation.id)
+      Logger.info('[LinkChat] Sending message to DB for conversation:', conversation.id)
       const messageResult = await sendMessage.mutateAsync({
         conversationId: conversation.id,
         content: messageContent,
       })
-      console.log('[LinkChat] Message saved to DB:', !!messageResult)
+      Logger.info('[LinkChat] Message saved to DB:', !!messageResult)
 
       // Learn user's style (non-blocking)
       learnUserStyle(user.id, messageContent).catch(() => { })
@@ -638,7 +639,7 @@ export default function LinkChat() {
       setIsLinkTyping(true)
 
       // Query Link backend for response
-      console.log('[LinkChat] Querying Link AI backend for university:', currentUserProfile?.university_id)
+      Logger.info('[LinkChat] Querying Link AI backend for university:', currentUserProfile?.university_id)
       const linkResponse = await queryLink(
         user.id,
         messageContent,
@@ -649,7 +650,7 @@ export default function LinkChat() {
           access_token: session?.access_token,
         }
       )
-      console.log('[LinkChat] Received Link response:', !!linkResponse)
+      Logger.info('[LinkChat] Received Link response:', !!linkResponse)
 
       setIsLinkTyping(false)
 
@@ -703,7 +704,7 @@ export default function LinkChat() {
       })
 
     } catch (error) {
-      console.error('Error sending message to Link:', error)
+      Logger.error('Error sending message to Link:', error)
       setIsLinkTyping(false)
     } finally {
       setIsSending(false)
@@ -731,7 +732,7 @@ export default function LinkChat() {
   const renderMessage = useCallback(({ item }) => {
     const isUser = item.sender_type === 'user'
     const metadata = normalizeMetadata(item.metadata)
-    console.log(`[LinkChat] Rendering message ${item.id} from ${item.sender_type}: ${item.content?.substring(0, 20)}...`)
+    Logger.info(`[LinkChat] Rendering message ${item.id} from ${item.sender_type}: ${item.content?.substring(0, 20)}...`)
     const consentKey = metadata?.run_id && metadata?.suggested_user_id
       ? `${metadata.run_id}:${metadata.suggested_user_id}`
       : null
@@ -950,7 +951,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   backButtonText: {
     color: '#FFF',
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     fontSize: hp(1.8),
   },
   header: {
@@ -990,9 +991,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerName: {
     fontSize: hp(2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   aiBadge: {
     backgroundColor: theme.colors.bondedPurple + '20',
@@ -1003,14 +1003,13 @@ const createStyles = (theme) => StyleSheet.create({
   aiBadgeText: {
     fontSize: hp(1.1),
     color: theme.colors.bondedPurple,
-    fontWeight: '700',
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   headerSubtitle: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
     marginTop: hp(0.2),
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   messagesWrapper: {
     flex: 1,
@@ -1061,15 +1060,15 @@ const createStyles = (theme) => StyleSheet.create({
   messageText: {
     fontSize: hp(1.8),
     lineHeight: hp(2.4),
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   userText: {
     color: '#FFF',
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   linkText: {
     color: theme.colors.textPrimary,
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   typingBubble: {
     flexDirection: 'row',
@@ -1080,7 +1079,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.5),
     color: theme.colors.textSecondary,
     fontStyle: 'italic',
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   citationsContainer: {
     marginTop: hp(1),
@@ -1096,14 +1095,14 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.3),
     color: theme.colors.textSecondary,
     marginBottom: hp(0.2),
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   forumFallbackText: {
     marginTop: hp(0.8),
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
     fontStyle: 'italic',
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   consentActions: {
     flexDirection: 'row',
@@ -1126,8 +1125,7 @@ const createStyles = (theme) => StyleSheet.create({
   consentButtonText: {
     color: theme.colors.textPrimary,
     fontSize: hp(1.6),
-    fontWeight: '600',
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   checkStatusContainer: {
     alignItems: 'center',
@@ -1144,9 +1142,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   checkStatusText: {
     color: '#FFF',
-    fontWeight: '600',
     fontSize: hp(1.6),
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   listHeader: {
     width: '100%',
@@ -1179,17 +1176,16 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyTitle: {
     fontSize: hp(2.4),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   emptySubtitle: {
     fontSize: hp(1.7),
     color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: hp(2.4),
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -1210,7 +1206,7 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textPrimary,
     maxHeight: hp(15),
     marginRight: wp(3),
-    fontFamily: 'System',
+    fontFamily: theme.typography.fontFamily.body,
   },
   sendButton: {
     width: hp(5),

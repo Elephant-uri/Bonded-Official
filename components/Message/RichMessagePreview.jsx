@@ -4,7 +4,8 @@
  */
 
 import { useRouter } from 'expo-router'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
 import { useProfileModal } from '../../contexts/ProfileModalContext'
@@ -50,7 +51,7 @@ export const EventSharePreview = ({ message, isOwn }) => {
       <PreviewCard onPress={handlePress} style={styles.eventCard}>
         <View style={styles.previewCardContent}>
           {event.image_url && (
-            <Image 
+            <CachedImage 
               source={{ uri: event.image_url }} 
               style={styles.previewThumbnail}
             />
@@ -100,7 +101,7 @@ export const PostSharePreview = ({ message, isOwn }) => {
       <PreviewCard onPress={handlePress} style={styles.postCard}>
         <View style={styles.previewCardContent}>
           {post.image_url && (
-            <Image 
+            <CachedImage 
               source={{ uri: post.image_url }} 
               style={styles.previewThumbnail}
             />
@@ -156,7 +157,7 @@ export const ProfileSharePreview = ({ message, isOwn }) => {
       
       <PreviewCard onPress={handlePress} style={styles.profileCard}>
         <View style={styles.previewCardContent}>
-          <Image 
+          <CachedImage 
             source={{ 
               uri: profile.avatar_url || undefined 
             }} 
@@ -214,7 +215,7 @@ export const OrgSharePreview = ({ message, isOwn }) => {
       
       <PreviewCard onPress={handlePress} style={styles.orgCard}>
         <View style={styles.previewCardContent}>
-          <Image 
+          <CachedImage 
             source={{ uri: org.logo_url || undefined }} 
             style={styles.previewThumbnail}
           />
@@ -280,11 +281,11 @@ const createStyles = (theme) => StyleSheet.create({
   
   // Base preview card
   previewCard: {
-    backgroundColor: theme.colors.cardBackground || '#F8F8F8',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: theme.colors.borderSecondary,
     maxWidth: '100%',
   },
   
@@ -298,13 +299,13 @@ const createStyles = (theme) => StyleSheet.create({
     width: wp(15),
     height: wp(15),
     borderRadius: 8,
-    backgroundColor: theme.colors.border || '#e5e7eb',
+    backgroundColor: theme.colors.border,
   },
   
   profileAvatar: {
     borderRadius: wp(7.5), // Circular for profiles
     borderWidth: 2,
-    borderColor: theme.colors.bondedPurple || '#007AFF',
+    borderColor: theme.colors.brand,
   },
   
   previewInfo: {
@@ -314,7 +315,7 @@ const createStyles = (theme) => StyleSheet.create({
   
   previewTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
@@ -333,20 +334,20 @@ const createStyles = (theme) => StyleSheet.create({
   
   metadataText: {
     fontSize: hp(1.3),
-    color: theme.colors.textTertiary || '#999',
+    color: theme.colors.textTertiary || theme.colors.textTertiary,
   },
   
   previewAction: {
     padding: hp(1),
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    borderTopColor: theme.colors.borderSecondary,
     alignItems: 'center',
   },
   
   actionText: {
     fontSize: hp(1.5),
-    fontWeight: '600',
-    color: theme.colors.bondedPurple || '#007AFF',
+    fontFamily: theme.typography.fontFamily.semibold,
+    color: theme.colors.brand,
   },
   
   // Event-specific styling
@@ -356,9 +357,9 @@ const createStyles = (theme) => StyleSheet.create({
   
   // Post-specific styling
   postCard: {
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.colors.backgroundSecondary,
     borderLeftWidth: 3,
-    borderLeftColor: theme.colors.bondedPurple || '#007AFF',
+    borderLeftColor: theme.colors.brand,
   },
   
   // Profile-specific styling

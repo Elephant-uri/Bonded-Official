@@ -3,6 +3,7 @@ import StoryCreator from './StoryCreator'
 import StoryEditor from './StoryEditor'
 import StoryPreview from './StoryPreview'
 import { useStoriesContext } from '../../contexts/StoriesContext'
+import { Logger } from '../../utils/logger'
 
 export default function StoryFlow({
   visible,
@@ -61,7 +62,7 @@ export default function StoryFlow({
       setEditedContent(null)
       onClose()
     } catch (error) {
-      console.log('Post story error:', error)
+      Logger.info('Post story error:', error)
     }
   }
 

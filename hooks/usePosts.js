@@ -3,6 +3,7 @@ import { resolveMediaUrls } from '../helpers/mediaStorage'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { getTimeAgo } from '../utils/dateFormatters'
+import { Logger } from '../utils/logger'
 
 const POSTS_PER_PAGE = 20 // Number of posts to fetch per page
 
@@ -93,7 +94,7 @@ export function usePosts(forumId, filters = {}) {
       const { data, error } = await query
 
       if (error) {
-        console.error('Error fetching posts:', error)
+        Logger.error('Error fetching posts:', error)
         throw error
       }
 
@@ -158,12 +159,12 @@ export function usePosts(forumId, filters = {}) {
     },
     initialPageParam: 0,
     enabled: !!user && !!forumId, // Only run if user is authenticated and forumId exists
-    staleTime: 30 * 1000, // 30 seconds - posts update frequently, need fresh data
-    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache for quick access
-    refetchOnMount: true, // Always refetch to get new posts
-    refetchOnWindowFocus: true, // Refetch when app regains focus
-    refetchOnReconnect: true, // Refetch if connection was lost
-    refetchInterval: 15000, // Keep forum feed fresh
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 120_000,
     retry: 1,
   })
 }
@@ -199,7 +200,7 @@ export function usePost(postId) {
         .single()
 
       if (error) {
-        console.error('Error fetching post:', error)
+        Logger.error('Error fetching post:', error)
         throw error
       }
 

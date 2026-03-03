@@ -1,5 +1,6 @@
 // Use legacy API for expo-file-system v19+
 import { createSignedUrlForPath, uploadImageToBondedMedia } from './mediaStorage'
+import { Logger } from '../utils/logger'
 
 /**
  * Upload photos to Supabase Storage
@@ -9,16 +10,16 @@ import { createSignedUrlForPath, uploadImageToBondedMedia } from './mediaStorage
  */
 export const uploadPhotosToSupabase = async (photos, userId, universityId = null) => {
   if (!photos || photos.length === 0) {
-    console.log('📸 No photos to upload')
+    Logger.info('No photos to upload')
     return []
   }
 
   if (!userId) {
-    console.error('❌ User ID is required for photo upload')
+    Logger.error('User ID is required for photo upload')
     throw new Error('User ID is required for photo upload')
   }
 
-  console.log(`📸 Starting upload of ${photos.length} photo(s) for user ${userId} (University: ${universityId || 'None'})`)
+  Logger.info(`Starting upload of ${photos.length} photo(s) for user ${userId} (University: ${universityId || 'None'})`)
 
   const uploadedPhotos = []
   const errors = []
@@ -28,19 +29,19 @@ export const uploadPhotosToSupabase = async (photos, userId, universityId = null
 
     // Skip if already uploaded
     if (photo.uploadedUrl) {
-      console.log(`✅ Photo ${i + 1} already uploaded, skipping: ${photo.uploadedUrl}`)
+      Logger.info(`Photo ${i + 1} already uploaded, skipping: ${photo.uploadedUrl}`)
       uploadedPhotos.push(photo)
       continue
     }
 
     if (!photo.localUri) {
-      console.warn(`⚠️ Photo ${i + 1} has no localUri, skipping`)
+      Logger.warn(`Photo ${i + 1} has no localUri, skipping`)
       errors.push({ index: i, error: 'No localUri provided' })
       continue
     }
 
     try {
-      console.log(`📤 Uploading photo ${i + 1}/${photos.length}...`)
+      Logger.info(`Uploading photo ${i + 1}/${photos.length}...`)
 
       const mediaType = photo.isYearbookPhoto ? 'profile_avatar' : 'profile_photo'
 
@@ -65,9 +66,9 @@ export const uploadPhotosToSupabase = async (photos, userId, universityId = null
       }
 
       uploadedPhotos.push(uploadedPhoto)
-      console.log(`🔗 Signed URL for photo ${i + 1}: ${signedUrl}`)
+      Logger.info(`Signed URL for photo ${i + 1}: ${signedUrl}`)
     } catch (error) {
-      console.error(`❌ Error processing photo ${i + 1}:`, error)
+      Logger.error(`Error processing photo ${i + 1}:`, error)
       errors.push({
         index: i,
         error: error.message || 'Unknown error',
@@ -79,10 +80,10 @@ export const uploadPhotosToSupabase = async (photos, userId, universityId = null
 
   // Log summary
   const successCount = uploadedPhotos.filter(p => p.uploadedUrl).length
-  console.log(`📊 Upload summary: ${successCount}/${photos.length} photos uploaded successfully`)
+  Logger.info(`Upload summary: ${successCount}/${photos.length} photos uploaded successfully`)
 
   if (errors.length > 0) {
-    console.warn(`⚠️ ${errors.length} photo(s) failed to upload:`, errors)
+    Logger.warn(`${errors.length} photo(s) failed to upload:`, errors)
   }
 
   if (uploadedPhotos.length === 0 && photos.length > 0) {

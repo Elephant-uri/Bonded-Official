@@ -32,6 +32,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { useCreatePost } from '../../hooks/useCreatePost'
 import { hp, wp } from '../../helpers/common'
 import { getFriendlyErrorMessage } from '../../utils/userFacingErrors'
+import { Logger } from '../../utils/logger'
 import { useAppTheme } from '../theme'
 
 export default function ClubDetail() {
@@ -150,7 +151,7 @@ export default function ClubDetail() {
         .eq('organization_id', club.id)
 
       if (error || !data || data.length === 0) {
-        console.warn('Failed to load org members:', error)
+        Logger.warn('Failed to load org members:', error)
         if (club?.members?.length) {
           const { data: profiles, error: profileError } = await supabase
             .from('profiles')
@@ -205,7 +206,7 @@ export default function ClubDetail() {
           .order('start_at', { ascending: true })
 
         if (error) {
-          console.warn('Failed to load club events:', error)
+          Logger.warn('Failed to load club events:', error)
           setClubEvents([])
           return
         }
@@ -275,7 +276,7 @@ export default function ClubDetail() {
         .limit(25)
 
       if (error) {
-        console.warn('Failed to load club posts:', error)
+        Logger.warn('Failed to load club posts:', error)
         setClubPosts([])
         setPostsCount(0)
         return
@@ -397,7 +398,7 @@ export default function ClubDetail() {
       // Trigger refetch by router navigation or context update
       router.replace(`/clubs/${club.id}`)
     } catch (error) {
-      console.error('Error updating organization:', error)
+      Logger.error('Error updating organization:', error)
       Alert.alert('Error', 'Failed to update organization. Please try again.')
     } finally {
       setIsSavingEdit(false)
@@ -499,7 +500,7 @@ export default function ClubDetail() {
       // Refresh posts list
       await fetchPosts()
     } catch (error) {
-      console.error('Failed to create post:', error)
+      Logger.error('Failed to create post:', error)
       Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to create post.'))
     } finally {
       setIsCreatingPost(false)
@@ -1311,7 +1312,6 @@ const createStyles = (theme) => StyleSheet.create({
   },
   avatarPlaceholderText: {
     fontSize: hp(3.2),
-    fontWeight: '800',
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -1328,7 +1328,6 @@ const createStyles = (theme) => StyleSheet.create({
   clubName: {
     fontSize: hp(2.6),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
   },
   clubHandle: {
@@ -1344,8 +1343,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   adminBadgeText: {
     fontSize: hp(1.2),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.info,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -1365,7 +1363,6 @@ const createStyles = (theme) => StyleSheet.create({
   statValue: {
     fontSize: hp(2.1),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
   },
   statLabel: {
@@ -1392,9 +1389,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   actionButtonPrimaryText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   actionButtonSecondary: {
     backgroundColor: theme.colors.backgroundSecondary,
@@ -1403,9 +1399,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   actionButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   bioSection: {
     marginBottom: hp(2),
@@ -1436,7 +1431,6 @@ const createStyles = (theme) => StyleSheet.create({
   membersModalTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   membersModalSpacer: {
@@ -1465,7 +1459,6 @@ const createStyles = (theme) => StyleSheet.create({
   createPostTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   createPostSubmit: {
@@ -1476,8 +1469,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createPostSubmitText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   createPostBody: {
@@ -1518,10 +1510,9 @@ const createStyles = (theme) => StyleSheet.create({
   },
   messageLabel: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   orgPostCard: {
     backgroundColor: theme.colors.backgroundSecondary,
@@ -1583,8 +1574,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   adminToolText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   createOrgPostButton: {
@@ -1609,8 +1599,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createOrgPostText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   tabs: {
@@ -1633,8 +1622,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   tabText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
     opacity: 0.6,
   },
@@ -1653,7 +1641,6 @@ const createStyles = (theme) => StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
@@ -1684,8 +1671,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   meetingDay: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   meetingTime: {
@@ -1721,8 +1707,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   leaderName: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   leaderRole: {
@@ -1746,7 +1731,6 @@ const createStyles = (theme) => StyleSheet.create({
   postTitle: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     flex: 1,
   },
@@ -1792,13 +1776,11 @@ const createStyles = (theme) => StyleSheet.create({
   memberAvatarInitial: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   memberName: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     maxWidth: wp(35),
@@ -1842,8 +1824,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyStateButtonText: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   postGridRow: {
@@ -1879,7 +1860,7 @@ const createStyles = (theme) => StyleSheet.create({
     right: wp(2),
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     paddingHorizontal: wp(2),
     paddingVertical: hp(0.3),
     borderRadius: theme.radius.sm,
@@ -1887,8 +1868,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   postGridLikes: {
     fontSize: hp(1.2),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   requestItem: {
@@ -1921,8 +1901,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   requestName: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
@@ -1988,8 +1967,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   backButtonText: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   viewSwitcherContainer: {
@@ -2031,12 +2009,11 @@ const createStyles = (theme) => StyleSheet.create({
   },
   viewSwitcherText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
   },
   viewSwitcherTextActive: {
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   analyticsGrid: {
@@ -2057,7 +2034,6 @@ const createStyles = (theme) => StyleSheet.create({
   analyticsValue: {
     fontSize: theme.typography.sizes.xxl,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.xs,
   },
@@ -2069,9 +2045,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   analyticsChange: {
     fontSize: theme.typography.sizes.xs,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.success,
-    fontWeight: theme.typography.weights.medium,
   },
   analyticsSection: {
     marginTop: theme.spacing.lg,
@@ -2079,7 +2054,6 @@ const createStyles = (theme) => StyleSheet.create({
   analyticsSectionTitle: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
   },

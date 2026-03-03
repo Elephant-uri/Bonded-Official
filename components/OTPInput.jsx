@@ -90,7 +90,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.background,
     fontSize: hp(3),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     ...Platform.select({

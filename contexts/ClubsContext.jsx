@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createSignedUrlForPath, uploadImageToBondedMedia } from '../helpers/mediaStorage'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 const ClubsContext = createContext()
 
@@ -21,11 +22,11 @@ export function ClubsProvider({ children }) {
       async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
           // User signed in, refresh clubs data
-          console.log('Auth state changed: SIGNED_IN, refreshing clubs')
+          Logger.info('Auth state changed: SIGNED_IN, refreshing clubs')
           fetchClubs()
         } else if (event === 'SIGNED_OUT') {
           // User signed out, clear clubs data
-          console.log('Auth state changed: SIGNED_OUT, clearing clubs')
+          Logger.info('Auth state changed: SIGNED_OUT, clearing clubs')
           setClubs({})
           setLoading(false)
           setError(null)
@@ -61,7 +62,7 @@ export function ClubsProvider({ children }) {
 
       let adminIds = (admins || []).map((row) => row.user_id).filter((id) => id && id !== requesterId)
       if (error) {
-        console.warn('Failed to fetch org admins for notifications:', error)
+        Logger.warn('Failed to fetch org admins for notifications:', error)
         adminIds = (fallbackAdminIds || []).filter((id) => id && id !== requesterId)
       }
 
@@ -87,7 +88,7 @@ export function ClubsProvider({ children }) {
       if (insertError?.code === 'PGRST204' || insertError?.message?.includes('entity_type')) {
         await supabase.from('notifications').insert(baseNotifications)
       } else if (insertError) {
-        console.warn('Failed to insert admin notifications:', insertError)
+        Logger.warn('Failed to insert admin notifications:', insertError)
       }
     } catch (error) {
       // Notifications are best-effort only.
@@ -103,13 +104,13 @@ export function ClubsProvider({ children }) {
         .single()
 
       if (error) {
-        console.warn('Failed to fetch org forum:', error)
+        Logger.warn('Failed to fetch org forum:', error)
         return { forumId: null, error }
       }
 
       return { forumId: forum?.id || null, error: null }
     } catch (err) {
-      console.error('Error in insertOrgForum:', err)
+      Logger.error('Error in insertOrgForum:', err)
       return { forumId: null, error: err }
     }
   }
@@ -132,12 +133,12 @@ export function ClubsProvider({ children }) {
         .single()
 
       if (profileError) {
-        console.error('Error fetching user university:', profileError)
+        Logger.error('Error fetching user university:', profileError)
         setLoading(false)
         return
       }
       if (!userProfile?.university_id) {
-        console.warn('User profile missing university_id; cannot load organizations.')
+        Logger.warn('User profile missing university_id; cannot load organizations.')
         setLoading(false)
         return
       }
@@ -153,14 +154,14 @@ export function ClubsProvider({ children }) {
       if (orgsError) {
         // PGRST205 = table not found - table might not be deployed yet
         if (orgsError.code === 'PGRST205') {
-          console.warn('⚠️ organizations table not found - organizations feature may not be deployed yet')
+          Logger.warn('organizations table not found - organizations feature may not be deployed yet')
           setClubs({})
           setOrgsAvailable(false)
           setError(null) // Don't show error to user if table doesn't exist
           setLoading(false)
           return
         }
-        console.error('Error fetching orgs:', orgsError)
+        Logger.error('Error fetching orgs:', orgsError)
         setError(orgsError.message)
         setLoading(false)
         return
@@ -172,7 +173,7 @@ export function ClubsProvider({ children }) {
         .rpc('get_user_org_memberships', { p_user_id: user.id })
 
       if (membershipError) {
-        console.warn('Failed to fetch user memberships:', membershipError)
+        Logger.warn('Failed to fetch user memberships:', membershipError)
         userMemberships = []
       }
 
@@ -210,11 +211,11 @@ export function ClubsProvider({ children }) {
       let fallbackMemberRoles = {}
       if (membersError) {
         if (membersError.code === 'PGRST205') {
-          console.warn('⚠️ org_members table not found - membership features disabled')
+          Logger.warn('org_members table not found - membership features disabled')
           setMembershipsAvailable(false)
           membersData = []
         } else {
-          console.warn('⚠️ org_members unavailable for reads:', membersError)
+          Logger.warn('org_members unavailable for reads:', membersError)
           setMembershipsAvailable(true)
           membersData = []
         }
@@ -253,7 +254,7 @@ export function ClubsProvider({ children }) {
         if (forumsError?.code === 'PGRST204' || forumsError?.message?.includes('org_id')) {
           forumsData = []
         } else if (forumsError) {
-          console.warn('⚠️ forums lookup failed:', forumsError)
+          Logger.warn('forums lookup failed:', forumsError)
           forumsData = []
         }
 
@@ -277,7 +278,7 @@ export function ClubsProvider({ children }) {
           .order('created_at', { ascending: false })
 
         if (mediaError) {
-          console.warn('⚠️ Failed to fetch org media:', mediaError)
+          Logger.warn('Failed to fetch org media:', mediaError)
         } else {
           orgMedia = (mediaData || []).reduce(
             (acc, row) => {
@@ -313,7 +314,7 @@ export function ClubsProvider({ children }) {
           try {
             return await createSignedUrlForPath(extractedPath)
           } catch (error) {
-            console.warn('Failed to sign media URL:', error?.message || error)
+            Logger.warn('Failed to sign media URL:', error?.message || error)
             return null
           }
         }
@@ -360,7 +361,7 @@ export function ClubsProvider({ children }) {
           try {
             avatarUrl = await createSignedUrlForPath(orgMedia.logo[org.id])
           } catch (error) {
-            console.warn('Failed to sign fallback org logo:', error?.message || error)
+            Logger.warn('Failed to sign fallback org logo:', error?.message || error)
           }
         }
 
@@ -369,7 +370,7 @@ export function ClubsProvider({ children }) {
           try {
             coverUrl = await createSignedUrlForPath(orgMedia.cover[org.id])
           } catch (error) {
-            console.warn('Failed to sign fallback org cover:', error?.message || error)
+            Logger.warn('Failed to sign fallback org cover:', error?.message || error)
           }
         }
 
@@ -400,7 +401,7 @@ export function ClubsProvider({ children }) {
 
       setClubs(clubsMap)
     } catch (err) {
-      console.error('Error in fetchClubs:', err)
+      Logger.error('Error in fetchClubs:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -445,7 +446,7 @@ export function ClubsProvider({ children }) {
 
   const requestToJoin = async (clubId, userId = currentUserId) => {
     if (!membershipsAvailable) {
-      console.warn('Organization memberships are not available yet.')
+      Logger.warn('Organization memberships are not available yet.')
       return { ok: false, error: 'Organization memberships are not available yet.' }
     }
     const club = clubs[clubId]
@@ -492,14 +493,14 @@ export function ClubsProvider({ children }) {
         // Handle specific error cases
         if (error.code === '23505') {
           // Duplicate - user already has some membership, this is expected behavior
-          console.log('User already has membership, treating as success')
+          Logger.info('User already has membership, treating as success')
           // Forum/conversation membership is handled by database triggers
           return { ok: true, pending: needsApproval }
         } else if (error.code === 'PGRST301' || error.message?.includes('permission')) {
-          console.error('Permission denied joining club:', error)
+          Logger.error('Permission denied joining club:', error)
           return { ok: false, error: 'You do not have permission to join this organization.' }
         } else {
-          console.error('Error joining club:', error)
+          Logger.error('Error joining club:', error)
         }
         
         return { ok: false, error: error.message || 'Failed to join organization.' }
@@ -525,14 +526,14 @@ export function ClubsProvider({ children }) {
       // when the org_members record is inserted above
 
       // Refresh data to ensure consistency
-      console.log('About to refresh clubs data after join...')
+      Logger.info('About to refresh clubs data after join...')
       await fetchClubs()
-      console.log('Clubs data refreshed after join')
+      Logger.info('Clubs data refreshed after join')
       queryClient.invalidateQueries({ queryKey: ['forums'] })
 
       return { ok: true, pending: needsApproval }
     } catch (err) {
-      console.error('Error in requestToJoin:', err)
+      Logger.error('Error in requestToJoin:', err)
       return { ok: false, error: err.message || 'Failed to join organization.' }
     }
   }
@@ -560,7 +561,7 @@ export function ClubsProvider({ children }) {
 
   const approveRequest = async (clubId, userId) => {
     if (!membershipsAvailable) {
-      console.warn('Organization memberships are not available yet.')
+      Logger.warn('Organization memberships are not available yet.')
       return false
     }
     try {
@@ -571,7 +572,7 @@ export function ClubsProvider({ children }) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error approving request:', error)
+        Logger.error('Error approving request:', error)
         return false
       }
 
@@ -590,14 +591,14 @@ export function ClubsProvider({ children }) {
 
       return true
     } catch (err) {
-      console.error('Error in approveRequest:', err)
+      Logger.error('Error in approveRequest:', err)
       return false
     }
   }
 
   const rejectRequest = async (clubId, userId) => {
     if (!membershipsAvailable) {
-      console.warn('Organization memberships are not available yet.')
+      Logger.warn('Organization memberships are not available yet.')
       return false
     }
     try {
@@ -608,7 +609,7 @@ export function ClubsProvider({ children }) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error rejecting request:', error)
+        Logger.error('Error rejecting request:', error)
         return false
       }
 
@@ -622,14 +623,14 @@ export function ClubsProvider({ children }) {
 
       return true
     } catch (err) {
-      console.error('Error in rejectRequest:', err)
+      Logger.error('Error in rejectRequest:', err)
       return false
     }
   }
 
   const leaveClub = async (clubId, userId = currentUserId) => {
     if (!membershipsAvailable) {
-      console.warn('Organization memberships are not available yet.')
+      Logger.warn('Organization memberships are not available yet.')
       return false
     }
     try {
@@ -640,7 +641,7 @@ export function ClubsProvider({ children }) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error leaving club:', error)
+        Logger.error('Error leaving club:', error)
         return false
       }
 
@@ -655,7 +656,7 @@ export function ClubsProvider({ children }) {
 
       return true
     } catch (err) {
-      console.error('Error in leaveClub:', err)
+      Logger.error('Error in leaveClub:', err)
       return false
     }
   }
@@ -667,7 +668,7 @@ export function ClubsProvider({ children }) {
 
   const removeMember = async (clubId, userId) => {
     if (!membershipsAvailable) {
-      console.warn('Organization memberships are not available yet.')
+      Logger.warn('Organization memberships are not available yet.')
       return false
     }
     const club = clubs[clubId]
@@ -682,7 +683,7 @@ export function ClubsProvider({ children }) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error removing member:', error)
+        Logger.error('Error removing member:', error)
         return false
       }
 
@@ -696,7 +697,7 @@ export function ClubsProvider({ children }) {
 
       return true
     } catch (err) {
-      console.error('Error in removeMember:', err)
+      Logger.error('Error in removeMember:', err)
       return false
     }
   }
@@ -723,7 +724,7 @@ export function ClubsProvider({ children }) {
         .single()
       universityId = profile?.university_id || null
     } catch (error) {
-      console.warn('Failed to fetch university for forum:', error)
+      Logger.warn('Failed to fetch university for forum:', error)
     }
 
     if (!universityId) return null
@@ -767,7 +768,7 @@ export function ClubsProvider({ children }) {
             .update({ org_id: clubId })
             .eq('id', namedForum.id)
         } catch (updateError) {
-          console.warn('Failed to attach org to existing forum:', updateError)
+          Logger.warn('Failed to attach org to existing forum:', updateError)
         }
         setClubs((prev) => ({
           ...prev,
@@ -815,7 +816,7 @@ export function ClubsProvider({ children }) {
 
   const addAdmin = async (clubId, userId) => {
     if (!membershipsAvailable) {
-      console.warn('Organization memberships are not available yet.')
+      Logger.warn('Organization memberships are not available yet.')
       return false
     }
     try {
@@ -826,7 +827,7 @@ export function ClubsProvider({ children }) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error adding admin:', error)
+        Logger.error('Error adding admin:', error)
         return false
       }
 
@@ -844,14 +845,14 @@ export function ClubsProvider({ children }) {
 
       return true
     } catch (err) {
-      console.error('Error in addAdmin:', err)
+      Logger.error('Error in addAdmin:', err)
       return false
     }
   }
 
   const removeAdmin = async (clubId, userId) => {
     if (!membershipsAvailable) {
-      console.warn('Organization memberships are not available yet.')
+      Logger.warn('Organization memberships are not available yet.')
       return false
     }
     try {
@@ -862,7 +863,7 @@ export function ClubsProvider({ children }) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error removing admin:', error)
+        Logger.error('Error removing admin:', error)
         return false
       }
 
@@ -880,7 +881,7 @@ export function ClubsProvider({ children }) {
 
       return true
     } catch (err) {
-      console.error('Error in removeAdmin:', err)
+      Logger.error('Error in removeAdmin:', err)
       return false
     }
   }
@@ -901,7 +902,7 @@ export function ClubsProvider({ children }) {
         .single()
 
       if (profileError) {
-        console.error('Error fetching university for org:', profileError)
+        Logger.error('Error fetching university for org:', profileError)
         return { id: null, error: 'Failed to fetch your university information. Please try again.' }
       }
       if (!userProfile?.university_id) {
@@ -951,7 +952,7 @@ export function ClubsProvider({ children }) {
       }
 
       if (orgError) {
-        console.error('Error creating org:', orgError)
+        Logger.error('Error creating org:', orgError)
         if (orgError.code === 'PGRST205') {
           return { id: null, error: 'Organizations are not available yet. Please try again later.' }
         }
@@ -978,7 +979,7 @@ export function ClubsProvider({ children }) {
           logoPath = uploadResult.path
           logoDisplayUrl = await createSignedUrlForPath(uploadResult.path)
         } catch (uploadError) {
-          console.warn('Failed to upload org logo:', uploadError?.message || uploadError)
+          Logger.warn('Failed to upload org logo:', uploadError?.message || uploadError)
           // Don't fail the whole creation for logo upload issues
         }
       }
@@ -997,7 +998,7 @@ export function ClubsProvider({ children }) {
           coverPath = uploadResult.path
           coverDisplayUrl = await createSignedUrlForPath(uploadResult.path)
         } catch (uploadError) {
-          console.warn('Failed to upload org cover:', uploadError?.message || uploadError)
+          Logger.warn('Failed to upload org cover:', uploadError?.message || uploadError)
           // Don't fail the whole creation for cover upload issues
         }
       }
@@ -1011,7 +1012,7 @@ export function ClubsProvider({ children }) {
           try {
             await supabase.from('organizations').update(updates).eq('id', newOrg.id)
           } catch (updateError) {
-            console.warn('Failed to update org media URLs:', updateError?.message || updateError)
+            Logger.warn('Failed to update org media URLs:', updateError?.message || updateError)
           }
         }
       }
@@ -1029,9 +1030,9 @@ export function ClubsProvider({ children }) {
 
       if (memberError) {
         if (memberError.code === 'PGRST205') {
-          console.warn('org_members table not found - skipping membership insert')
+          Logger.warn('org_members table not found - skipping membership insert')
         } else {
-          console.warn('Error adding creator as admin:', memberError)
+          Logger.warn('Error adding creator as admin:', memberError)
           // Continue with creation but warn about membership issue
         }
       } else {
@@ -1049,10 +1050,10 @@ export function ClubsProvider({ children }) {
         if (!forumError && forum?.id) {
           forumId = forum.id
         } else {
-          console.warn('Forum not found after org creation:', forumError)
+          Logger.warn('Forum not found after org creation:', forumError)
         }
       } catch (forumErr) {
-        console.warn('Error fetching org forum:', forumErr)
+        Logger.warn('Error fetching org forum:', forumErr)
       }
 
       // Update local state
@@ -1091,7 +1092,7 @@ export function ClubsProvider({ children }) {
 
       return { id: newOrg.id, error: null }
     } catch (err) {
-      console.error('Error in createClub:', err)
+      Logger.error('Error in createClub:', err)
       return { id: null, error: err.message || 'An unexpected error occurred while creating the organization.' }
     }
   }

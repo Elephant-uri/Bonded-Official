@@ -24,6 +24,7 @@ import { useAppTheme } from '../../app/theme'
 import Picker from '../Picker'
 import { useEventsContext } from '../../contexts/EventsContext'
 import { formatDate, formatTime } from '../../utils/dateFormatters'
+import { Logger } from '../../utils/logger'
 
 const CATEGORIES = [
   { value: 'social', label: 'Social' },
@@ -98,7 +99,7 @@ const CreateEventModal = ({ visible, onClose, onSuccess }) => {
         setCoverImage(result.assets[0].uri)
       }
     } catch (error) {
-      console.log('Image picker error:', error)
+      Logger.info('Image picker error:', error)
       Alert.alert('Error', 'Failed to pick image')
     }
   }
@@ -876,7 +877,7 @@ export default CreateEventModal
 const createStyles = (theme) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(0, 0, 0, 0.25)',
+    backgroundColor: Platform.OS === 'ios' ? 'transparent' : theme.colors.overlayLight,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -915,8 +916,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   swipeHint: {
     fontSize: hp(1.2),
-    color: '#8E8E93',
-    fontWeight: '400',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.body,
     letterSpacing: 0.2,
   },
   modalHeader: {
@@ -927,20 +928,20 @@ const createStyles = (theme) => StyleSheet.create({
     paddingVertical: hp(1.8),
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomColor: theme.colors.border,
   },
   cancelButton: {
     paddingVertical: hp(0.5),
   },
   cancelButtonText: {
     fontSize: hp(1.7),
-    color: '#007AFF',
-    fontWeight: '400',
+    color: theme.colors.info,
+    fontFamily: theme.typography.fontFamily.body,
     letterSpacing: -0.2,
   },
   modalTitle: {
     fontSize: hp(2.1),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000000',
     letterSpacing: -0.4,
   },
@@ -949,8 +950,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createButtonText: {
     fontSize: hp(1.7),
-    color: '#007AFF',
-    fontWeight: '600',
+    color: theme.colors.info,
+    fontFamily: theme.typography.fontFamily.semibold,
     letterSpacing: -0.2,
   },
   scrollView: {
@@ -959,14 +960,14 @@ const createStyles = (theme) => StyleSheet.create({
   scrollContent: {
     padding: wp(4),
     paddingBottom: hp(6),
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   inputGroup: {
     marginBottom: hp(2.5),
   },
   label: {
     fontSize: hp(1.5),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000000',
     marginBottom: hp(1),
     letterSpacing: -0.2,
@@ -979,7 +980,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.7),
     color: '#000000',
     borderWidth: 0.5,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: theme.colors.border,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1029,13 +1030,13 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000000',
     marginBottom: hp(0.5),
   },
   sectionSubtext: {
     fontSize: hp(1.4),
-    color: '#8E8E93',
+    color: theme.colors.textSecondary,
     marginBottom: hp(1.5),
   },
   switchRow: {
@@ -1044,7 +1045,7 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     paddingVertical: hp(1),
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: theme.colors.border,
   },
   switchLabel: {
     flex: 1,
@@ -1054,19 +1055,19 @@ const createStyles = (theme) => StyleSheet.create({
   },
   switchText: {
     fontSize: hp(1.6),
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#000000',
     marginBottom: hp(0.2),
   },
   switchSubtext: {
     fontSize: hp(1.3),
-    color: '#8E8E93',
+    color: theme.colors.textSecondary,
   },
   recurringOptions: {
     marginTop: hp(1.5),
     paddingTop: hp(1.5),
     borderTopWidth: 0.5,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: theme.colors.border,
   },
   recurringTypeRow: {
     flexDirection: 'row',
@@ -1077,16 +1078,16 @@ const createStyles = (theme) => StyleSheet.create({
     paddingVertical: hp(1),
     paddingHorizontal: wp(3),
     borderRadius: hp(0.8),
-    backgroundColor: '#E5E5EA',
+    backgroundColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   recurringTypeButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.info,
   },
   recurringTypeText: {
     fontSize: hp(1.5),
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: '#000000',
   },
   recurringTypeTextActive: {
@@ -1103,13 +1104,13 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(2.2),
     borderRadius: hp(0.4),
     borderWidth: 2,
-    borderColor: '#8E8E93',
+    borderColor: theme.colors.textSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: theme.colors.info,
+    borderColor: theme.colors.info,
   },
   forumOptionText: {
     fontSize: hp(1.6),
@@ -1124,14 +1125,14 @@ const createStyles = (theme) => StyleSheet.create({
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: theme.colors.info,
     borderStyle: 'dashed',
     gap: wp(2),
   },
   imagePickerText: {
     fontSize: hp(1.7),
-    fontWeight: '500',
-    color: '#007AFF',
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.info,
   },
   imagePreviewContainer: {
     position: 'relative',
@@ -1147,14 +1148,14 @@ const createStyles = (theme) => StyleSheet.create({
     position: 'absolute',
     top: hp(1),
     right: wp(4),
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     borderRadius: hp(1.25),
     padding: hp(0.5),
   },
   pickerModal: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   pickerModalContent: {
     backgroundColor: '#FFFFFF',
@@ -1170,11 +1171,11 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: theme.colors.border,
   },
   pickerModalTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000000',
   },
   pickerModalButton: {
@@ -1183,12 +1184,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   pickerModalButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '400',
-    color: '#8E8E93',
+    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textSecondary,
   },
   pickerModalButtonDone: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: theme.colors.info,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   iosPickerContainer: {
     width: '100%',

@@ -1,5 +1,6 @@
 import React from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native'
+import CachedImage from './CachedImage'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../helpers/common'
@@ -65,10 +66,10 @@ const AppTopBar = ({
       {/* Center: Bonded Logo */}
       <View style={styles.centerSection}>
         <View style={styles.bondedLogoContainer}>
-          <Image
+          <CachedImage
             source={require('../assets/images/transparent-bonded.png')}
             style={styles.bondedLogo}
-            resizeMode="contain"
+            contentFit="contain"
           />
           <ThemedText style={styles.bondedText}>Bonded</ThemedText>
         </View>
@@ -140,8 +141,7 @@ const createStyles = (theme) => StyleSheet.create({
   schoolName: {
     fontSize: hp(1.8),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     textAlign: 'center',
     letterSpacing: -0.3,
   },
@@ -158,8 +158,7 @@ const createStyles = (theme) => StyleSheet.create({
   bondedText: {
     fontSize: hp(2),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     letterSpacing: -0.3,
   },
   chevronButton: {
@@ -200,8 +199,7 @@ const createStyles = (theme) => StyleSheet.create({
   notificationBadgeText: {
     fontSize: hp(1.1),
     color: theme.colors.white,
-    fontWeight: '700',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.bold,
     includeFontPadding: false,
   },
 })

@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to create/update user profile after successful login
@@ -29,7 +30,7 @@ export const useCreateProfile = () => {
         .single()
 
       if (error) {
-        console.error('Error creating profile:', error)
+        Logger.error('Error creating profile:', error)
         throw error
       }
 

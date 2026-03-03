@@ -35,7 +35,7 @@ export default function Button({
           style={[
             {
               color: variant === 'secondary' ? theme.colors.textPrimary : theme.colors.white,
-              fontWeight: '600',
+              fontFamily: theme.typography.fontFamily.semibold,
               textAlign: 'center',
             },
             textStyle,

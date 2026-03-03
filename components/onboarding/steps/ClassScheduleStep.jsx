@@ -13,6 +13,7 @@ import { getFriendlyErrorMessage } from '../../../utils/userFacingErrors'
 import ScheduleConfirmStep from './ScheduleConfirmStep'
 import ScheduleEditStep from './ScheduleEditStep'
 import ScheduleUploadStep from './ScheduleUploadStep'
+import { Logger } from '../../../utils/logger'
 
 const SCHEDULE_STEPS = {
   UPLOAD: 'upload',
@@ -88,7 +89,7 @@ export default function ClassScheduleStep({ formData, updateFormData, onScroll }
           ])
         },
         onError: (error) => {
-          console.error('Error saving schedule:', error)
+          Logger.error('Error saving schedule:', error)
           Alert.alert(
             'Error',
             getFriendlyErrorMessage(error, 'Failed to save schedule. Please try again.')

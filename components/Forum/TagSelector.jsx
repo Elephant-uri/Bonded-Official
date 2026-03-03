@@ -223,7 +223,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1.5),
@@ -248,7 +248,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.4),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   removeTagButton: {
     marginLeft: wp(1.5),
@@ -303,7 +303,7 @@ const createStyles = (theme) => StyleSheet.create({
   tagChipText: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   tagChipTextDisabled: {
     color: theme.colors.textSecondary,
@@ -319,7 +319,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.5),
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     marginRight: wp(1),
   },
   maxTagsWarning: {

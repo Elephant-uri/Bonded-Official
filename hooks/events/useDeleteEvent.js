@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { deleteEvent } from '../../api/events/deleteEvent'
 import { useAuthStore } from '../../stores/authStore'
+import { Logger } from '../../utils/logger'
 
 /**
  * Hook to delete an event
@@ -16,13 +17,13 @@ export function useDeleteEvent() {
         throw new Error('User must be authenticated to delete events')
       }
 
-      console.log('Deleting event:', eventId)
+      Logger.info('Deleting event:', eventId)
       const result = await deleteEvent(eventId)
-      console.log('Event deleted successfully:', result)
+      Logger.info('Event deleted successfully:', result)
       return result
     },
     onSuccess: (data) => {
-      console.log('✅ Event deleted, invalidating queries:', {
+      Logger.info('Event deleted, invalidating queries:', {
         eventId: data?.id,
         title: data?.title,
       })
@@ -32,10 +33,10 @@ export function useDeleteEvent() {
       queryClient.invalidateQueries({ queryKey: ['eventsForUser'] })
       queryClient.invalidateQueries({ queryKey: ['calendarData'] })
 
-      console.log('🔄 Queries invalidated - events should refetch')
+      Logger.info('Queries invalidated - events should refetch')
     },
     onError: (error) => {
-      console.error('❌ Event deletion failed:', error)
+      Logger.error('Event deletion failed:', error)
     },
     retry: 1,
   })

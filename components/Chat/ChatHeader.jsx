@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { useAppTheme } from '../../app/theme'
 import { useProfileModal } from '../../contexts/ProfileModalContext'
 import { hp, wp } from '../../helpers/common'
@@ -49,10 +50,9 @@ export default function ChatHeader({
                 >
                     <View style={styles.avatarContainer}>
                         {userAvatar ? (
-                            <Image
+                            <CachedImage
                                 source={{ uri: userAvatar }}
                                 style={styles.avatar}
-                                resizeMode="cover"
                             />
                         ) : (
                             <View style={[styles.avatar, styles.avatarPlaceholder]}>
@@ -94,7 +94,7 @@ const createStyles = (theme) => StyleSheet.create({
     container: {
         backgroundColor: theme.colors.background, // iOS clean white/dark
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border || 'rgba(0,0,0,0.1)',
+        borderBottomColor: theme.colors.border,
         paddingTop: hp(1),
         paddingBottom: hp(1.5),
         paddingHorizontal: wp(2),
@@ -132,14 +132,14 @@ const createStyles = (theme) => StyleSheet.create({
     avatarText: {
         fontSize: hp(1.8),
         color: theme.colors.textSecondary,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     textContainer: {
         alignItems: 'center',
     },
     name: {
         fontSize: hp(2),
-        fontWeight: '700', // Bold header
+        fontFamily: theme.typography.fontFamily.bold, // Bold header
         color: theme.colors.textPrimary,
         fontFamily: theme.typography.fontFamily.heading,
     },

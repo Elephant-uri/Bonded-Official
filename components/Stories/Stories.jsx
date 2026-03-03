@@ -139,7 +139,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.4),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     maxWidth: wp(18),
     textAlign: 'center',
   },

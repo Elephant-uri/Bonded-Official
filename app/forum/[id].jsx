@@ -32,6 +32,7 @@ import { resolveMediaUrls } from '../../helpers/mediaStorage'
 import { useComments } from '../../hooks/useComments'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { Logger } from '../../utils/logger'
 import { useAppTheme } from '../theme'
 
 // Avatar component
@@ -59,7 +60,7 @@ const PostAvatar = ({ post, size = hp(4.5), theme, onPress }) => {
 
         return (
             <LinearGradient
-                colors={['#6B7280', '#4B5563']}
+                colors={[theme.colors.textSecondary, theme.colors.textSecondary]}
                 style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
             >
                 <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>
@@ -94,16 +95,16 @@ const HorizontalVote = ({ score, userVote, onUpvote, onDownvote, theme, size = '
             <TouchableOpacity onPress={onUpvote} style={styles.voteButton} activeOpacity={0.7}>
                 <ArrowUpCircle
                     size={iconSize}
-                    color={isUpvoted ? '#2ecc71' : theme.colors.textSecondary}
+                    color={isUpvoted ? theme.colors.success : theme.colors.textSecondary}
                     strokeWidth={2}
-                    fill={isUpvoted ? '#2ecc71' : 'none'}
+                    fill={isUpvoted ? theme.colors.success : 'none'}
                 />
             </TouchableOpacity>
             <Text style={[
                 styles.voteCount,
                 { fontSize },
-                isUpvoted && { color: '#2ecc71' },
-                isDownvoted && { color: '#e74c3c' },
+                isUpvoted && { color: theme.colors.success },
+                isDownvoted && { color: theme.colors.destructive },
                 !userVote && { color: theme.colors.textSecondary }
             ]}>
                 {score}
@@ -111,9 +112,9 @@ const HorizontalVote = ({ score, userVote, onUpvote, onDownvote, theme, size = '
             <TouchableOpacity onPress={onDownvote} style={styles.voteButton} activeOpacity={0.7}>
                 <ArrowDownCircle
                     size={iconSize}
-                    color={isDownvoted ? '#e74c3c' : theme.colors.textSecondary}
+                    color={isDownvoted ? theme.colors.destructive : theme.colors.textSecondary}
                     strokeWidth={2}
-                    fill={isDownvoted ? '#e74c3c' : 'none'}
+                    fill={isDownvoted ? theme.colors.destructive : 'none'}
                 />
             </TouchableOpacity>
         </View>
@@ -262,7 +263,7 @@ export default function SharedPostScreen() {
                     .single()
 
                 if (fetchError) {
-                    console.error('Error fetching post:', fetchError)
+                    Logger.error('Error fetching post:', fetchError)
                     setError('Post not found')
                     setLoading(false)
                     return
@@ -304,7 +305,7 @@ export default function SharedPostScreen() {
                 })
                 setLoading(false)
             } catch (err) {
-                console.error('Error:', err)
+                Logger.error('Error:', err)
                 setError('Failed to load post')
                 setLoading(false)
             }
@@ -397,7 +398,7 @@ export default function SharedPostScreen() {
             setReplyingTo(null)
             await refetchComments()
         } catch (e) {
-            console.error('Failed to submit comment:', e)
+            Logger.error('Failed to submit comment:', e)
             Alert.alert('Error', 'Failed to post comment. Please try again.')
         }
         setIsSubmitting(false)
@@ -708,7 +709,7 @@ const styles = StyleSheet.create({
     },
     backButtonText: {
         fontSize: hp(1.6),
-        fontWeight: '600',
+        fontFamily: 'Inter_600SemiBold',
         color: '#fff',
     },
     header: {
@@ -727,7 +728,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: hp(2),
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
     },
     listContent: {
         paddingBottom: hp(2),
@@ -752,14 +753,14 @@ const styles = StyleSheet.create({
     avatarImage: {},
     avatarText: {
         color: '#fff',
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
     },
     postAuthorInfo: {
         flex: 1,
     },
     postAuthorName: {
         fontSize: hp(1.7),
-        fontWeight: '600',
+        fontFamily: 'Inter_600SemiBold',
     },
     postMeta: {
         fontSize: hp(1.4),
@@ -767,7 +768,7 @@ const styles = StyleSheet.create({
     },
     postTitle: {
         fontSize: hp(2),
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
         marginBottom: hp(0.8),
         lineHeight: hp(2.6),
     },
@@ -801,7 +802,7 @@ const styles = StyleSheet.create({
         padding: hp(0.4),
     },
     voteCount: {
-        fontWeight: '600',
+        fontFamily: 'Inter_600SemiBold',
         minWidth: wp(5),
         textAlign: 'center',
     },
@@ -829,7 +830,7 @@ const styles = StyleSheet.create({
     },
     commentsTitle: {
         fontSize: hp(1.8),
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
     },
     sortButton: {
         flexDirection: 'row',
@@ -838,7 +839,7 @@ const styles = StyleSheet.create({
     },
     sortText: {
         fontSize: hp(1.5),
-        fontWeight: '500',
+        fontFamily: 'Inter_500Medium',
     },
     commentItem: {
         flexDirection: 'row',
@@ -858,7 +859,7 @@ const styles = StyleSheet.create({
     },
     commentAuthor: {
         fontSize: hp(1.5),
-        fontWeight: '600',
+        fontFamily: 'Inter_600SemiBold',
     },
     commentTime: {
         fontSize: hp(1.3),
@@ -882,7 +883,7 @@ const styles = StyleSheet.create({
     },
     replyButtonText: {
         fontSize: hp(1.4),
-        fontWeight: '500',
+        fontFamily: 'Inter_500Medium',
     },
     emptyContainer: {
         alignItems: 'center',
@@ -931,7 +932,7 @@ const styles = StyleSheet.create({
     },
     anonToggleText: {
         fontSize: hp(1.2),
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
     },
     sendButton: {
         width: hp(3.5),

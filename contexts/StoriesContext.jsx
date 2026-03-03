@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { fetchUnsplashPhoto } from '../services/unsplashService'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 const StoriesContext = createContext()
 
@@ -162,7 +163,7 @@ export function StoriesProvider({ children }) {
         const stories = await generateMockStories()
         setForumStories(stories)
       } catch (error) {
-        console.error('Error loading stories:', error)
+        Logger.error('Error loading stories:', error)
         // Fallback to empty stories if there's an error
         setForumStories({})
       } finally {

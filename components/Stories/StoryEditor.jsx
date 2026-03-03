@@ -25,17 +25,17 @@ const TEXT_COLORS = [
   '#000000',
   '#FF6B9D',
   '#C239B3',
-  '#A45CFF',
+  theme.colors.brand,
   '#3498db',
-  '#2ecc71',
-  '#f39c12',
-  '#e74c3c',
-  '#FFD700',
+  theme.colors.success,
+  theme.colors.warning,
+  theme.colors.destructive,
+  theme.colors.warning,
 ]
 
 const BACKGROUND_COLORS = [
   'transparent',
-  'rgba(0, 0, 0, 0.5)',
+  theme.colors.overlay,
   'rgba(255, 107, 157, 0.5)',
   'rgba(194, 57, 179, 0.5)',
   'rgba(164, 92, 255, 0.5)',
@@ -467,7 +467,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   headerButton: {
     width: hp(3),
@@ -479,7 +479,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: theme.typography.sizes.lg,
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   headerSubtitle: {
     fontSize: theme.typography.sizes.sm,
@@ -506,7 +506,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   textElementText: {
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   stickerElement: {
     position: 'absolute',
@@ -546,7 +546,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   textInput: {
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     textAlign: 'center',
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
@@ -618,7 +618,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.8),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   stickerPickerOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -642,7 +642,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(2),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   stickerGrid: {
     flexDirection: 'row',

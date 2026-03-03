@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useProfileModal } from '../../contexts/ProfileModalContext'
 import { hp, wp } from '../../helpers/common'
 import { ArrowDownCircle, ArrowUpCircle } from '../Icons'
+import { Logger } from '../../utils/logger'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const MODAL_HEIGHT = SCREEN_HEIGHT * 0.75
@@ -290,7 +291,7 @@ export default function CommentsModal({
             setNewComment('')
             setReplyingTo(null)
         } catch (e) {
-            console.error('Failed to submit comment:', e)
+            Logger.error('Failed to submit comment:', e)
         }
         setIsSubmitting(false)
     }, [newComment, isAnon, isSubmitting, onAddComment, post?.id, replyingTo])
@@ -489,7 +490,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: hp(2),
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
     },
     sortButton: {
         flexDirection: 'row',
@@ -498,7 +499,7 @@ const styles = StyleSheet.create({
     },
     sortText: {
         fontSize: hp(1.5),
-        fontWeight: '500',
+        fontFamily: 'Inter_500Medium',
     },
     listContent: {
         paddingBottom: hp(2),
@@ -517,7 +518,7 @@ const styles = StyleSheet.create({
     avatarImage: {},
     avatarText: {
         color: '#fff',
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
     },
     commentContent: {
         flex: 1,
@@ -530,7 +531,7 @@ const styles = StyleSheet.create({
     },
     commentAuthor: {
         fontSize: hp(1.5),
-        fontWeight: '600',
+        fontFamily: 'Inter_600SemiBold',
     },
     commentTime: {
         fontSize: hp(1.3),
@@ -559,7 +560,7 @@ const styles = StyleSheet.create({
     },
     voteCount: {
         fontSize: hp(1.4),
-        fontWeight: '600',
+        fontFamily: 'Inter_600SemiBold',
         minWidth: wp(4),
         textAlign: 'center',
     },
@@ -568,7 +569,7 @@ const styles = StyleSheet.create({
     },
     replyButtonText: {
         fontSize: hp(1.4),
-        fontWeight: '500',
+        fontFamily: 'Inter_500Medium',
     },
     emptyContainer: {
         alignItems: 'center',
@@ -618,7 +619,7 @@ const styles = StyleSheet.create({
     },
     anonToggleText: {
         fontSize: hp(1.2),
-        fontWeight: '700',
+        fontFamily: 'Inter_700Bold',
     },
     sendButton: {
         width: hp(3.5),

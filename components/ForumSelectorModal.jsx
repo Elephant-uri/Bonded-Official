@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
 import { supabase } from '../lib/supabase'
+import { Logger } from '../utils/logger'
 
 const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, onClose, onCreateForum }) => {
   const theme = useAppTheme()
@@ -42,7 +43,7 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
         .maybeSingle()
 
       if (error) {
-        console.error('Error finding class chat:', error)
+        Logger.error('Error finding class chat:', error)
         return
       }
 
@@ -50,10 +51,10 @@ const ForumSelectorModal = ({ visible, forums, currentForumId, onSelectForum, on
         onClose()
         router.push(`/chat?conversationId=${conversation.id}`)
       } else {
-        console.log('No chat found for this class section')
+        Logger.info('No chat found for this class section')
       }
     } catch (err) {
-      console.error('Error navigating to class chat:', err)
+      Logger.error('Error navigating to class chat:', err)
     }
   }
 
@@ -380,7 +381,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: hp(2.4),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: -0.3,
@@ -436,7 +437,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -449,7 +450,7 @@ const createStyles = (theme) => StyleSheet.create({
   sectionCount: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   sectionContent: {
     gap: hp(0.5),
@@ -501,7 +502,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   forumName: {
     fontSize: hp(1.7),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.2),
@@ -531,7 +532,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   unreadBadgeText: {
     fontSize: hp(1),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   classActionButton: {
@@ -557,7 +558,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
   },

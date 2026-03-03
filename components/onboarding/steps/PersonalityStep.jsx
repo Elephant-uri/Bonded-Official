@@ -181,7 +181,7 @@ const PersonalityStep = ({ formData, updateFormData, onScroll }) => {
 
 export default PersonalityStep
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -191,16 +191,16 @@ const createStyles = () => StyleSheet.create({
   },
   title: {
     fontSize: hp(4),
-    fontWeight: '800',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.extrabold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginBottom: hp(4),
     textAlign: 'center',
   },
@@ -218,13 +218,13 @@ const createStyles = () => StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#A45CFF',
+    backgroundColor: theme.colors.brand,
     borderRadius: 9999,
   },
   progressText: {
     fontSize: hp(1.8),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
   },
   questionContainer: {
     marginBottom: hp(4),
@@ -232,9 +232,9 @@ const createStyles = () => StyleSheet.create({
   },
   questionText: {
     fontSize: hp(3),
-    fontWeight: '700',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.bold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.bold || 'System',
     textAlign: 'center',
     lineHeight: hp(4),
   },
@@ -248,31 +248,31 @@ const createStyles = () => StyleSheet.create({
     paddingVertical: hp(2.5),
     paddingHorizontal: wp(5),
     borderWidth: 2,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: theme.colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   optionButtonSelected: {
     backgroundColor: '#A45CFF15',
-    borderColor: '#A45CFF',
+    borderColor: theme.colors.brand,
   },
   optionText: {
     fontSize: hp(2),
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     flex: 1,
     lineHeight: hp(2.8),
   },
   optionTextSelected: {
-    color: '#A45CFF',
-    fontWeight: '600',
+    color: theme.colors.brand,
+    fontFamily: theme.typography?.fontFamily?.semibold,
   },
   checkmark: {
     width: hp(3),
     height: hp(3),
     borderRadius: hp(1.5),
-    backgroundColor: '#A45CFF',
+    backgroundColor: theme.colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: wp(3),
@@ -280,7 +280,7 @@ const createStyles = () => StyleSheet.create({
   checkmarkText: {
     color: '#FFFFFF',
     fontSize: hp(1.8),
-    fontWeight: 'bold',
+    fontFamily: theme.typography?.fontFamily?.bold,
   },
   backButton: {
     alignSelf: 'flex-start',
@@ -290,8 +290,8 @@ const createStyles = () => StyleSheet.create({
   },
   backButtonText: {
     fontSize: hp(2),
-    color: '#A45CFF',
-    fontFamily: 'System',
-    fontWeight: '600',
+    color: theme.colors.brand,
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
+    fontFamily: theme.typography?.fontFamily?.semibold,
   },
 })

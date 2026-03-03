@@ -57,6 +57,6 @@ const createStyles = (theme) => StyleSheet.create({
     opacity: 0.5,
   },
   buttonDisabledText: {
-    color: '#8E8E8E',
+    color: theme.colors.textSecondary,
   },
 })

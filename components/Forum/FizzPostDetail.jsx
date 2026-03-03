@@ -25,9 +25,11 @@ import {
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { hp, wp } from '../../helpers/common'
+import { Logger } from '../../utils/logger'
 
 // Avatar component matching forum post design
 const PostAvatar = ({ post, size = hp(4.5), theme }) => {
+    const styles = createStyles(theme)
     if (post.isAnon) {
         return (
             <LinearGradient
@@ -50,7 +52,7 @@ const PostAvatar = ({ post, size = hp(4.5), theme }) => {
     
     return (
         <LinearGradient
-            colors={['#6B7280', '#4B5563']}
+            colors={[theme.colors.textSecondary, theme.colors.textSecondary]}
             style={[styles.postAvatar, { width: size, height: size, borderRadius: size / 2 }]}
         >
             <Text style={[styles.postAvatarText, { fontSize: size * 0.4 }]}>
@@ -69,6 +71,7 @@ const VerticalVote = ({
     theme,
     size = 'normal' // 'normal' | 'small'
 }) => {
+    const styles = createStyles(theme)
     const iconSize = size === 'small' ? hp(2) : hp(2.8)
     const fontSize = size === 'small' ? hp(1.6) : hp(2)
 
@@ -109,6 +112,7 @@ const CommentItem = ({
     theme,
     anonNumber
 }) => {
+    const styles = createStyles(theme)
     const score = (comment.upvotes || 0) - (comment.downvotes || 0)
 
     return (
@@ -170,6 +174,7 @@ export default function ForumPostDetail({
     onRepost,
     theme,
 }) {
+    const styles = createStyles(theme)
     const insets = useSafeAreaInsets()
     const [newComment, setNewComment] = useState('')
     const [isAnon, setIsAnon] = useState(true)
@@ -201,7 +206,7 @@ export default function ForumPostDetail({
             await onAddComment(post.id, newComment.trim(), isAnon)
             setNewComment('')
         } catch (e) {
-            console.error('Failed to submit comment:', e)
+            Logger.error('Failed to submit comment:', e)
         }
         setIsSubmitting(false)
     }, [newComment, isAnon, isSubmitting, onAddComment, post?.id])
@@ -242,16 +247,14 @@ export default function ForumPostDetail({
                                             fontSize: hp(1.7),
                                             color: theme.colors.textPrimary,
                                             fontFamily: theme.typography?.fontFamily?.heading,
-                                            fontWeight: '600',
                                         }]}>
                                             {post.isAnon ? 'Anonymous' : post.author}
                                         </Text>
                                         <Text style={[styles.postMetaText, {
                                             fontSize: hp(1.3),
                                             color: theme.colors.textSecondary,
-                                            fontFamily: theme.typography?.fontFamily?.body,
+                                            fontFamily: theme.typography?.fontFamily?.body || 'System',
                                             marginTop: hp(0.1),
-                                            fontWeight: '400',
                                         }]}>
                                             {post.forum || post.location || ''} • {post.timeAgo}
                                         </Text>
@@ -264,7 +267,6 @@ export default function ForumPostDetail({
                                 {post.title && (
                                     <Text style={[styles.postTitle, {
                                         fontSize: hp(2),
-                                        fontWeight: '700',
                                         color: theme.colors.textPrimary,
                                         fontFamily: theme.typography?.fontFamily?.heading,
                                         marginBottom: hp(0.6),
@@ -416,7 +418,7 @@ export default function ForumPostDetail({
     )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
     },
@@ -456,8 +458,7 @@ const styles = StyleSheet.create({
     },
     postAvatarText: {
         color: '#fff',
-        fontFamily: 'System',
-        fontWeight: '700',
+        fontFamily: theme.typography?.fontFamily?.bold || 'System',
     },
     postAuthorInfo: {
         flex: 1,
@@ -491,7 +492,7 @@ const styles = StyleSheet.create({
         padding: hp(0.5),
     },
     voteCount: {
-        fontWeight: '700',
+        fontFamily: theme.typography?.fontFamily?.bold || 'System',
         marginVertical: hp(0.3),
     },
     actionBar: {
@@ -509,7 +510,7 @@ const styles = StyleSheet.create({
     },
     actionCount: {
         fontSize: hp(1.5),
-        fontWeight: '500',
+        fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     commentsHeader: {
         paddingHorizontal: wp(4),
@@ -523,7 +524,7 @@ const styles = StyleSheet.create({
     },
     sortText: {
         fontSize: hp(1.6),
-        fontWeight: '500',
+        fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     commentsList: {
         paddingBottom: hp(10),
@@ -550,7 +551,7 @@ const styles = StyleSheet.create({
     },
     commentAuthor: {
         fontSize: hp(1.4),
-        fontWeight: '600',
+        fontFamily: theme.typography?.fontFamily?.semibold || 'System',
         marginRight: wp(2),
     },
     commentMeta: {
@@ -572,7 +573,7 @@ const styles = StyleSheet.create({
     },
     commentActionText: {
         fontSize: hp(1.3),
-        fontWeight: '500',
+        fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     emptyComments: {
         padding: wp(8),
@@ -608,7 +609,7 @@ const styles = StyleSheet.create({
     },
     gifButton: {
         fontSize: hp(1.3),
-        fontWeight: '700',
+        fontFamily: theme.typography?.fontFamily?.bold || 'System',
         paddingHorizontal: wp(2),
         paddingVertical: hp(0.5),
         borderWidth: 1,

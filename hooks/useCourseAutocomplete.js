@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { Logger } from '../utils/logger'
 
 /**
  * Search for courses matching a search term
@@ -34,7 +35,7 @@ export function useCourseAutocomplete(searchTerm, universityId) {
         .limit(10)
 
       if (error) {
-        console.error('Error fetching course suggestions:', error)
+        Logger.error('Error fetching course suggestions:', error)
         return []
       }
 
@@ -66,7 +67,7 @@ export function useUniversityCourses(universityId) {
         .order('course_code')
 
       if (error) {
-        console.error('Error fetching university courses:', error)
+        Logger.error('Error fetching university courses:', error)
         return []
       }
 

@@ -3,9 +3,11 @@
  */
 
 import { useRouter } from 'expo-router'
-import { Image, Text, TouchableOpacity, View } from 'react-native'
+import { Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
+import { Logger } from '../../utils/logger'
 
 const RichMessagePreview = ({ message, isOwn }) => {
   const theme = useAppTheme()
@@ -20,7 +22,7 @@ const RichMessagePreview = ({ message, isOwn }) => {
     const shareData = message.metadata.shareData || {}
     const actualData = shareData.data || shareData
     
-    console.log('🔗 Rich preview clicked:', {
+    Logger.info('Rich preview clicked:', {
       shareType: message.metadata.shareType,
       shareData: shareData,
       actualData: actualData,
@@ -33,51 +35,51 @@ const RichMessagePreview = ({ message, isOwn }) => {
     switch (message.metadata.shareType) {
       case 'event':
         const eventId = actualData?.id
-        console.log('🎉 Navigating to event:', eventId)
+        Logger.info('Navigating to event:', eventId)
         if (eventId) {
           router.push(`/events/${eventId}`)
         } else {
-          console.warn('⚠️ No event ID found')
+          Logger.warn('No event ID found')
         }
         break
       
       case 'post':
         const postId = actualData?.id
         const forumId = actualData?.forumId || actualData?.forum_id
-        console.log('💬 Navigating to post:', { postId, forumId })
+        Logger.info('Navigating to post:', { postId, forumId })
         if (postId && forumId) {
           router.push(`/forum/${forumId}?post=${postId}`)
         } else if (postId) {
-          console.log('💬 Trying forum search for post:', postId)
+          Logger.info('Trying forum search for post:', postId)
           router.push(`/forum?post=${postId}`)
         } else {
-          console.warn('⚠️ No post ID found')
+          Logger.warn('No post ID found')
         }
         break
       
       case 'profile':
         const profileId = actualData?.id
-        console.log('👤 Navigating to profile:', profileId)
+        Logger.info('Navigating to profile:', profileId)
         if (profileId) {
           router.push(`/profile/${profileId}`)
         } else {
-          console.warn('⚠️ No profile ID found')
+          Logger.warn('No profile ID found')
         }
         break
       
       case 'organization':
       case 'org':
         const orgId = actualData?.id
-        console.log('🏢 Navigating to org:', orgId)
+        Logger.info('Navigating to org:', orgId)
         if (orgId) {
           router.push(`/org/${orgId}`)
         } else {
-          console.warn('⚠️ No org ID found')
+          Logger.warn('No org ID found')
         }
         break
       
       default:
-        console.log('❓ Unknown share type:', message.metadata.shareType)
+        Logger.info('Unknown share type:', message.metadata.shareType)
     }
   }
   
@@ -108,7 +110,7 @@ const RichMessagePreview = ({ message, isOwn }) => {
         <View style={styles.previewContent}>
           {/* Thumbnail */}
           {actualData?.image_url ? (
-            <Image 
+            <CachedImage 
               source={{ uri: actualData.image_url }}
               style={styles.postThumbnail}
             />
@@ -170,7 +172,7 @@ const RichMessagePreview = ({ message, isOwn }) => {
         <View style={styles.previewContent}>
           {/* Thumbnail */}
           {actualData?.image_url ? (
-            <Image 
+            <CachedImage 
               source={{ uri: actualData.image_url }}
               style={styles.eventThumbnail}
             />
@@ -227,7 +229,7 @@ const RichMessagePreview = ({ message, isOwn }) => {
         {/* Content - Horizontal Layout */}
         <View style={styles.previewContent}>
           {/* Avatar */}
-          <Image 
+          <CachedImage 
             source={{ 
               uri: actualData?.avatar_url || undefined 
             }} 
@@ -277,7 +279,7 @@ const RichMessagePreview = ({ message, isOwn }) => {
         <View style={styles.previewContent}>
           {/* Logo */}
           {actualData?.logo_url ? (
-            <Image 
+            <CachedImage 
               source={{ uri: actualData.logo_url }}
               style={styles.orgThumbnail}
             />
@@ -348,7 +350,7 @@ const styles = {
   },
   shareHeader: {
     fontSize: hp(1.4),
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: hp(0.5),
     fontStyle: 'italic',
   },
@@ -376,17 +378,17 @@ const styles = {
     gap: wp(2),
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.backgroundSecondary,
     borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
+    borderBottomColor: theme.colors.border,
   },
   previewIcon: {
     fontSize: wp(4),
   },
   previewLabel: {
     fontSize: hp(1.3),
-    fontWeight: '600',
-    color: '#666',
+    fontFamily: theme.typography.fontFamily.semibold,
+    color: theme.colors.textSecondary,
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
@@ -405,7 +407,7 @@ const styles = {
     width: wp(15),
     height: wp(15),
     borderRadius: wp(2),
-    backgroundColor: '#F0F0F0',
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   postThumbnailFallback: {
     alignItems: 'center',
@@ -416,14 +418,14 @@ const styles = {
   },
   postTitle: {
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000',
     lineHeight: hp(2.6),
     marginBottom: hp(0.8),
   },
   postBody: {
     fontSize: hp(1.7),
-    color: '#333',
+    color: theme.colors.textPrimary,
     lineHeight: hp(2.2),
     marginBottom: hp(0.8),
   },
@@ -449,7 +451,7 @@ const styles = {
   },
   eventTitle: {
     fontSize: hp(1.9),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000',
     lineHeight: hp(2.5),
     marginBottom: hp(0.8),
@@ -469,21 +471,21 @@ const styles = {
     height: wp(15),
     borderRadius: wp(7.5),
     borderWidth: 2,
-    borderColor: '#007AFF',
-    backgroundColor: '#F0F0F0',
+    borderColor: theme.colors.info,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
     fontSize: hp(1.9),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000',
     marginBottom: hp(0.3),
   },
   profileUsername: {
     fontSize: hp(1.5),
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: hp(0.5),
   },
   profileMetadata: {
@@ -497,7 +499,7 @@ const styles = {
     width: wp(12.5),
     height: wp(12.5),
     borderRadius: wp(2),
-    backgroundColor: '#F0F0F0',
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   orgThumbnailFallback: {
     alignItems: 'center',
@@ -508,7 +510,7 @@ const styles = {
   },
   orgName: {
     fontSize: hp(1.9),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#000',
     lineHeight: hp(2.5),
     marginBottom: hp(0.8),
@@ -525,7 +527,7 @@ const styles = {
   },
   metadataText: {
     fontSize: hp(1.5),
-    color: '#999',
+    color: theme.colors.textTertiary,
   },
   metadataIcon: {
     fontSize: wp(3),

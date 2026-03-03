@@ -3,6 +3,8 @@
  * Consolidates RLS recursion error detection and logging across the codebase
  */
 
+import { Logger } from './logger'
+
 /**
  * Check if an error is an RLS recursion error
  * RLS recursion errors occur when policies reference the same table in subqueries
@@ -22,8 +24,8 @@ export function isRlsRecursionError(error) {
  * @param {string} table - The table name that has the RLS issue
  */
 export function logRlsFixHint(table = 'profiles') {
-  console.warn(
-    `⚠️ RLS recursion error detected on ${table} table. ` +
+  Logger.warn(
+    `RLS recursion error detected on ${table} table. ` +
     `This is a database policy issue. See database/fix-all-rls-recursion.sql for fixes.`
   )
 }

@@ -32,12 +32,14 @@ import { useProfileModal } from '../../contexts/ProfileModalContext'
 import { hp, wp } from '../../helpers/common'
 import { ArrowDownCircle, ArrowUpCircle } from '../Icons'
 import ShareModal from '../ShareModal'
+import { Logger } from '../../utils/logger'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const DISMISS_THRESHOLD = 150
 
 // Avatar component matching forum post design - clickable to view profile
 const PostAvatar = ({ post, size = hp(4.5), theme, onPress }) => {
+    const styles = createStyles(theme)
     const avatarContent = () => {
         if (post.isAnon) {
             return (
@@ -61,7 +63,7 @@ const PostAvatar = ({ post, size = hp(4.5), theme, onPress }) => {
 
         return (
             <LinearGradient
-                colors={['#6B7280', '#4B5563']}
+                colors={[theme.colors.textSecondary, theme.colors.textSecondary]}
                 style={[styles.postAvatar, { width: size, height: size, borderRadius: size / 2 }]}
             >
                 <Text style={[styles.postAvatarText, { fontSize: size * 0.4 }]}>
@@ -101,6 +103,7 @@ const HorizontalVote = ({
     theme,
     size = 'normal' // 'normal' | 'small'
 }) => {
+    const styles = createStyles(theme)
     const iconSize = size === 'small' ? hp(2.4) : hp(2.4)
     const fontSize = size === 'small' ? hp(1.5) : hp(1.5)
     const isUpvoted = userVote === 'upvote'
@@ -115,16 +118,16 @@ const HorizontalVote = ({
             >
                 <ArrowUpCircle
                     size={iconSize}
-                    color={isUpvoted ? theme.statusColors?.success || '#2ecc71' : theme.colors.textSecondary}
+                    color={isUpvoted ? theme.statusColors?.success || theme.colors.success : theme.colors.textSecondary}
                     strokeWidth={2}
-                    fill={isUpvoted ? '#2ecc71' : 'none'}
+                    fill={isUpvoted ? theme.colors.success : 'none'}
                 />
             </TouchableOpacity>
             <Text style={[
                 styles.voteCount,
                 { fontSize },
-                isUpvoted && { color: theme.colors?.success || '#2ecc71' },
-                isDownvoted && { color: theme.colors?.error || '#e74c3c' },
+                isUpvoted && { color: theme.colors?.success || theme.colors.success },
+                isDownvoted && { color: theme.colors?.error || theme.colors.destructive },
                 !userVote && { color: theme.colors.textSecondary }
             ]}>
                 {score}
@@ -136,9 +139,9 @@ const HorizontalVote = ({
             >
                 <ArrowDownCircle
                     size={iconSize}
-                    color={isDownvoted ? theme.statusColors?.error || '#e74c3c' : theme.colors.textSecondary}
+                    color={isDownvoted ? theme.statusColors?.error || theme.colors.destructive : theme.colors.textSecondary}
                     strokeWidth={2}
-                    fill={isDownvoted ? '#e74c3c' : 'none'}
+                    fill={isDownvoted ? theme.colors.destructive : 'none'}
                 />
             </TouchableOpacity>
         </View>
@@ -158,6 +161,7 @@ const CommentItem = ({
     depth = 0,
     parentComment = null
 }) => {
+    const styles = createStyles(theme)
     const { openProfile } = useProfileModal()
     const score = (comment.upvotes || 0) - (comment.downvotes || 0)
     const isReply = depth > 0
@@ -186,7 +190,7 @@ const CommentItem = ({
                     theme={theme}
                     onPress={() => {
                         if (!comment.isAnon && comment.userId) {
-                            console.log('👤 Navigating to profile:', comment.userId)
+                            Logger.info('Navigating to profile:', comment.userId)
                             router.push(`/profile/${comment.userId}`)
                         }
                     }}
@@ -254,6 +258,7 @@ export default function ForumPostDetail({
     theme,
     router,
 }) {
+    const styles = createStyles(theme)
     const { openProfile } = useProfileModal()
     const { openOrg } = useOrgModal()
     const insets = useSafeAreaInsets()
@@ -332,7 +337,7 @@ export default function ForumPostDetail({
             setNewComment('')
             setReplyingTo(null)
         } catch (e) {
-            console.error('Failed to submit comment:', e)
+            Logger.error('Failed to submit comment:', e)
         }
         setIsSubmitting(false)
     }, [newComment, isAnon, isSubmitting, onAddComment, post?.id, replyingTo])
@@ -409,10 +414,10 @@ export default function ForumPostDetail({
                                             onPress={() => {
                                                 if (!post.isAnon) {
                                                     if (post.isOrgPost && post.orgId) {
-                                                        console.log('🏢 Opening org modal:', post.orgId)
+                                                        Logger.info('Opening org modal:', post.orgId)
                                                         openOrg(post.orgId)
                                                     } else if (post.userId) {
-                                                        console.log('👤 Navigating to main post author profile:', post.userId)
+                                                        Logger.info('Navigating to main post author profile:', post.userId)
                                                         router.push(`/profile/${post.userId}`)
                                                     }
                                                 }
@@ -423,16 +428,14 @@ export default function ForumPostDetail({
                                                 fontSize: hp(1.7),
                                                 color: theme.colors.textPrimary,
                                                 fontFamily: theme.typography?.fontFamily?.heading,
-                                                fontWeight: '600',
                                             }]}>
                                                 {post.isAnon ? 'Anonymous' : post.author}
                                             </Text>
                                             <Text style={[styles.postMetaText, {
                                                 fontSize: hp(1.3),
                                                 color: theme.colors.textSecondary,
-                                                fontFamily: theme.typography?.fontFamily?.body,
+                                                fontFamily: theme.typography?.fontFamily?.body || 'System',
                                                 marginTop: hp(0.1),
-                                                fontWeight: '400',
                                             }]}>
                                                 {post.forum || post.location || ''} • {post.timeAgo}
                                             </Text>
@@ -445,7 +448,6 @@ export default function ForumPostDetail({
                                     {post.title && (
                                         <Text style={[styles.postTitle, {
                                             fontSize: hp(2),
-                                            fontWeight: '700',
                                             color: theme.colors.textPrimary,
                                             fontFamily: theme.typography?.fontFamily?.heading,
                                             marginBottom: hp(0.6),
@@ -508,8 +510,8 @@ export default function ForumPostDetail({
                                     <TouchableOpacity
                                         style={styles.actionButton}
                                         onPress={() => {
-                                            console.log('🔍 ForumPostDetail post object:', post)
-                                            console.log('🔍 Setting shareContent:', { type: 'post', data: post })
+                                            Logger.info('ForumPostDetail post object:', post)
+                                            Logger.info('Setting shareContent:', { type: 'post', data: post })
                                             setShareContent({ type: 'post', data: post })
                                             setShowShareModal(true)
                                         }}
@@ -653,7 +655,7 @@ export default function ForumPostDetail({
                                 >
                                     <Text style={[styles.anonToggleText, {
                                         color: isAnon ? theme.colors.bondedPurple : theme.colors.textSecondary,
-                                        fontWeight: isAnon ? '700' : '600',
+                                        fontFamily: isAnon ? theme.typography?.fontFamily?.bold : theme.typography?.fontFamily?.semibold,
                                     }]}>
                                         {isAnon ? 'ANON' : 'PUBLIC'}
                                     </Text>
@@ -701,7 +703,7 @@ export default function ForumPostDetail({
     )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
     },
@@ -739,8 +741,7 @@ const styles = StyleSheet.create({
     },
     postAvatarText: {
         color: '#fff',
-        fontFamily: 'System',
-        fontWeight: '700',
+        fontFamily: theme.typography?.fontFamily?.bold || 'System',
     },
     postAuthorInfo: {
         flex: 1,
@@ -777,10 +778,9 @@ const styles = StyleSheet.create({
     },
     voteCount: {
         fontSize: hp(1.5),
-        fontWeight: '600',
         minWidth: wp(5),
         textAlign: 'center',
-        fontFamily: 'System',
+        fontFamily: theme.typography?.fontFamily?.semibold || 'System',
     },
     actionBar: {
         flexDirection: 'row',
@@ -809,8 +809,7 @@ const styles = StyleSheet.create({
     },
     actionCount: {
         fontSize: hp(1.4),
-        fontWeight: '500',
-        fontFamily: 'System',
+        fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     commentsHeader: {
         paddingHorizontal: wp(4),
@@ -824,7 +823,7 @@ const styles = StyleSheet.create({
     },
     sortText: {
         fontSize: hp(1.6),
-        fontWeight: '500',
+        fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     commentsList: {
         paddingBottom: hp(10),
@@ -858,7 +857,7 @@ const styles = StyleSheet.create({
     },
     commentAuthor: {
         fontSize: hp(1.4),
-        fontWeight: '600',
+        fontFamily: theme.typography?.fontFamily?.semibold || 'System',
         marginRight: wp(2),
     },
     commentMeta: {
@@ -880,7 +879,7 @@ const styles = StyleSheet.create({
     },
     commentActionText: {
         fontSize: hp(1.3),
-        fontWeight: '500',
+        fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     emptyComments: {
         padding: wp(8),
@@ -923,7 +922,7 @@ const styles = StyleSheet.create({
     },
     anonToggleText: {
         fontSize: hp(1.3),
-        fontFamily: 'System',
+        fontFamily: theme.typography?.fontFamily?.body || 'System',
     },
     sendButton: {
         // Styled inline

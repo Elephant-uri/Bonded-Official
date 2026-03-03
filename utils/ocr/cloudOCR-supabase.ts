@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '../../lib/supabase'
+import { Logger } from '../logger'
 import { TextBlock, OCRResult } from './extractText'
 
 /**
@@ -26,7 +27,7 @@ export async function extractTextFromImageSupabase(imageUri: string): Promise<OC
   }
 
   try {
-    console.log('📷 Processing image with Supabase Edge Function OCR...')
+    Logger.info('Processing image with Supabase Edge Function OCR...')
     
     // Read image as base64
     const base64 = await FileSystem.readAsStringAsync(imageUri, {
@@ -42,12 +43,12 @@ export async function extractTextFromImageSupabase(imageUri: string): Promise<OC
     })
 
     if (error) {
-      console.error('❌ Supabase Edge Function error:', error)
+      Logger.error(error, 'Supabase Edge Function error')
       throw error
     }
 
     if (!data || !data.text) {
-      console.warn('⚠️ No text found in image')
+      Logger.warn('No text found in image')
       return {
         rawText: '',
         blocks: [],
@@ -67,8 +68,8 @@ export async function extractTextFromImageSupabase(imageUri: string): Promise<OC
       confidence: block.confidence,
     }))
 
-    console.log(`✅ Supabase OCR extracted ${data.text.length} characters`)
-    console.log(`📊 Found ${blocks.length} text blocks`)
+    Logger.info(`Supabase OCR extracted ${data.text.length} characters`)
+    Logger.info(`Found ${blocks.length} text blocks`)
 
     return {
       rawText: data.text || '',
@@ -76,7 +77,7 @@ export async function extractTextFromImageSupabase(imageUri: string): Promise<OC
       imageUri,
     }
   } catch (error) {
-    console.error('❌ Supabase OCR failed:', error)
+    Logger.error(error, 'Supabase OCR failed')
     
     // Return empty result on error
     return {

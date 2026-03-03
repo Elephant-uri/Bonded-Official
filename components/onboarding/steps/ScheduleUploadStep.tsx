@@ -23,6 +23,7 @@ import { hp, wp } from '../../../helpers/common'
 import { parseScheduleImage } from '../../../services/scheduleParser'
 import { pickScheduleImage, takeSchedulePhoto } from '../../../utils/ocr/extractText'
 import { getFriendlyErrorMessage } from '../../../utils/userFacingErrors'
+import { Logger } from '../../../utils/logger'
 
 interface ScheduleUploadStepProps {
   formData: any
@@ -125,7 +126,7 @@ export default function ScheduleUploadStep({
         }
       }
     } catch (error: any) {
-      console.error('Scan failed:', error)
+      Logger.error('Scan failed:', error)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       Alert.alert('Scan Failed', getFriendlyErrorMessage(error, 'Could not parse schedule. Please try a clearer photo.'))
     } finally {
@@ -240,7 +241,7 @@ export default function ScheduleUploadStep({
 
           {completedCount > 0 && (
             <View style={styles.progressBadge}>
-              <Ionicons name="checkmark-circle" size={hp(1.8)} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={hp(1.8)} color=theme.colors.success />
               <Text style={styles.progressText}>{completedCount} class{completedCount !== 1 ? 'es' : ''} added</Text>
             </View>
           )}
@@ -318,7 +319,7 @@ export default function ScheduleUploadStep({
                   <Ionicons
                     name={expandedId === classEntry.id ? "chevron-up" : "chevron-down"}
                     size={hp(2.5)}
-                    color="#8E8E8E"
+                    color=theme.colors.textSecondary
                   />
                 </View>
               </TouchableOpacity>
@@ -332,7 +333,7 @@ export default function ScheduleUploadStep({
                     <TextInput
                       style={styles.textInput}
                       placeholder="e.g., CS 101, MATH 201"
-                      placeholderTextColor="#BDBDBD"
+                      placeholderTextColor=theme.colors.textTertiary
                       value={classEntry.courseCode}
                       onChangeText={(text) => updateClass(classEntry.id, 'courseCode', text.toUpperCase())}
                       autoCapitalize="characters"
@@ -345,7 +346,7 @@ export default function ScheduleUploadStep({
                     <TextInput
                       style={styles.textInput}
                       placeholder="e.g., Introduction to Computer Science"
-                      placeholderTextColor="#BDBDBD"
+                      placeholderTextColor=theme.colors.textTertiary
                       value={classEntry.courseName}
                       onChangeText={(text) => updateClass(classEntry.id, 'courseName', text)}
                     />
@@ -357,7 +358,7 @@ export default function ScheduleUploadStep({
                     <TextInput
                       style={styles.textInput}
                       placeholder="e.g., Dr. Smith"
-                      placeholderTextColor="#BDBDBD"
+                      placeholderTextColor=theme.colors.textTertiary
                       value={classEntry.professor}
                       onChangeText={(text) => updateClass(classEntry.id, 'professor', text)}
                     />
@@ -395,7 +396,7 @@ export default function ScheduleUploadStep({
                       <TextInput
                         style={styles.textInput}
                         placeholder="e.g., 9:00 AM"
-                        placeholderTextColor="#BDBDBD"
+                        placeholderTextColor=theme.colors.textTertiary
                         value={classEntry.startTime}
                         onChangeText={(text) => updateClass(classEntry.id, 'startTime', text)}
                       />
@@ -405,7 +406,7 @@ export default function ScheduleUploadStep({
                       <TextInput
                         style={styles.textInput}
                         placeholder="e.g., 10:30 AM"
-                        placeholderTextColor="#BDBDBD"
+                        placeholderTextColor=theme.colors.textTertiary
                         value={classEntry.endTime}
                         onChangeText={(text) => updateClass(classEntry.id, 'endTime', text)}
                       />
@@ -418,7 +419,7 @@ export default function ScheduleUploadStep({
                     <TextInput
                       style={styles.textInput}
                       placeholder="e.g., Room 101, Science Building"
-                      placeholderTextColor="#BDBDBD"
+                      placeholderTextColor=theme.colors.textTertiary
                       value={classEntry.location}
                       onChangeText={(text) => updateClass(classEntry.id, 'location', text)}
                     />
@@ -443,7 +444,7 @@ export default function ScheduleUploadStep({
 
         {/* Helper Text */}
         <View style={styles.helperContainer}>
-          <Ionicons name="information-circle-outline" size={hp(2)} color="#BDBDBD" />
+          <Ionicons name="information-circle-outline" size={hp(2)} color=theme.colors.textTertiary />
           <Text style={styles.helperText}>
             You can always update your schedule later in settings. Only the course code is required.
           </Text>
@@ -484,16 +485,16 @@ const createStyles = (theme: any) =>
     },
     title: {
       fontSize: hp(3.2),
-      fontWeight: '800',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
+      color: theme.colors.textPrimary,
       textAlign: 'center',
       marginBottom: hp(0.5),
       letterSpacing: -0.5,
     },
     subtitle: {
       fontSize: hp(1.8),
-      fontWeight: '500',
-      color: '#8E8E8E',
+      fontFamily: theme.typography?.fontFamily?.medium || 'System',
+      color: theme.colors.textSecondary,
       textAlign: 'center',
     },
     progressBadge: {
@@ -508,8 +509,8 @@ const createStyles = (theme: any) =>
     },
     progressText: {
       fontSize: hp(1.5),
-      fontWeight: '600',
-      color: '#4CAF50',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
+      color: theme.colors.success,
     },
     classesContainer: {
       gap: hp(1.5),
@@ -561,7 +562,7 @@ const createStyles = (theme: any) =>
     scanButtonText: {
       color: '#FFFFFF',
       fontSize: hp(1.7),
-      fontWeight: '700',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
     },
     scanButtonTextOutline: {
       color: ONBOARDING_THEME.colors.bondedPurple,
@@ -579,8 +580,8 @@ const createStyles = (theme: any) =>
     },
     dividerText: {
       fontSize: hp(1.2),
-      fontWeight: '700',
-      color: '#BDBDBD',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
+      color: theme.colors.textTertiary,
       letterSpacing: 1,
     },
     cardHeader: {
@@ -606,17 +607,17 @@ const createStyles = (theme: any) =>
       marginRight: wp(3),
     },
     classNumberComplete: {
-      backgroundColor: '#4CAF50',
+      backgroundColor: theme.colors.success,
     },
     classNumberText: {
       fontSize: hp(1.6),
-      fontWeight: '700',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
       color: '#FFFFFF',
     },
     classSummary: {
       fontSize: hp(1.7),
-      fontWeight: '600',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
+      color: theme.colors.textPrimary,
       flex: 1,
     },
     cardHeaderRight: {
@@ -637,7 +638,7 @@ const createStyles = (theme: any) =>
     },
     inputLabel: {
       fontSize: hp(1.5),
-      fontWeight: '600',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
       color: '#666666',
       marginLeft: wp(1),
     },
@@ -647,7 +648,7 @@ const createStyles = (theme: any) =>
       paddingVertical: hp(1.5),
       paddingHorizontal: wp(4),
       fontSize: hp(1.7),
-      color: '#1A1A1A',
+      color: theme.colors.textPrimary,
       borderWidth: 1,
       borderColor: 'transparent',
     },
@@ -671,8 +672,8 @@ const createStyles = (theme: any) =>
     },
     dayButtonText: {
       fontSize: hp(1.5),
-      fontWeight: '600',
-      color: '#8E8E8E',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
+      color: theme.colors.textSecondary,
     },
     dayButtonTextActive: {
       color: theme.colors.bondedPurple,
@@ -707,7 +708,7 @@ const createStyles = (theme: any) =>
     },
     addClassText: {
       fontSize: hp(1.7),
-      fontWeight: '600',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
       color: theme.colors.bondedPurple,
     },
     helperContainer: {
@@ -720,7 +721,7 @@ const createStyles = (theme: any) =>
     helperText: {
       flex: 1,
       fontSize: hp(1.4),
-      color: '#BDBDBD',
+      color: theme.colors.textTertiary,
       lineHeight: hp(2),
     },
   })

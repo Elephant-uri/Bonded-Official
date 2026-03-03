@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
+import { Logger } from '../../utils/logger'
 
 export default function SharedContentPreview({ metadata, onPress }) {
   const theme = useAppTheme()
@@ -18,7 +20,7 @@ export default function SharedContentPreview({ metadata, onPress }) {
 
     const shareData = metadata.shareData || {}
     
-    console.log('🔗 Navigating to shared content:', {
+    Logger.info('Navigating to shared content:', {
       shareType: metadata.shareType,
       metadata: metadata,
       shareData: shareData
@@ -29,25 +31,25 @@ export default function SharedContentPreview({ metadata, onPress }) {
       switch (metadata.shareType) {
         case 'event':
           const eventId = metadata.eventId || shareData?.id
-          console.log('📅 Navigating to event:', eventId)
+          Logger.info('Navigating to event:', eventId)
           if (eventId) {
             router.push(`/events/${eventId}`)
           } else {
-            console.warn('⚠️ No event ID found')
+            Logger.warn('No event ID found')
           }
           break
         
         case 'post':
           const postId = metadata.postId || shareData?.id
           const forumId = metadata.forumId || shareData?.forumId || shareData?.forum_id
-          console.log('💬 Navigating to post:', { postId, forumId })
+          Logger.info('Navigating to post:', { postId, forumId })
           if (postId && forumId) {
             router.push(`/forum/${forumId}?post=${postId}`)
           } else if (postId) {
             // Fallback - try to find forum
             router.push(`/forum?post=${postId}`)
           } else {
-            console.warn('⚠️ No post ID found')
+            Logger.warn('No post ID found')
           }
           break
         
@@ -55,51 +57,51 @@ export default function SharedContentPreview({ metadata, onPress }) {
           const commentId = metadata.commentId || shareData?.id
           const commentPostId = metadata.postId || shareData?.postId
           const commentForumId = metadata.forumId || shareData?.forumId || shareData?.forum_id
-          console.log('💭 Navigating to comment:', { commentId, commentPostId, commentForumId })
+          Logger.info('Navigating to comment:', { commentId, commentPostId, commentForumId })
           if (commentPostId && commentForumId) {
             router.push(`/forum/${commentForumId}?post=${commentPostId}&comment=${commentId}`)
           } else {
-            console.warn('⚠️ Missing comment navigation data')
+            Logger.warn('Missing comment navigation data')
           }
           break
         
         case 'profile':
           const profileId = metadata.profileId || shareData?.id
-          console.log('👤 Navigating to profile:', profileId)
+          Logger.info('Navigating to profile:', profileId)
           if (profileId) {
             router.push(`/profile/${profileId}`)
           } else {
-            console.warn('⚠️ No profile ID found')
+            Logger.warn('No profile ID found')
           }
           break
         
         case 'organization':
         case 'org':
           const orgId = metadata.orgId || shareData?.id
-          console.log('🏢 Navigating to org:', orgId)
+          Logger.info('Navigating to org:', orgId)
           if (orgId) {
             router.push(`/org/${orgId}`)
           } else {
-            console.warn('⚠️ No org ID found')
+            Logger.warn('No org ID found')
           }
           break
         
         case 'class':
         case 'club':
           const classId = metadata.classId || shareData?.id
-          console.log('📚 Navigating to class:', classId)
+          Logger.info('Navigating to class:', classId)
           if (classId) {
             router.push(`/class/${classId}`)
           } else {
-            console.warn('⚠️ No class ID found')
+            Logger.warn('No class ID found')
           }
           break
         
         default:
-          console.log('❓ Unknown share type:', metadata.shareType)
+          Logger.info('Unknown share type:', metadata.shareType)
       }
     } catch (error) {
-      console.error('❌ Navigation error:', error)
+      Logger.error('Navigation error:', error)
     }
   }
 
@@ -206,7 +208,7 @@ export default function SharedContentPreview({ metadata, onPress }) {
           <View style={styles.contentContainer}>
             <View style={styles.profileRow}>
               {(metadata.profileAvatar || actualData?.avatar_url) && (
-                <Image source={{ uri: metadata.profileAvatar || actualData?.avatar_url }} style={styles.profileAvatar} />
+                <CachedImage source={{ uri: metadata.profileAvatar || actualData?.avatar_url }} style={styles.profileAvatar} />
               )}
               <View>
                 <Text style={styles.title}>
@@ -280,7 +282,7 @@ export default function SharedContentPreview({ metadata, onPress }) {
     switch (metadata.shareType) {
       case 'event':
         const eventId = metadata.eventId || actualData?.id
-        console.log('🔍 Event ID lookup:', { 
+        Logger.info('Event ID lookup:', { 
           metadataEventId: metadata.eventId, 
           actualDataId: actualData?.id, 
           shareDataId: shareData?.id,
@@ -291,7 +293,7 @@ export default function SharedContentPreview({ metadata, onPress }) {
       case 'post':
         const postId = metadata.postId || actualData?.id
         const forumId = metadata.forumId || actualData?.forumId || actualData?.forum_id
-        console.log('🔍 Post ID lookup:', { postId, forumId })
+        Logger.info('Post ID lookup:', { postId, forumId })
         if (postId && forumId) {
           return `/forum/${forumId}?post=${postId}`
         } else if (postId) {
@@ -303,7 +305,7 @@ export default function SharedContentPreview({ metadata, onPress }) {
         const commentId = metadata.commentId || actualData?.id
         const commentPostId = metadata.postId || actualData?.postId
         const commentForumId = metadata.forumId || actualData?.forumId || actualData?.forum_id
-        console.log('🔍 Comment ID lookup:', { commentId, commentPostId, commentForumId })
+        Logger.info('Comment ID lookup:', { commentId, commentPostId, commentForumId })
         if (commentPostId && commentForumId) {
           return `/forum/${commentForumId}?post=${commentPostId}&comment=${commentId}`
         }
@@ -311,23 +313,23 @@ export default function SharedContentPreview({ metadata, onPress }) {
       
       case 'profile':
         const profileId = metadata.profileId || actualData?.id
-        console.log('🔍 Profile ID lookup:', { profileId })
+        Logger.info('Profile ID lookup:', { profileId })
         return profileId ? `/profile/${profileId}` : null
       
       case 'organization':
       case 'org':
         const orgId = metadata.orgId || actualData?.id
-        console.log('🔍 Org ID lookup:', { orgId })
+        Logger.info('Org ID lookup:', { orgId })
         return orgId ? `/org/${orgId}` : null
       
       case 'class':
       case 'club':
         const classId = metadata.classId || actualData?.id
-        console.log('🔍 Class ID lookup:', { classId })
+        Logger.info('Class ID lookup:', { classId })
         return classId ? `/class/${classId}` : null
       
       default:
-        console.log('🔍 Unknown share type:', metadata.shareType)
+        Logger.info('Unknown share type:', metadata.shareType)
         return null
     }
   }
@@ -341,7 +343,7 @@ export default function SharedContentPreview({ metadata, onPress }) {
         style={styles.container} 
         activeOpacity={0.7}
         onPress={() => {
-          console.log('🔗 Navigating to:', href)
+          Logger.info('Navigating to:', href)
           router.push(href)
         }}
       >
@@ -387,7 +389,7 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'flex-start',
     backgroundColor: theme.colors.cardBackground || theme.colors.background,
     borderWidth: 1,
-    borderColor: theme.colors.border || '#e5e7eb',
+    borderColor: theme.colors.border,
     borderRadius: 12,
     padding: hp(1.2),
     marginVertical: hp(0.5),
@@ -425,18 +427,18 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.background,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border || '#e5e7eb',
+    borderColor: theme.colors.border,
     overflow: 'hidden',
   },
   postHeader: {
     padding: hp(1.2),
     paddingBottom: hp(0.8),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border || '#e5e7eb',
+    borderBottomColor: theme.colors.border,
   },
   postTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.4),
     lineHeight: hp(2.4),
@@ -469,16 +471,16 @@ const createStyles = (theme) => StyleSheet.create({
   postType: {
     fontSize: hp(1.3),
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   postArrow: {
     fontSize: hp(1.4),
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   title: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
@@ -526,7 +528,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.2),
     color: theme.colors.bondedPurple,
     marginTop: hp(0.2),
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   arrowContainer: {
     justifyContent: 'center',
@@ -536,6 +538,6 @@ const createStyles = (theme) => StyleSheet.create({
   arrow: {
     fontSize: hp(2),
     color: theme.colors.bondedPurple,
-    fontWeight: '300',
+    fontFamily: theme.typography.fontFamily.body,
   },
 })

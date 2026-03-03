@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Animated, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Animated, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../components/CachedImage'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
 import AppHeader from '../components/AppHeader'
@@ -182,7 +183,7 @@ export default function Notifications() {
               }}
             >
               {item.sender?.avatar_url ? (
-                <Image
+                <CachedImage
                   source={{ uri: item.sender.avatar_url }}
                   style={styles.avatar}
                 />
@@ -442,13 +443,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   notificationTitle: {
     fontSize: hp(1.9),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: hp(0.4),
   },
   unreadTitle: {
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   notificationBody: {
     fontSize: hp(1.7),
@@ -465,9 +465,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   friendRequestTitle: {
     fontSize: hp(1.9),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   friendRequestSubtitle: {
     fontSize: hp(1.6),
@@ -497,9 +496,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   acceptButtonText: {
     fontSize: hp(1.5),
-    fontWeight: '600',
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   declineButton: {
     backgroundColor: theme.colors.backgroundSecondary,
@@ -513,9 +511,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   declineButtonText: {
     fontSize: hp(1.5),
-    fontWeight: '600',
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   loadingContainer: {
     flex: 1,
@@ -538,9 +535,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyTitle: {
     fontSize: hp(2),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginTop: hp(2),
     marginBottom: hp(1),
   },

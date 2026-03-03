@@ -7,6 +7,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to subscribe to realtime Link messages updates
@@ -35,7 +36,7 @@ export function useLinkMessagesRealtime(conversationId) {
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Subscribed to Link messages realtime')
+          Logger.info('Subscribed to Link messages realtime')
         }
       })
 
@@ -73,7 +74,7 @@ export function useLinkSystemProfile() {
         .maybeSingle()
 
       if (error) {
-        console.error('Error fetching Link profile:', error)
+        Logger.error('Error fetching Link profile:', error)
         return null
       }
 
@@ -100,7 +101,7 @@ export function useLinkConversation() {
         .rpc('get_or_create_link_conversation', { p_user_id: user.id })
 
       if (error) {
-        console.error('Error getting Link conversation:', error)
+        Logger.error('Error getting Link conversation:', error)
         throw error
       }
 
@@ -142,7 +143,7 @@ export function useLinkMessages(conversationId, sessionId) {
         .range(offset, offset + limit - 1)
 
       if (error) {
-        console.error('Error fetching Link messages:', error)
+        Logger.error('Error fetching Link messages:', error)
         throw error
       }
 

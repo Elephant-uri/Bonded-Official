@@ -16,7 +16,7 @@ import { hp, wp } from '../../helpers/common'
 import { useAppTheme } from '../../app/theme'
 
 // Speaker Avatar Component (Twitter Spaces style)
-const SpeakerAvatar = ({ speaker, isAnonymous, isSpeaking = true }) => {
+const SpeakerAvatar = ({ speaker, isAnonymous, isSpeaking = true, theme, styles }) => {
   const initial = isAnonymous ? '🎭' : speaker.name?.charAt(0)?.toUpperCase()
 
   return (
@@ -30,7 +30,7 @@ const SpeakerAvatar = ({ speaker, isAnonymous, isSpeaking = true }) => {
 
       {/* Avatar */}
       <LinearGradient
-        colors={['#8B5CF6', '#6366F1']}
+        colors={[theme.colors.brand, theme.colors.brandLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.avatar}
@@ -54,7 +54,7 @@ const SpeakerAvatar = ({ speaker, isAnonymous, isSpeaking = true }) => {
 }
 
 // Listener Avatar Component (smaller, no ring)
-const ListenerAvatar = ({ name, hasChangedMind }) => {
+const ListenerAvatar = ({ name, hasChangedMind, styles }) => {
   const isAnon = name === 'Anon'
   const initial = isAnon ? '🎭' : name?.charAt(0)?.toUpperCase()
 
@@ -65,7 +65,7 @@ const ListenerAvatar = ({ name, hasChangedMind }) => {
       </View>
       {hasChangedMind && (
         <View style={styles.changeBadge}>
-          <Ionicons name="swap-vertical" size={hp(1)} color="#10B981" />
+          <Ionicons name="swap-vertical" size={hp(1)} color=theme.colors.success />
         </View>
       )}
     </View>
@@ -112,7 +112,7 @@ export default function CircleRoom({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleLeave}>
       <LinearGradient
-        colors={['#1F2937', '#111827']}
+        colors={[theme.colors.textPrimary, theme.colors.textPrimary]}
         style={{ flex: 1 }}
       >
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -150,6 +150,8 @@ export default function CircleRoom({
                     speaker={speaker}
                     isAnonymous={speaker.isAnonymous}
                     isSpeaking={true}
+                    theme={theme}
+                    styles={styles}
                   />
                 ))}
               </View>
@@ -166,6 +168,7 @@ export default function CircleRoom({
                     key={listener.id}
                     name={listener.name}
                     hasChangedMind={listener.hasChangedMind}
+                    styles={styles}
                   />
                 ))}
                 {mockListeners.length > 24 && (
@@ -208,7 +211,7 @@ export default function CircleRoom({
                 style={styles.updateButton}
                 onPress={() => setShowUpdateModal(true)}
               >
-                <Ionicons name="refresh-circle" size={hp(2)} color="#8B5CF6" />
+                <Ionicons name="refresh-circle" size={hp(2)} color={theme.colors.brand} />
                 <Text style={styles.updateButtonText}>Update my viewpoint</Text>
               </TouchableOpacity>
             </View>
@@ -226,10 +229,10 @@ export default function CircleRoom({
 
             <View style={styles.quickActions}>
               <TouchableOpacity style={styles.quickActionButton}>
-                <Ionicons name="share-outline" size={hp(2.2)} color="#9CA3AF" />
+                <Ionicons name="share-outline" size={hp(2.2)} color=theme.colors.textTertiary />
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionButton}>
-                <Ionicons name="thumbs-up-outline" size={hp(2.2)} color="#9CA3AF" />
+                <Ionicons name="thumbs-up-outline" size={hp(2.2)} color=theme.colors.textTertiary />
               </TouchableOpacity>
             </View>
           </View>
@@ -262,9 +265,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   roomNumber: {
     fontSize: hp(1.5),
-    fontWeight: '600',
-    color: '#9CA3AF',
-    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.textTertiary,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   menuButton: {
     width: hp(4),
@@ -289,7 +291,6 @@ const createStyles = (theme) => StyleSheet.create({
   },
   topicText: {
     fontSize: hp(2.2),
-    fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.heading,
     textAlign: 'center',
@@ -301,8 +302,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.4),
-    fontWeight: '700',
-    color: '#9CA3AF',
+    color: theme.colors.textTertiary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(2),
     letterSpacing: 1,
@@ -326,7 +326,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(11),
     height: hp(11),
     borderRadius: hp(5.5),
-    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+    backgroundColor: theme.colors.brandMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -334,7 +334,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(10.2),
     height: hp(10.2),
     borderRadius: hp(5.1),
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: theme.colors.brandMuted,
   },
   avatar: {
     width: hp(9),
@@ -343,19 +343,17 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: '#1F2937',
+    borderColor: theme.colors.textPrimary,
   },
   avatarText: {
     fontSize: hp(3.5),
     color: '#FFFFFF',
-    fontWeight: '700',
     fontFamily: theme.typography.fontFamily.heading,
   },
   speakerName: {
     fontSize: hp(1.5),
-    fontWeight: '600',
     color: '#FFFFFF',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginTop: hp(0.8),
     textAlign: 'center',
   },
@@ -366,11 +364,11 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(2.8),
     height: hp(2.8),
     borderRadius: hp(1.4),
-    backgroundColor: '#8B5CF6',
+    backgroundColor: theme.colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#1F2937',
+    borderColor: theme.colors.textPrimary,
   },
   listenersGrid: {
     flexDirection: 'row',
@@ -385,14 +383,14 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: '#374151',
+    backgroundColor: theme.colors.backgroundTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   listenerAvatarText: {
     fontSize: hp(1.8),
-    color: '#9CA3AF',
-    fontWeight: '600',
+    color: theme.colors.textTertiary,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   changeBadge: {
     position: 'absolute',
@@ -401,7 +399,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(1.8),
     height: hp(1.8),
     borderRadius: hp(0.9),
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.colors.textPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -409,14 +407,14 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: '#374151',
+    backgroundColor: theme.colors.backgroundTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   moreListenersText: {
     fontSize: hp(1.3),
-    color: '#9CA3AF',
-    fontWeight: '700',
+    color: theme.colors.textTertiary,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   viewpointCard: {
     backgroundColor: 'rgba(55, 65, 81, 0.5)',
@@ -432,7 +430,6 @@ const createStyles = (theme) => StyleSheet.create({
   },
   viewpointTitle: {
     fontSize: hp(1.7),
-    fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -441,7 +438,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   viewpointLabel: {
     fontSize: hp(1.4),
-    color: '#9CA3AF',
+    color: theme.colors.textTertiary,
     fontFamily: theme.typography.fontFamily.body,
     marginBottom: hp(0.5),
   },
@@ -455,35 +452,34 @@ const createStyles = (theme) => StyleSheet.create({
   },
   confidenceBar: {
     height: hp(0.6),
-    backgroundColor: '#374151',
+    backgroundColor: theme.colors.backgroundTertiary,
     borderRadius: theme.radius.sm,
     overflow: 'hidden',
     marginBottom: hp(0.5),
   },
   confidenceFill: {
     height: '100%',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: theme.colors.brand,
     borderRadius: theme.radius.sm,
   },
   confidenceLabel: {
     fontSize: hp(1.3),
-    color: '#9CA3AF',
+    color: theme.colors.textTertiary,
     fontFamily: theme.typography.fontFamily.body,
   },
   updateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: theme.colors.brandMuted,
     paddingVertical: hp(1.2),
     borderRadius: theme.radius.lg,
     gap: wp(2),
   },
   updateButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
-    color: '#A78BFA',
-    fontFamily: theme.typography.fontFamily.body,
+    color: theme.colors.brandLight,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   bottomContainer: {
     paddingHorizontal: wp(4),
@@ -494,7 +490,7 @@ const createStyles = (theme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: theme.colors.brand,
     paddingVertical: hp(1.6),
     borderRadius: theme.radius.xl,
     gap: wp(2),
@@ -502,9 +498,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   raiseHandText: {
     fontSize: hp(1.8),
-    fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   queueBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
@@ -515,9 +510,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   queueText: {
     fontSize: hp(1.3),
-    fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   quickActions: {
     flexDirection: 'row',

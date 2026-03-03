@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
 import { useAppTheme } from '../../app/theme'
+import { Logger } from '../../utils/logger'
 
 export default function StoryCreator({ visible, forumId, forumName, onClose, onCaptured }) {
   const theme = useAppTheme()
@@ -39,7 +40,7 @@ export default function StoryCreator({ visible, forumId, forumName, onClose, onC
         source: 'camera',
       })
     } catch (error) {
-      console.log('Camera error:', error)
+      Logger.info('Camera error:', error)
       Alert.alert('Error', 'Failed to take picture')
     }
   }
@@ -68,7 +69,7 @@ export default function StoryCreator({ visible, forumId, forumName, onClose, onC
         })
       }
     } catch (error) {
-      console.log('Gallery error:', error)
+      Logger.info('Gallery error:', error)
       Alert.alert('Error', 'Failed to pick media')
     }
   }
@@ -104,7 +105,7 @@ export default function StoryCreator({ visible, forumId, forumName, onClose, onC
         duration: recordingTime,
       })
     } catch (error) {
-      console.log('Recording error:', error)
+      Logger.info('Recording error:', error)
       Alert.alert('Error', 'Failed to record video')
     } finally {
       setIsRecording(false)
@@ -125,7 +126,7 @@ export default function StoryCreator({ visible, forumId, forumName, onClose, onC
         clearInterval(recordingTimerRef.current)
       }
     } catch (error) {
-      console.log('Stop recording error:', error)
+      Logger.info('Stop recording error:', error)
     }
   }
 
@@ -271,7 +272,7 @@ const createStyles = (theme) => StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: theme.colors.overlayLight,
   },
   headerButton: {
     width: hp(3.5),
@@ -283,7 +284,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: theme.typography.sizes.lg,
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   headerSubtitle: {
     fontSize: theme.typography.sizes.sm,
@@ -305,7 +306,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(5),
     height: hp(5),
     borderRadius: hp(2.5),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -323,7 +324,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(6),
     height: hp(6),
     borderRadius: hp(3),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -349,7 +350,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(6),
     height: hp(6),
     borderRadius: hp(3),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -380,7 +381,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.4),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   captureButtonRecording: {
     borderColor: theme.colors.error,
@@ -400,7 +401,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(2.4),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(1),
   },
   permissionText: {
@@ -422,7 +423,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.8),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   permissionButtonSecondary: {
     paddingVertical: hp(1.5),

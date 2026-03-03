@@ -26,6 +26,7 @@ import { useFriends } from '../../hooks/useFriends'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { formatDateTime } from '../../utils/dateFormatters'
+import { Logger } from '../../utils/logger'
 import { useAppTheme } from '../theme'
 
 const EMPTY_ATTENDANCE = []
@@ -48,15 +49,15 @@ export default function EventDetail() {
   // Debug logging
   useEffect(() => {
     if (eventId) {
-      console.log('🔍 EventDetail - eventId:', eventId, 'type:', typeof eventId)
+      Logger.info('EventDetail - eventId:', eventId, 'type:', typeof eventId)
     } else {
-      console.warn('⚠️ EventDetail - No eventId found in params')
+      Logger.warn('EventDetail - No eventId found in params')
     }
     if (error) {
-      console.error('❌ EventDetail - Error loading event:', error)
+      Logger.error('EventDetail - Error loading event:', error)
     }
     if (event) {
-      console.log('✅ EventDetail - Event loaded:', { id: event.id, title: event.title })
+      Logger.info('EventDetail - Event loaded:', { id: event.id, title: event.title })
     }
   }, [eventId, event, error])
 
@@ -196,7 +197,7 @@ export default function EventDetail() {
       .eq('user_id', user.id)
 
     if (updateError) {
-      console.error('Error updating RSVP visibility:', updateError)
+      Logger.error('Error updating RSVP visibility:', updateError)
       Alert.alert('Error', 'Could not update your RSVP visibility.')
     } else {
       await refetch()
@@ -476,7 +477,7 @@ const createStyles = (theme) =>
     },
     errorText: {
       fontSize: hp(2),
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.textPrimary,
       marginBottom: hp(1),
     },
@@ -496,7 +497,7 @@ const createStyles = (theme) =>
     backButtonText: {
       color: theme.colors.white,
       fontSize: hp(1.6),
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
     },
     headerRow: {
       flexDirection: 'row',
@@ -510,12 +511,12 @@ const createStyles = (theme) =>
     },
     headerTitle: {
       fontSize: hp(2),
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.textPrimary,
     },
     title: {
       fontSize: hp(2.6),
-      fontWeight: '700',
+      fontFamily: theme.typography.fontFamily.bold,
       color: theme.colors.textPrimary,
       marginBottom: hp(1.5),
     },
@@ -574,7 +575,7 @@ const createStyles = (theme) =>
       bottom: 0,
       left: 0,
       right: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      backgroundColor: theme.colors.overlay,
       paddingVertical: hp(1),
       paddingHorizontal: wp(4),
     },
@@ -587,8 +588,7 @@ const createStyles = (theme) =>
     mapOverlayText: {
       fontSize: hp(1.5),
       color: theme.colors.white,
-      fontFamily: theme.typography.fontFamily.body,
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
     },
     section: {
       marginTop: hp(3),
@@ -633,7 +633,7 @@ const createStyles = (theme) =>
     },
     publicToggleTitle: {
       fontSize: hp(1.6),
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.textPrimary,
     },
     publicToggleSubtitle: {
@@ -667,7 +667,7 @@ const createStyles = (theme) =>
     },
     attendeeAvatarText: {
       fontSize: hp(1.6),
-      fontWeight: '700',
+      fontFamily: theme.typography.fontFamily.bold,
       color: theme.colors.textSecondary,
     },
     attendeeInfo: {
@@ -675,7 +675,7 @@ const createStyles = (theme) =>
     },
     attendeeName: {
       fontSize: hp(1.6),
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.textPrimary,
     },
     attendeeMeta: {
@@ -695,7 +695,7 @@ const createStyles = (theme) =>
     },
     sectionTitle: {
       fontSize: hp(2),
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.textPrimary,
       marginBottom: hp(1),
     },
@@ -739,7 +739,7 @@ const createStyles = (theme) =>
     },
     joinButtonText: {
       fontSize: theme.typography.sizes.lg,
-      fontWeight: '700',
+      fontFamily: theme.typography.fontFamily.bold,
     },
     joinButtonTextPending: {
       color: theme.colors.textSecondary,

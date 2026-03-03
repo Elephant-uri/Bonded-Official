@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to fetch profiles for Yearbook
@@ -21,7 +22,7 @@ export function useProfiles(filters = {}) {
         throw new Error('User must be authenticated to view profiles')
       }
 
-      console.log('🎓 Fetching yearbook profiles...')
+      Logger.info('Fetching yearbook profiles...')
       const startTime = Date.now()
 
       // Get user's university first to filter profiles
@@ -90,12 +91,12 @@ export function useProfiles(filters = {}) {
       const { data, error } = await query
 
       if (error) {
-        console.error('❌ Error fetching profiles:', error)
+        Logger.error('Error fetching profiles:', error)
         throw error
       }
 
       const fetchTime = Date.now() - startTime
-      console.log(`✅ Fetched ${data?.length || 0} profiles in ${fetchTime}ms`)
+      Logger.info(`Fetched ${data?.length || 0} profiles in ${fetchTime}ms`)
 
       // Transform data to match Yearbook component expectations
       // Gallery photos are loaded lazily via useProfilePhotos hook
@@ -163,7 +164,7 @@ export function useProfilePhotos(profileId) {
           try {
             return await createSignedUrlForPath(media.path)
           } catch (error) {
-            console.warn('Failed to get signed URL for media:', media.id)
+            Logger.warn('Failed to get signed URL for media:', media.id)
             return null
           }
         })
@@ -229,13 +230,13 @@ export function useUserOrganizations(userId) {
           .rpc('get_user_organizations', { p_user_id: userId })
 
         if (error) {
-          console.warn('Error fetching user organizations:', error)
+          Logger.warn('Error fetching user organizations:', error)
           return []
         }
 
         return data || []
       } catch (error) {
-        console.warn('Exception fetching user organizations:', error)
+        Logger.warn('Exception fetching user organizations:', error)
         return []
       }
     },

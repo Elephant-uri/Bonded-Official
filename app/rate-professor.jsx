@@ -109,7 +109,7 @@ export default function RateProfessor() {
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
         stars.push(
-          <Ionicons key={i} name="star" size={hp(1.8)} color="#FFD700" />
+          <Ionicons key={i} name="star" size={hp(1.8)} color=theme.colors.warning />
         )
       } else if (i === fullStars && hasHalfStar) {
         stars.push(
@@ -117,7 +117,7 @@ export default function RateProfessor() {
             key={i}
             name="star-half"
             size={hp(1.8)}
-            color="#FFD700"
+            color=theme.colors.warning
           />
         )
       } else {
@@ -126,7 +126,7 @@ export default function RateProfessor() {
             key={i}
             name="star-outline"
             size={hp(1.8)}
-            color="#CCCCCC"
+            color=theme.colors.textTertiary
           />
         )
       }
@@ -170,10 +170,10 @@ export default function RateProfessor() {
                   width: `${(item.difficulty / 5) * 100}%`,
                   backgroundColor:
                     item.difficulty <= 2
-                      ? '#2ecc71'
+                      ? theme.colors.success
                       : item.difficulty <= 3.5
-                      ? '#f39c12'
-                      : '#e74c3c',
+                      ? theme.colors.warning
+                      : theme.colors.destructive,
                 },
               ]}
             />
@@ -246,8 +246,8 @@ export default function RateProfessor() {
         </View>
         {item.wouldTakeAgain && (
           <View style={styles.reviewStat}>
-            <Ionicons name="checkmark-circle" size={hp(1.5)} color="#2ecc71" />
-            <Text style={[styles.reviewStatText, { color: '#2ecc71' }]}>
+            <Ionicons name="checkmark-circle" size={hp(1.5)} color=theme.colors.success />
+            <Text style={[styles.reviewStatText, { color: theme.colors.success }]}>
               Would Take Again
             </Text>
           </View>
@@ -433,10 +433,10 @@ export default function RateProfessor() {
                                 width: `${(selectedProfessor.difficulty / 5) * 100}%`,
                                 backgroundColor:
                                   selectedProfessor.difficulty <= 2
-                                    ? '#2ecc71'
+                                    ? theme.colors.success
                                     : selectedProfessor.difficulty <= 3.5
-                                    ? '#f39c12'
-                                    : '#e74c3c',
+                                    ? theme.colors.warning
+                                    : theme.colors.destructive,
                               },
                             ]}
                           />
@@ -605,7 +605,7 @@ function AddReviewModal({ professor, onClose }) {
                     <Ionicons
                       name={star <= rating ? 'star' : 'star-outline'}
                       size={hp(4)}
-                      color={star <= rating ? '#FFD700' : '#CCCCCC'}
+                      color={star <= rating ? theme.colors.warning : theme.colors.textTertiary}
                     />
                   </TouchableOpacity>
                 ))}
@@ -727,7 +727,6 @@ const createStyles = (theme) => StyleSheet.create({
   title: {
     fontSize: hp(3.5),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
@@ -771,8 +770,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   filterLabel: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
@@ -805,7 +803,6 @@ const createStyles = (theme) => StyleSheet.create({
   professorName: {
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
@@ -824,7 +821,6 @@ const createStyles = (theme) => StyleSheet.create({
   ratingNumber: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.white,
   },
   ratingRow: {
@@ -874,8 +870,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   statValue: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   coursesRow: {
@@ -887,8 +882,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   coursesLabel: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginRight: wp(1),
   },
@@ -900,9 +894,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   courseTagText: {
     fontSize: hp(1.3),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
   },
   tagsRow: {
     flexDirection: 'row',
@@ -943,7 +936,6 @@ const createStyles = (theme) => StyleSheet.create({
   modalTitle: {
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   modalAddButton: {
@@ -954,8 +946,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalSubmitText: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   modalScrollView: {
@@ -974,7 +965,6 @@ const createStyles = (theme) => StyleSheet.create({
   professorDetailName: {
     fontSize: hp(3),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
@@ -998,7 +988,6 @@ const createStyles = (theme) => StyleSheet.create({
   ratingDisplayNumber: {
     fontSize: hp(4.5),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '800',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
@@ -1028,7 +1017,6 @@ const createStyles = (theme) => StyleSheet.create({
   detailStatValue: {
     fontSize: hp(2.5),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
@@ -1045,7 +1033,6 @@ const createStyles = (theme) => StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
@@ -1062,9 +1049,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   courseTagLargeText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
   },
   reviewsSection: {
     marginTop: hp(1),
@@ -1086,8 +1072,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   addReviewText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   reviewCard: {
@@ -1110,7 +1095,6 @@ const createStyles = (theme) => StyleSheet.create({
   reviewCourse: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
@@ -1176,7 +1160,6 @@ const createStyles = (theme) => StyleSheet.create({
   noReviewsText: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     marginTop: hp(1.5),
     marginBottom: hp(0.5),
@@ -1195,7 +1178,6 @@ const createStyles = (theme) => StyleSheet.create({
   addReviewProfessorName: {
     fontSize: hp(2.5),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
@@ -1212,7 +1194,6 @@ const createStyles = (theme) => StyleSheet.create({
   addReviewLabel: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
@@ -1245,7 +1226,6 @@ const createStyles = (theme) => StyleSheet.create({
   difficultyButtonText: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textSecondary,
   },
   difficultyButtonTextActive: {
@@ -1272,8 +1252,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   gradeButtonText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   gradeButtonTextActive: {
@@ -1293,7 +1272,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   toggleButtonTextActive: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   reviewTextInput: {
     backgroundColor: theme.colors.backgroundSecondary,

@@ -1,13 +1,14 @@
+import * as Sentry from '@sentry/react-native'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Logger } from '../utils/logger'
 
-// Helper to clear persisted auth data
 const clearAuthStorage = async () => {
   try {
     await AsyncStorage.removeItem('auth-storage')
   } catch (error) {
-    console.warn('Error clearing auth storage:', error)
+    Logger.warn('Error clearing auth storage:', error)
   }
 }
 
@@ -38,10 +39,14 @@ export const useAuthStore = create(
       ...initialState,
 
       // Actions
-      setUser: (user) => set({ 
-        user, 
-        isAuthenticated: !!user 
-      }),
+      setUser: (user) => {
+        if (user) {
+          Sentry.setUser({ id: user.id, email: user.email });
+        } else {
+          Sentry.setUser(null);
+        }
+        set({ user, isAuthenticated: !!user });
+      },
 
       setEmail: (email) => set({ email }),
 

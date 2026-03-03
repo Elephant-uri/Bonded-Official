@@ -11,6 +11,7 @@
  */
 
 import * as ImagePicker from 'expo-image-picker'
+import { Logger } from '../logger'
 
 export interface TextBlock {
   text: string
@@ -39,9 +40,9 @@ try {
   // Dynamic import to avoid crash in Expo Go
   TextRecognition = require('@react-native-ml-kit/text-recognition').default
   mlKitAvailable = true
-  console.log('✅ ML Kit Text Recognition is available')
+  Logger.info('ML Kit Text Recognition is available')
 } catch (error) {
-  console.log('⚠️ ML Kit not available (likely running in Expo Go)')
+  Logger.info('ML Kit not available (likely running in Expo Go)')
   mlKitAvailable = false
 }
 
@@ -78,7 +79,7 @@ export async function pickScheduleImage(): Promise<string | null> {
 
     return result.assets[0].uri
   } catch (error) {
-    console.error('Error picking image:', error)
+    Logger.error(error, 'Error picking image')
     throw error
   }
 }
@@ -105,7 +106,7 @@ export async function takeSchedulePhoto(): Promise<string | null> {
 
     return result.assets[0].uri
   } catch (error) {
-    console.error('Error taking photo:', error)
+    Logger.error(error, 'Error taking photo')
     throw error
   }
 }
@@ -127,16 +128,16 @@ export async function extractTextFromImage(imageUri: string): Promise<OCRResult>
     throw new Error('Image URI is required')
   }
 
-  console.log('📷 Processing image:', imageUri)
+  Logger.info('Processing image:', imageUri)
 
   // Priority 1: Try ML Kit (production/dev builds)
   if (mlKitAvailable && TextRecognition) {
     try {
-      console.log('🔍 Starting ML Kit text recognition...')
+      Logger.info('Starting ML Kit text recognition...')
 
       const result = await TextRecognition.recognize(imageUri)
 
-      console.log(`✅ ML Kit recognized ${result.blocks?.length || 0} text blocks`)
+      Logger.info(`ML Kit recognized ${result.blocks?.length || 0} text blocks`)
 
       const blocks: TextBlock[] = (result.blocks || []).map((block: any) => ({
         text: block.text || '',
@@ -151,7 +152,7 @@ export async function extractTextFromImage(imageUri: string): Promise<OCRResult>
 
       const rawText = result.text || blocks.map((b) => b.text).join('\n')
 
-      console.log(`📝 Extracted ${rawText.length} characters of text`)
+      Logger.info(`Extracted ${rawText.length} characters of text`)
 
       return {
         rawText,
@@ -159,7 +160,7 @@ export async function extractTextFromImage(imageUri: string): Promise<OCRResult>
         imageUri,
       }
     } catch (error) {
-      console.warn('⚠️ ML Kit failed, falling back to cloud OCR:', error)
+      Logger.warn('ML Kit failed, falling back to cloud OCR:', error)
       // Fall through to cloud OCR
     }
   }
@@ -169,7 +170,7 @@ export async function extractTextFromImage(imageUri: string): Promise<OCRResult>
     const { extractTextFromImageCloud, isCloudOCRAvailable } = await import('./cloudOCR')
     
     if (isCloudOCRAvailable()) {
-      console.log('☁️ Using Google Cloud Vision API (works in Expo Go)')
+      Logger.info('Using Google Cloud Vision API (works in Expo Go)')
       const result = await extractTextFromImageCloud(imageUri)
       
       if (result.rawText) {
@@ -177,7 +178,7 @@ export async function extractTextFromImage(imageUri: string): Promise<OCRResult>
       }
     }
   } catch (error) {
-    console.warn('⚠️ Google Cloud Vision not available:', error)
+    Logger.warn('Google Cloud Vision not available:', error)
   }
 
   // Priority 3: Try Supabase Edge Function (works in Expo Go)
@@ -185,7 +186,7 @@ export async function extractTextFromImage(imageUri: string): Promise<OCRResult>
     const { extractTextFromImageSupabase, isSupabaseOCRAvailable } = await import('./cloudOCR-supabase')
     
     if (await isSupabaseOCRAvailable()) {
-      console.log('☁️ Using Supabase Edge Function OCR (works in Expo Go)')
+      Logger.info('Using Supabase Edge Function OCR (works in Expo Go)')
       const result = await extractTextFromImageSupabase(imageUri)
       
       if (result.rawText) {
@@ -193,15 +194,15 @@ export async function extractTextFromImage(imageUri: string): Promise<OCRResult>
       }
     }
   } catch (error) {
-    console.warn('⚠️ Supabase OCR not available:', error)
+    Logger.warn('Supabase OCR not available:', error)
   }
 
   // Fallback: No OCR available
-  console.log('⚠️ No OCR method available')
-  console.log('💡 Options:')
-  console.log('   1. Use Google Cloud Vision API (set EXPO_PUBLIC_GOOGLE_VISION_API_KEY)')
-  console.log('   2. Deploy Supabase Edge Function for OCR')
-  console.log('   3. Use EAS Build with ML Kit for on-device OCR')
+  Logger.info('No OCR method available')
+  Logger.info('Options:')
+  Logger.info('   1. Use Google Cloud Vision API (set EXPO_PUBLIC_GOOGLE_VISION_API_KEY)')
+  Logger.info('   2. Deploy Supabase Edge Function for OCR')
+  Logger.info('   3. Use EAS Build with ML Kit for on-device OCR')
   
   return {
     rawText: '',

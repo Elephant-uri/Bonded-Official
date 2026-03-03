@@ -1,7 +1,11 @@
 /**
  * Unsplash API Service
  * Fetches college-aged photos for yearbook demo
- * 
+ */
+
+import { Logger } from '../utils/logger'
+
+/**
  * Note: You'll need an Unsplash API key
  * Get one free at: https://unsplash.com/developers
  * Add to .env: UNSPLASH_ACCESS_KEY=your_key_here
@@ -40,14 +44,14 @@ export const fetchUnsplashPhoto = async (searchTerm = null, width = 400, height 
 
     if (!response.ok) {
       // Fallback to a placeholder service if Unsplash fails
-      console.warn('Unsplash API failed, using fallback')
+      Logger.warn('Unsplash API failed, using fallback')
       return getFallbackPhoto()
     }
 
     const data = await response.json()
     return data.urls?.regular || data.urls?.small || getFallbackPhoto()
   } catch (error) {
-    console.error('Error fetching Unsplash photo:', error)
+    Logger.error('Error fetching Unsplash photo:', error)
     return getFallbackPhoto()
   }
 }
@@ -71,7 +75,7 @@ export const fetchMultiplePhotos = async (count = 10) => {
     const data = await response.json()
     return data.map(photo => photo.urls?.regular || photo.urls?.small || getFallbackPhoto())
   } catch (error) {
-    console.error('Error fetching multiple Unsplash photos:', error)
+    Logger.error('Error fetching multiple Unsplash photos:', error)
     return Array.from({ length: count }, () => getFallbackPhoto())
   }
 }

@@ -22,6 +22,7 @@ import { hp, wp } from '../../helpers/common'
 import { getStaticMapUrlWithCoords } from '../../helpers/mapUtils'
 import { createSignedUrlForPath, uploadImageToBondedMedia } from '../../helpers/mediaStorage'
 import { useCreateEvent } from '../../hooks/events/useCreateEvent'
+import { useFriends } from '../../hooks/useFriends'
 import { supabase } from '../../lib/supabase'
 import { getFriendlyErrorMessage } from '../../utils/userFacingErrors'
 import { useAuthStore } from '../../stores/authStore'
@@ -38,6 +39,7 @@ export default function CreateEvent() {
   const { user } = useAuthStore()
   const { orgId, eventId, mode } = useLocalSearchParams()
   const { getClub } = useClubsContext()
+  const { data: friends = [] } = useFriends()
   const preselectedOrg = orgId ? getClub(orgId) : null
   const preselectedOrgId = typeof orgId === 'string' ? orgId : null
   const createEventMutation = useCreateEvent()
@@ -90,7 +92,7 @@ export default function CreateEvent() {
             setSelectedOrgId(data.org_id)
           }
         } catch (error) {
-          console.error('Error fetching event:', error)
+          Logger.error('Error fetching event:', error)
           Alert.alert('Error', 'Failed to load event data')
         } finally {
           setIsLoadingEvent(false)
@@ -270,7 +272,12 @@ export default function CreateEvent() {
     }
   }
 
-  const mockConnections = []
+  const inviteableConnections = friends.map((friend) => ({
+    id: friend.id,
+    name: friend.full_name || friend.username || 'Friend',
+    avatar: (friend.full_name || friend.username || 'F').charAt(0).toUpperCase(),
+    type: 'friend',
+  }))
 
   const toggleInvitee = (id) => {
     setSelectedInvitees((prev) =>
@@ -497,11 +504,11 @@ export default function CreateEvent() {
             >
               <View style={styles.inviteAvatars}>
                 {selectedInvitees.length === 0 ? (
-                  <Text style={styles.inviteText}>Invite people or orgs</Text>
+                  <Text style={styles.inviteText}>Invite friends</Text>
                 ) : (
                   <>
                     {selectedInvitees.slice(0, 3).map((id) => {
-                      const invitee = mockConnections.find((c) => c.id === id)
+                      const invitee = inviteableConnections.find((c) => c.id === id)
                       return invitee ? (
                         <View key={id} style={styles.avatar}>
                           <Text style={styles.avatarText}>{invitee.avatar}</Text>
@@ -793,7 +800,7 @@ export default function CreateEvent() {
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalBody}>
-                {mockConnections.map((connection) => (
+                {inviteableConnections.map((connection) => (
                   <TouchableOpacity
                     key={connection.id}
                     style={[
@@ -810,7 +817,7 @@ export default function CreateEvent() {
                       <View style={styles.inviteeInfo}>
                         <Text style={styles.inviteeName}>{connection.name}</Text>
                         <Text style={styles.inviteeType}>
-                          {connection.type === 'org' ? 'Organization' : 'Friend'}
+                          Friend
                         </Text>
                       </View>
                     </View>
@@ -819,6 +826,9 @@ export default function CreateEvent() {
                     )}
                   </TouchableOpacity>
                 ))}
+                {inviteableConnections.length === 0 && (
+                  <Text style={styles.inviteText}>No friends available to invite yet</Text>
+                )}
               </ScrollView>
             </View>
           </View>
@@ -862,19 +872,16 @@ const createStyles = (theme) => StyleSheet.create({
   cancelText: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '400',
     color: theme.colors.bondedPurple,
   },
   headerTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   createText: {
     fontSize: hp(1.6),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '400',
     color: theme.colors.bondedPurple,
   },
   scrollView: {
@@ -910,9 +917,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   imagePlaceholderText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textPrimary,
-    fontWeight: '500',
   },
   eventImage: {
     width: '100%',
@@ -924,8 +930,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
     textTransform: 'uppercase',
@@ -1034,8 +1039,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   avatarText: {
     fontSize: hp(1.2),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   inviteText: {
@@ -1059,8 +1063,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   nextButtonText: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   nextButtonDisabled: {
@@ -1084,8 +1087,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   locationConfirmButtonText: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   mapPreviewContainer: {
@@ -1115,7 +1117,7 @@ const createStyles = (theme) => StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: theme.colors.overlay,
     paddingVertical: hp(1),
     paddingHorizontal: wp(4),
     flexDirection: 'row',
@@ -1124,8 +1126,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   mapPreviewText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
     flex: 1,
   },
@@ -1156,7 +1157,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -1177,13 +1178,11 @@ const createStyles = (theme) => StyleSheet.create({
   modalTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   modalCloseText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   modalBody: {
@@ -1213,12 +1212,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   optionTextSelected: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   checkmark: {
     fontSize: hp(2),
     color: theme.colors.bondedPurple,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   inviteeRow: {
     flexDirection: 'row',
@@ -1252,8 +1251,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   inviteeAvatarText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   inviteeInfo: {
@@ -1261,8 +1259,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   inviteeName: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
@@ -1274,7 +1271,7 @@ const createStyles = (theme) => StyleSheet.create({
   pickerModal: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   pickerModalContent: {
     backgroundColor: theme.colors.background,
@@ -1294,7 +1291,6 @@ const createStyles = (theme) => StyleSheet.create({
   pickerModalTitle: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   pickerModalButton: {
@@ -1303,13 +1299,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   pickerModalButtonText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
   },
   pickerModalButtonDone: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   locationInput: {
     backgroundColor: theme.colors.background,

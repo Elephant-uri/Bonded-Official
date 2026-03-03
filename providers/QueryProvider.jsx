@@ -1,29 +1,46 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
+import { QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import React from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Create a client instance with default options
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Retry failed requests once
       retry: 1,
-      // Cache data for 5 minutes
-      staleTime: 5 * 60 * 1000,
-      // Keep unused data in cache for 10 minutes
-      gcTime: 10 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,       // 5 min — data considered fresh
+      gcTime: 1000 * 60 * 60 * 24,     // 24 hr — keep in cache for persistence
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: 'always',
     },
     mutations: {
-      // Retry failed mutations once
       retry: 1,
     },
   },
 })
 
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: 'BONDED_RQ_CACHE',
+  throttleTime: 2000,
+})
+
+export { queryClient }
+
 export default function QueryProvider({ children }) {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: asyncStoragePersister,
+        maxAge: 1000 * 60 * 60 * 24,   // Persist cache for 24 hours
+        buster: '1',                     // Bump to invalidate all caches on next deploy
+      }}
+      onSuccess={() => {
+        queryClient.resumePausedMutations()
+      }}
+    >
       {children}
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   )
 }
-

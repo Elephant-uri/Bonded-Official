@@ -170,7 +170,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   buttonText: {
     fontSize: hp(1.5),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -196,7 +196,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   infoTitle: {
     fontSize: hp(1.8),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -247,11 +247,11 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.9),
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   recipientName: {
     fontSize: hp(1.7),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -260,7 +260,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   inputLabel: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),

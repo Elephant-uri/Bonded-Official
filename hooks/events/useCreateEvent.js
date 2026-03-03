@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createEvent } from '../../api/events/createEvent'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { Logger } from '../../utils/logger'
 
 /**
  * Hook to create a new event
@@ -60,13 +61,13 @@ export function useCreateEvent() {
         recurring_end_date: eventData.recurring_end_date || null,
       }
 
-      console.log('Creating event with data:', eventInput)
+      Logger.info('Creating event with data:', eventInput)
       const result = await createEvent(eventInput)
-      console.log('Event created successfully:', result)
+      Logger.info('Event created successfully:', result)
       return result
     },
     onSuccess: (data) => {
-      console.log('✅ Event created, invalidating queries:', {
+      Logger.info('Event created, invalidating queries:', {
         eventId: data?.id,
         title: data?.title,
       })
@@ -75,10 +76,10 @@ export function useCreateEvent() {
       queryClient.invalidateQueries({ queryKey: ['events'] })
       queryClient.invalidateQueries({ queryKey: ['eventsForUser'] })
 
-      console.log('🔄 Queries invalidated - events should refetch')
+      Logger.info('Queries invalidated - events should refetch')
     },
     onError: (error) => {
-      console.error('❌ Event creation failed:', error)
+      Logger.error('Event creation failed:', error)
     },
     retry: 1,
   })

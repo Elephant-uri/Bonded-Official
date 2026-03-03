@@ -1,20 +1,31 @@
 import React from 'react'
-import { View, StyleSheet, Platform } from 'react-native'
-import { hp, wp } from '../helpers/common'
+import { StyleSheet, View } from 'react-native'
 import { useAppTheme } from '../app/theme'
 
-const AppCard = ({ children, style, radius = 'lg', padding = true }) => {
+/**
+ * MergeFund Design System — Card / Surface
+ *
+ * Flat design with subtle 1px low-opacity borders. No heavy drop shadows.
+ * Uses `variant` prop: "default" | "elevated" | "flat"
+ */
+const AppCard = ({
+  children,
+  style,
+  variant = 'default',
+  radius = 'md',
+  padding = true,
+}) => {
   const theme = useAppTheme()
-  const styles = createStyles(theme)
-  const radiusValue = radius === 'lg' ? hp(1.8) : hp(1.2)
+  const variantStyle = theme.cardVariants?.[variant] || theme.cardVariants?.default || {}
+  const radiusValue = theme.radius[radius] ?? theme.radius.md
 
   return (
     <View
       style={[
-        styles.card,
+        variantStyle,
         {
           borderRadius: radiusValue,
-          padding: padding ? wp(4) : 0,
+          padding: padding ? theme.spacing.md : 0,
         },
         style,
       ]}
@@ -25,21 +36,3 @@ const AppCard = ({ children, style, radius = 'lg', padding = true }) => {
 }
 
 export default AppCard
-
-const createStyles = (theme) => StyleSheet.create({
-  card: {
-    backgroundColor: theme.colors.surface,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-})
-

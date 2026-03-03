@@ -1,9 +1,11 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
+// Support both Next.js and Expo env var names (for monorepo)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim()
+const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim()
 
-// Only create client if credentials are available
+// Anon client (for client-side or RLS-respecting server use)
 let supabase: SupabaseClient | null = null
 
 if (supabaseUrl && supabaseAnonKey) {
@@ -14,12 +16,21 @@ if (supabaseUrl && supabaseAnonKey) {
   }
 } else {
   if (typeof window === 'undefined') {
-    // Only log in server-side (build time)
     console.warn('Supabase credentials not found. Waitlist will use local storage fallback.')
   }
 }
 
-export { supabase }
+// Service role client (server-only, bypasses RLS) — use for waitlist inserts
+let supabaseAdmin: SupabaseClient | null = null
+if (typeof window === 'undefined' && supabaseUrl && supabaseServiceKey) {
+  try {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
+  } catch (error) {
+    console.warn('Failed to initialize Supabase admin client:', error)
+  }
+}
+
+export { supabase, supabaseAdmin }
 
 
 

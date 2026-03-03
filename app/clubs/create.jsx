@@ -27,6 +27,7 @@ import { MapPin } from '../../components/Icons'
 import { useClubsContext } from '../../contexts/ClubsContext'
 import { hp, wp } from '../../helpers/common'
 import { formatTime } from '../../utils/dateFormatters'
+import { Logger } from '../../utils/logger'
 import { useAppTheme } from '../theme'
 
 const CATEGORIES = [
@@ -49,11 +50,11 @@ export default function CreateOrg() {
   const orgsAvailable = clubsContext?.orgsAvailable !== false
   
   // Debug: Log to see if component is rendering
-  console.log('CreateOrg rendering - clubsContext:', !!clubsContext, 'createClub:', !!createClub)
+  Logger.info('CreateOrg rendering - clubsContext:', !!clubsContext, 'createClub:', !!createClub)
   
   // Check if createClub function is available
   if (!clubsContext || !createClub) {
-    console.warn('CreateOrg: Missing context or createClub function')
+    Logger.warn('CreateOrg: Missing context or createClub function')
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.container}>
@@ -122,7 +123,7 @@ export default function CreateOrg() {
         }
       }
     } catch (error) {
-      console.log('Image picker error:', error)
+      Logger.info('Image picker error:', error)
       Alert.alert('Error', 'Failed to pick image')
     }
   }
@@ -211,7 +212,7 @@ export default function CreateOrg() {
   }
 
   // Debug: Ensure component is rendering
-  console.log('CreateOrg: Rendering component with theme:', !!theme, 'styles:', !!styles)
+  Logger.info('CreateOrg: Rendering component with theme:', !!theme, 'styles:', !!styles)
   
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -674,8 +675,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: theme.typography.sizes.xl,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.extrabold,
+    fontFamily: theme.typography.fontFamily.extrabold,
     color: theme.colors.textPrimary,
     letterSpacing: -0.5,
   },
@@ -705,8 +705,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   cardTitle: {
     fontSize: theme.typography.sizes.lg,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
     letterSpacing: -0.2,
@@ -716,8 +715,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: theme.typography.sizes.sm,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
@@ -767,8 +765,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   imagePickerText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   imagePickerSubtext: {
@@ -832,8 +829,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   switchText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.xs,
   },
@@ -857,8 +853,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createButtonText: {
     fontSize: theme.typography.sizes.lg,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   createButtonHelper: {
@@ -925,13 +920,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   addMeetingTimeText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.accent,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -950,15 +944,13 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalTitle: {
     fontSize: theme.typography.sizes.lg,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   modalCloseText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.accent,
-    fontWeight: theme.typography.weights.semibold,
   },
   modalBody: {
     padding: theme.spacing.lg,
@@ -983,7 +975,7 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   dayOptionTextSelected: {
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.accent,
   },
   confirmButton: {
@@ -995,8 +987,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   confirmButtonText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   locationInput: {
@@ -1038,7 +1029,7 @@ const createStyles = (theme) => StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: theme.colors.overlay,
     paddingVertical: hp(0.8),
     paddingHorizontal: wp(3),
     flexDirection: 'row',
@@ -1047,8 +1038,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   mapPreviewText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
     flex: 1,
   },
@@ -1089,8 +1079,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   locationConfirmButtonText: {
     fontSize: theme.typography.sizes.base,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
 })

@@ -220,7 +220,7 @@ const createStyles = (theme) => StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   headerSubtitle: {
@@ -242,7 +242,7 @@ const createStyles = (theme) => StyleSheet.create({
   inviteButtonText: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   searchContainer: {
@@ -298,14 +298,14 @@ const createStyles = (theme) => StyleSheet.create({
   selectedUserAvatarInitial: {
     fontSize: hp(1.2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.bondedPurple,
   },
   selectedUserName: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   usersList: {
     paddingHorizontal: wp(4),
@@ -337,7 +337,7 @@ const createStyles = (theme) => StyleSheet.create({
   userAvatarInitial: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.bondedPurple,
   },
   userInfo: {
@@ -347,7 +347,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textPrimary,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     marginBottom: hp(0.2),
   },
   emptyState: {

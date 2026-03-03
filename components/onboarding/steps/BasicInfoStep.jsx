@@ -8,6 +8,7 @@ import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
 import { supabase } from '../../../lib/supabase'
 import Input from '../../Input'
 import Picker from '../../Picker'
+import { Logger } from '../../../utils/logger'
 
 const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
   const styles = createStyles(ONBOARDING_THEME)
@@ -99,7 +100,7 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
           })
         }
       } catch (error) {
-        console.error('Error checking username:', error)
+        Logger.error('Error checking username:', error)
         setUsernameValidation({
           isChecking: false,
           isValid: false,
@@ -249,19 +250,19 @@ const BasicInfoStep = ({ formData, updateFormData, onScroll }) => {
           <View style={styles.validationContainer}>
             {usernameValidation.isChecking ? (
               <>
-                <ActivityIndicator size="small" color="#A45CFF" />
+                <ActivityIndicator size="small" color=theme.colors.brand />
                 <Text style={styles.validationText}>{usernameValidation.message}</Text>
               </>
             ) : usernameValidation.isValid ? (
               <>
-                <Ionicons name="checkmark-circle" size={hp(2)} color="#4CAF50" />
+                <Ionicons name="checkmark-circle" size={hp(2)} color=theme.colors.success />
                 <Text style={[styles.validationText, styles.validationSuccess]}>
                   {usernameValidation.message}
                 </Text>
               </>
             ) : usernameValidation.message ? (
               <>
-                <Ionicons name="close-circle" size={hp(2)} color="#EF4444" />
+                <Ionicons name="close-circle" size={hp(2)} color=theme.colors.destructive />
                 <Text style={[styles.validationText, styles.validationError]}>
                   {usernameValidation.message}
                 </Text>
@@ -347,8 +348,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(3.5),
-    fontWeight: '800',
-    color: theme.colors.textPrimary || '#1A1A1A',
+    fontFamily: theme.typography?.fontFamily?.extrabold,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography?.fontFamily?.heading || 'System',
     marginBottom: hp(1),
     textAlign: 'center',
@@ -356,7 +357,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   subtitle: {
     fontSize: hp(2),
-    color: theme.colors.textSecondary || '#8E8E8E',
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginBottom: hp(5),
     textAlign: 'center',
@@ -372,18 +373,18 @@ const createStyles = (theme) => StyleSheet.create({
   },
   validationText: {
     fontSize: hp(1.5),
-    color: theme.colors.textSecondary || '#8E8E8E',
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography?.fontFamily?.body || 'System',
   },
   validationSuccess: {
-    color: '#4CAF50',
+    color: theme.colors.success,
   },
   validationError: {
-    color: '#EF4444',
+    color: theme.colors.destructive,
   },
   helperText: {
     fontSize: hp(1.3),
-    color: theme.colors.textSecondary || '#8E8E8E',
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginTop: hp(0.5),
     opacity: 0.7,

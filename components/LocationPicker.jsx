@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { hp, wp } from '../helpers/common'
 import { useAppTheme } from '../app/theme'
 import { MapPin } from './Icons'
+import { Logger } from '../utils/logger'
 
 /**
  * LocationPicker Component
@@ -140,7 +141,7 @@ export default function LocationPicker({
                   )
                 }}
                 onFail={(error) => {
-                  console.error('Google Places Autocomplete error:', error)
+                  Logger.error('Google Places Autocomplete error:', error)
                 }}
               />
             ) : (
@@ -173,7 +174,7 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border || 'rgba(0,0,0,0.1)',
+    borderBottomColor: theme.colors.border,
   },
   cancelButton: {
     paddingVertical: theme.spacing.xs,
@@ -186,7 +187,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -216,7 +217,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
     height: hp(5.5),
     borderWidth: 1,
-    borderColor: theme.colors.border || 'rgba(0,0,0,0.1)',
+    borderColor: theme.colors.border,
   },
   listView: {
     backgroundColor: theme.colors.background,
@@ -228,7 +229,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.border || 'rgba(0,0,0,0.1)',
+    backgroundColor: theme.colors.border,
     marginLeft: wp(12), // Align with text (icon + margin)
   },
   description: {
@@ -256,7 +257,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   rowTitle: {
     fontSize: theme.typography.sizes.base,
-    fontWeight: theme.typography.weights.medium,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -277,7 +278,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
     color: theme.colors.textPrimary,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     textAlign: 'center',
   },
   missingKeyText: {

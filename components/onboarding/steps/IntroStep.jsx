@@ -84,7 +84,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(5),
-    fontWeight: '800',
+    fontFamily: theme.typography?.fontFamily?.extrabold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     marginBottom: hp(2),
@@ -98,7 +98,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   subtitle: {
     fontSize: hp(2.8),
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     fontFamily: theme.typography.fontFamily.heading,
@@ -119,7 +119,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   timeText: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
   },

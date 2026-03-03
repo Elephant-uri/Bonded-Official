@@ -234,7 +234,7 @@ const createStyles = (theme) => StyleSheet.create({
   skipText: {
     fontSize: hp(2),
     color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold,
     fontFamily: theme.typography.fontFamily.body,
   },
   slide: {
@@ -264,7 +264,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(4.5),
-    fontWeight: '800',
+    fontFamily: theme.typography?.fontFamily?.extrabold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     marginBottom: hp(3),

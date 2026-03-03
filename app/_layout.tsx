@@ -1,9 +1,17 @@
 import { Ionicons } from '@expo/vector-icons'
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from '@expo-google-fonts/inter'
 import * as Sentry from '@sentry/react-native'
 import Constants from 'expo-constants'
+import { useFonts } from 'expo-font'
 import { Stack, usePathname, useRouter } from 'expo-router'
 import React, { useEffect, useRef, useState } from 'react'
-import { Dimensions, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { AppState, Dimensions, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { DrawerLayout, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Loading from '../components/Loading'
 import { OnboardingNudge } from '../components/OnboardingNudge'
@@ -25,10 +33,10 @@ import QueryProvider from '../providers/QueryProvider'
 import { useAuthStore } from '../stores/authStore'
 import { useOnboardingStore } from '../stores/onboardingStore'
 import { isFeatureEnabled } from '../utils/featureGates'
+import { flushAnalytics, trackScreen } from '../utils/analytics'
+import { Logger, silenceConsoleInProduction } from '../utils/logger'
 import { ThemeProvider, useAppTheme } from './theme'
 
-// Only initialize Sentry on native platforms (iOS/Android)
-// Web SSR doesn't have access to browser APIs during server-side rendering
 if (Platform.OS !== 'web') {
   const sentryDsn = process.env.SENTRY_DSN || process.env.EXPO_PUBLIC_SENTRY_DSN;
   const environment = process.env.EXPO_PUBLIC_APP_ENV
@@ -42,9 +50,14 @@ if (Platform.OS !== 'web') {
       debug: __DEV__,
       environment,
       release,
+      tracesSampleRate: __DEV__ ? 1.0 : 0.2,
+      enableAutoSessionTracking: true,
+      attachScreenshot: true,
     });
   }
 }
+
+silenceConsoleInProduction();
 
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -73,8 +86,7 @@ const DrawerItem = ({ icon, label, onPress }: { icon: string; label: string; onP
         style={{
           fontSize: hp(1.8),
           color: theme.colors.textPrimary,
-          fontFamily: theme.typography.fontFamily.body,
-          fontWeight: '500',
+          fontFamily: theme.typography.fontFamily.medium,
         }}
       >
         {label}
@@ -146,7 +158,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
 
     // Group 2: Science, Math & Engineering
     if (code.startsWith('MAT') || code.startsWith('MTH') || code.startsWith('PHY') || code.startsWith('CHM') || code.startsWith('STA') || code.startsWith('ENGR') || code.startsWith('EGR')) {
-      return { name: 'flask-outline', color: '#10B981', label: 'STEM' }
+      return { name: 'flask-outline', color: theme.colors.success, label: 'STEM' }
     }
 
     // Group 3: Business, Economics & Finance
@@ -161,12 +173,12 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
 
     // Group 5: Biological & Health Sciences
     if (code.startsWith('BIO') || code.startsWith('NUR') || code.startsWith('KIN') || code.startsWith('HSC') || code.startsWith('MED') || code.startsWith('PHM')) {
-      return { name: 'medical-outline', color: '#EF4444', label: 'BIO' }
+      return { name: 'medical-outline', color: theme.colors.destructive, label: 'BIO' }
     }
 
     // Group 6: Social Sciences & Communication
     if (code.startsWith('PSY') || code.startsWith('SOC') || code.startsWith('POL') || code.startsWith('COM') || code.startsWith('LAW') || code.startsWith('EDU')) {
-      return { name: 'people-outline', color: '#8B5CF6', label: 'SOC' }
+      return { name: 'people-outline', color: '#7C3AED', label: 'SOC' }
     }
 
     // Default: General School
@@ -252,7 +264,6 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   <Text
                     style={{
                       fontSize: hp(4),
-                      fontWeight: '800',
                       color: theme.colors.textPrimary,
                       fontFamily: theme.typography.fontFamily.heading,
                     }}
@@ -269,7 +280,6 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
             <Text
               style={{
                 fontSize: hp(2.2),
-                fontWeight: '700',
                 color: theme.colors.textPrimary,
                 fontFamily: theme.typography.fontFamily.heading,
                 marginRight: wp(1),
@@ -334,7 +344,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
         >
           <TouchableOpacity activeOpacity={0.7}>
             <Text style={{ fontSize: hp(1.4), color: theme.colors.textSecondary, fontFamily: theme.typography.fontFamily.body }}>
-              <Text style={{ color: '#70B5F9', fontWeight: '600' }}>{userProfile.profileViewers}</Text> profile viewers
+              <Text style={{ color: '#70B5F9', fontFamily: theme.typography.fontFamily.semibold }}>{userProfile.profileViewers}</Text> profile viewers
             </Text>
           </TouchableOpacity>
         </View>
@@ -352,9 +362,8 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
             <Text
               style={{
                 fontSize: hp(1.6),
-                fontWeight: '600',
                 color: theme.colors.textPrimary,
-                fontFamily: theme.typography.fontFamily.body,
+                fontFamily: theme.typography.fontFamily.semibold,
                 marginBottom: hp(1.5),
               }}
             >
@@ -449,9 +458,8 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
           <Text
             style={{
               fontSize: hp(1.6),
-              fontWeight: '600',
               color: theme.colors.textPrimary,
-              fontFamily: theme.typography.fontFamily.body,
+              fontFamily: theme.typography.fontFamily.semibold,
               marginBottom: hp(1.5),
             }}
           >
@@ -506,8 +514,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               style={{
                 fontSize: hp(1.8),
                 color: theme.colors.textPrimary,
-                fontFamily: theme.typography.fontFamily.body,
-                fontWeight: '600',
+                fontFamily: theme.typography.fontFamily.semibold,
               }}
             >
               {campusForumLabel}
@@ -550,8 +557,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 style={{
                   fontSize: hp(1.8),
                   color: theme.colors.textPrimary,
-                  fontFamily: theme.typography.fontFamily.body,
-                  fontWeight: '500',
+                  fontFamily: theme.typography.fontFamily.medium,
                 }}
               >
                 Your classes
@@ -610,8 +616,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                     style={{
                       fontSize: hp(1.5),
                       color: theme.colors.textPrimary,
-                      fontFamily: theme.typography.fontFamily.body,
-                      fontWeight: '500',
+                      fontFamily: theme.typography.fontFamily.medium,
                     }}
                     numberOfLines={1}
                   >
@@ -685,8 +690,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 style={{
                   fontSize: hp(1.8),
                   color: theme.colors.textPrimary,
-                  fontFamily: theme.typography.fontFamily.body,
-                  fontWeight: '500',
+                  fontFamily: theme.typography.fontFamily.medium,
                 }}
               >
                 Public forums
@@ -760,7 +764,6 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                         fontSize: hp(1.6),
                         color: theme.colors.bondedPurple,
                         fontFamily: theme.typography.fontFamily.heading,
-                        fontWeight: '700',
                       }}
                     >
                       {forum.name?.charAt(0).toUpperCase() || 'F'}
@@ -771,8 +774,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                   style={{
                     fontSize: hp(1.6),
                     color: theme.colors.textPrimary,
-                    fontFamily: theme.typography.fontFamily.body,
-                    fontWeight: '500',
+                    fontFamily: theme.typography.fontFamily.medium,
                     flex: 1,
                   }}
                   numberOfLines={1}
@@ -819,8 +821,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 style={{
                   fontSize: hp(1.8),
                   color: theme.colors.textPrimary,
-                  fontFamily: theme.typography.fontFamily.body,
-                  fontWeight: '500',
+                  fontFamily: theme.typography.fontFamily.medium,
                 }}
               >
                 Private forums
@@ -893,7 +894,6 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                           fontSize: hp(1.6),
                           color: theme.colors.bondedPurple,
                           fontFamily: theme.typography.fontFamily.heading,
-                          fontWeight: '700',
                         }}
                       >
                         {forum.name?.charAt(0).toUpperCase() || 'P'}
@@ -989,8 +989,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                 style={{
                   fontSize: hp(1.4),
                   color: theme.colors.textSecondary,
-                  fontFamily: theme.typography.fontFamily.body,
-                  fontWeight: '600',
+                  fontFamily: theme.typography.fontFamily.semibold,
                   marginBottom: hp(1),
                   letterSpacing: 0.3,
                 }}
@@ -1044,7 +1043,6 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                             fontSize: hp(1.8),
                             color: theme.colors.accent,
                             fontFamily: theme.typography.fontFamily.heading,
-                            fontWeight: '700',
                           }}
                         >
                           {club.name.charAt(0).toUpperCase()}
@@ -1055,8 +1053,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
                       style={{
                         fontSize: hp(1.6),
                         color: theme.colors.textPrimary,
-                        fontFamily: theme.typography.fontFamily.body,
-                        fontWeight: '500',
+                        fontFamily: theme.typography.fontFamily.medium,
                         flex: 1,
                       }}
                     >
@@ -1107,8 +1104,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               style={{
                 fontSize: hp(1.6),
                 color: theme.colors.bondedPurple,
-                fontFamily: theme.typography.fontFamily.body,
-                fontWeight: '600',
+                fontFamily: theme.typography.fontFamily.semibold,
               }}
             >
               Create organization
@@ -1194,8 +1190,7 @@ const DrawerContent = ({ onNavigate }: { onNavigate: (path: string) => void }) =
               style={{
                 fontSize: hp(1.8),
                 color: theme.colors.textPrimary,
-                fontFamily: theme.typography.fontFamily.body,
-                fontWeight: '500',
+                fontFamily: theme.typography.fontFamily.medium,
               }}
             >
               Settings
@@ -1213,10 +1208,33 @@ const RootLayout = () => {
   const drawerRef = useRef<DrawerLayout | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showContent, setShowContent] = useState(false)
+
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+  })
   const { user, isAuthenticated, setUser, setSession, logout } = useAuthStore()
   const { setUserId: setOnboardingUserId, clearUserId: clearOnboardingUserId } = useOnboardingStore()
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const initialCheckCompleteRef = useRef(false)
+  const pathnameRef = useRef(pathname)
+
+  useEffect(() => {
+    pathnameRef.current = pathname
+    trackScreen(pathname)
+  }, [pathname])
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        flushAnalytics();
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // Routes where drawer should be DISABLED (auth, onboarding, welcome)
   const drawerDisabledRoutes = [
@@ -1241,8 +1259,7 @@ const RootLayout = () => {
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
-          console.error('❌ Error checking session:', error)
-          // Clear auth state if there's an error
+          Logger.error('Error checking session:', error)
           await logout()
           await supabase.auth.signOut()
           setIsCheckingSession(false)
@@ -1252,20 +1269,20 @@ const RootLayout = () => {
 
         if (session?.user) {
           // Valid session exists - sync with authStore
-          console.log('✅ Valid session found, syncing auth state')
+          Logger.info('Valid session found, syncing auth state')
           setUser(session.user)
           setSession(session)
           // Sync onboarding store with user ID
           setOnboardingUserId(session.user.id)
         } else {
           // No valid session - clear auth state IMMEDIATELY
-          console.log('ℹ️ No valid session found, clearing auth state')
+          Logger.info('No valid session found, clearing auth state')
           await logout()
           clearOnboardingUserId()
           // Avoid signOut when there's no active session to prevent extra auth churn
         }
       } catch (error) {
-        console.error('❌ Error in checkSession:', error)
+        Logger.error('Error in checkSession:', error)
         await logout()
         // Avoid signOut here; we already cleared local auth state
       } finally {
@@ -1282,11 +1299,24 @@ const RootLayout = () => {
     // IMPORTANT: Only update auth state if we've completed the initial session check
     // This prevents race conditions where the listener fires before we've cleared stale state
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔔 Auth state changed:', event, session?.user?.email, 'initialCheckComplete:', initialCheckCompleteRef.current)
+      Logger.debug('Auth state changed:', event, session?.user?.email)
 
       // Don't process auth changes until initial check is complete
       if (!initialCheckCompleteRef.current) {
-        console.log('⏳ Skipping auth state change - initial check not complete')
+        Logger.debug('Skipping auth state change - initial check not complete')
+        return
+      }
+
+      // Don't process auth changes while user is on auth-related routes
+      // This prevents token refresh from redirecting user away from login/OTP flow
+      const authRoutes = ['/', '/index', '/welcome', '/login', '/otp', '/onboarding', '/auth/callback']
+      const currentPath = pathnameRef.current || ''
+      const isOnAuthRoute = authRoutes.some(route => currentPath === route || currentPath.startsWith('/auth'))
+
+      // Skip token refresh and auto-signin events while on auth routes
+      // to prevent interrupting the login/OTP flow
+      if (isOnAuthRoute && (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN')) {
+        Logger.debug(`Skipping ${event} event while on auth route:`, currentPath)
         return
       }
 
@@ -1299,7 +1329,7 @@ const RootLayout = () => {
         // User signed out or session expired
         // Note: logout() is async but we can't await in this callback
         // The async operation will complete in the background
-        logout().catch(err => console.error('Error in logout:', err))
+        logout().catch(err => Logger.error('Error in logout:', err))
         clearOnboardingUserId()
       }
     })
@@ -1312,44 +1342,16 @@ const RootLayout = () => {
   useEffect(() => {
     const preloadResources = async () => {
       try {
-        // Preload all background images used across the app
-        const backgroundImages = [
-          require('../assets/images/bonded-gradient.jpg'),
-          require('../assets/images/bonded-gradient2.jpg'),
-        ]
-
-        // Preload all background images in parallel
-        const preloadPromises = backgroundImages.map(async (image) => {
-          try {
-            const imageUri = Image.resolveAssetSource(image).uri
-            await Image.prefetch(imageUri)
-            console.log('✅ Preloaded background image:', imageUri)
-            return true
-          } catch (error) {
-            console.warn('⚠️ Failed to preload image:', error)
-            return false
-          }
-        })
-
-        // Wait for all images to preload
-        await Promise.all(preloadPromises)
-
-        // Also preload the logo used in loading animation
-        const logoImage = require('../assets/images/transparent-bonded.png')
-        const logoUri = Image.resolveAssetSource(logoImage).uri
-        await Image.prefetch(logoUri)
-
-        // Give time for other resources to load
-        await new Promise((resolve) => setTimeout(resolve, 500)) // Minimum loading time
+        const { Image: ExpoImage } = require('expo-image');
+        await ExpoImage.prefetch([
+          Image.resolveAssetSource(require('../assets/images/bonded-gradient.jpg')).uri,
+          Image.resolveAssetSource(require('../assets/images/bonded-gradient2.jpg')).uri,
+          Image.resolveAssetSource(require('../assets/images/transparent-bonded.png')).uri,
+        ]);
       } catch (error) {
-        console.log('Error preloading resources:', error)
-        // Continue even if preload fails
+        Logger.warn('Image prefetch failed:', error)
       } finally {
-        // Start fade out animation, then hide after fade completes
-        setTimeout(() => {
-          // Trigger fade out
-          setIsLoading(false)
-        }, 1500) // Start fade after 1.5 seconds
+        setTimeout(() => setIsLoading(false), 600)
       }
     }
 
@@ -1364,11 +1366,11 @@ const RootLayout = () => {
     }
   }
 
-  // Show loading screen while resources load OR while checking session
-  if (!showContent || isCheckingSession) {
+  // Show loading screen while resources/fonts load OR while checking session
+  if (!showContent || isCheckingSession || !fontsLoaded) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <ThemeProvider>
+        <ThemeProvider routePath={pathname}>
           <Loading
             size={80}
             duration={1200}
@@ -1403,15 +1405,13 @@ const RootLayout = () => {
     drawerRef.current = null
 
     // Debug logging
-    if (__DEV__) {
-      console.log('🚫 Drawer disabled - isAuthenticated:', isAuthenticated, 'hasValidUser:', hasValidUser, 'isCheckingSession:', isCheckingSession, 'isDrawerDisabledRoute:', isDrawerDisabledRoute, 'pathname:', pathname, 'user:', user)
-    }
+    Logger.debug('Drawer disabled - isAuthenticated:', isAuthenticated, 'hasValidUser:', hasValidUser, 'isDrawerDisabledRoute:', isDrawerDisabledRoute)
 
     // NO DrawerLayout rendered - drawer is completely inaccessible
     // Using a plain View wrapper instead of GestureHandlerRootView to prevent any gesture handling
     return (
       <View style={{ flex: 1 }}>
-        <ThemeProvider>
+        <ThemeProvider routePath={pathname}>
           <QueryProvider>
             <ProfileModalProvider>
               <Stack
@@ -1430,9 +1430,7 @@ const RootLayout = () => {
   }
 
   // Debug logging when drawer should be shown
-  if (__DEV__) {
-    console.log('✅ Drawer enabled - isAuthenticated:', isAuthenticated, 'hasValidUser:', hasValidUser, 'isCheckingSession:', isCheckingSession, 'isDrawerDisabledRoute:', isDrawerDisabledRoute, 'pathname:', pathname)
-  }
+  Logger.debug('Drawer enabled - isAuthenticated:', isAuthenticated, 'hasValidUser:', hasValidUser, 'isDrawerDisabledRoute:', isDrawerDisabledRoute)
 
   // User is authenticated - render full app with providers and drawer
   // DrawerLayout is ONLY rendered when authenticated AND session check is complete
@@ -1441,7 +1439,7 @@ const RootLayout = () => {
     // Fallback safety check - should never reach here, but just in case
     return (
       <View style={{ flex: 1 }}>
-        <ThemeProvider>
+        <ThemeProvider routePath={pathname}>
           <QueryProvider>
             <ProfileModalProvider>
               <Stack
@@ -1461,7 +1459,7 @@ const RootLayout = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
+      <ThemeProvider routePath={pathname}>
         <QueryProvider>
           <EventsPrefetcher />
           <StoriesProvider>

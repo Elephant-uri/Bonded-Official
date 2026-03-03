@@ -19,7 +19,11 @@
       "mcp__supabase__list_migrations",
       "Bash(git commit:*)",
       "Bash(psql:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(curl:*)",
+      "Bash(git init:*)",
+      "mcp__supabase__get_advisors",
+      "mcp__supabase__list_edge_functions"
     ],
     "deny": [],
     "ask": []

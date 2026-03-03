@@ -1,68 +1,97 @@
-import { Pressable, StyleSheet, Text } from 'react-native'
+import React from 'react'
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text } from 'react-native'
 import { useAppTheme } from '../app/theme'
-import { hp, wp } from '../helpers/common'
+import { usePressScale } from '../utils/animations'
 
+/**
+ * MergeFund Design System — Primary Button
+ *
+ * Variants:
+ *   "primary"     — Brand purple bg, white text, pill
+ *   "linear"      — Foreground bg, background text, pill (high-contrast)
+ *   "secondary"   — Transparent bg, 1px border, pill
+ *   "ghost"       — No bg, no border, rounded
+ *   "destructive" — Red bg, white text, pill
+ */
 const Button = ({
-    buttonStyle,
-    textStyle,
-    title = '',
-    onPress = () => {},
-    loading = false,
-    hasShadow = true,
-    disabled = false,
-    theme: customTheme, // Optional theme override (for onboarding) - when provided, completely bypasses app theme
+  title = '',
+  onPress = () => {},
+  variant = 'primary',
+  loading = false,
+  disabled = false,
+  buttonStyle,
+  textStyle,
+  hasShadow = false,
+  theme: customTheme,
 }) => {
-  // Always call hook (React rules), but ignore if customTheme provided
   const appTheme = useAppTheme()
-  const theme = customTheme || appTheme // Use custom theme if provided, otherwise use app theme
+  const theme = customTheme || appTheme
+  const { scaleStyle, onPressIn, onPressOut } = usePressScale(
+    theme.motion.pressScale,
+    theme.motion.duration.fast
+  )
 
-  // Debug: Log when using custom theme (remove after testing)
-  if (customTheme && __DEV__) {
-    console.log('Button using ONBOARDING_THEME:', {
-      backgroundColor: theme.colors.bondedPurple,
-      textColor: theme.colors.white
-    })
-  }
+  const variantStyle = theme.buttonVariants?.[variant] || theme.buttonVariants?.primary || {}
 
-  const styles = createStyles(theme)
-
-  // Handle shadows - use custom theme shadows first, then app theme, then empty
-  const shadowStyle = hasShadow ? (theme.shadows?.md || (!customTheme && appTheme?.shadows?.md) || {}) : {}
-
-  // Handle press with disabled check
-  const handlePress = () => {
-    if (!disabled && !loading) {
-      onPress()
+  const textColor = (() => {
+    switch (variant) {
+      case 'primary':
+      case 'destructive':
+        return '#FFFFFF'
+      case 'linear':
+        return theme.colors.background
+      case 'secondary':
+      case 'ghost':
+      default:
+        return theme.colors.textPrimary
     }
-  }
+  })()
 
-  // buttonStyle comes last to ensure it overrides default styles
   return (
-    <Pressable
-      onPress={handlePress}
-      disabled={disabled || loading}
-      style={[styles.button, shadowStyle, buttonStyle]}
-    >
-      <Text style={[styles.text, textStyle]}>{title}</Text>
-    </Pressable>
+    <Animated.View style={[scaleStyle, buttonStyle]}>
+      <Pressable
+        onPress={disabled || loading ? undefined : onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={disabled || loading}
+        style={[
+          styles.base,
+          variantStyle,
+          hasShadow && theme.shadows?.sm,
+          disabled && styles.disabled,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={textColor} size="small" />
+        ) : (
+          <Text
+            style={[
+              styles.text,
+              { color: textColor, fontFamily: theme.typography.fontFamily.semibold },
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
+        )}
+      </Pressable>
+    </Animated.View>
   )
 }
 
 export default Button
 
-const createStyles = (theme) => StyleSheet.create({
-    button: {
-        backgroundColor: theme.colors.bondedPurple,
-        paddingVertical: hp(2),
-        paddingHorizontal: wp(6),
-        borderRadius: theme.radius.full,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    text: {
-        color: theme.colors.white,
-        fontSize: hp(2),
-        fontWeight: '600',
-        fontFamily: theme.typography.fontFamily.heading,
-    },
+const styles = StyleSheet.create({
+  base: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  text: {
+    fontSize: 15,
+    letterSpacing: -0.1,
+  },
+  disabled: {
+    opacity: 0.45,
+  },
 })

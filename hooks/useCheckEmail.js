@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to check if an email exists in the database
@@ -50,7 +51,7 @@ export const useCheckEmail = (email) => {
           verificationStatus: data.is_verified ? 'verified' : 'unverified',
         }
       } catch (error) {
-        console.error('Error checking email:', error)
+        Logger.error('Error checking email:', error)
         throw error
       }
     },

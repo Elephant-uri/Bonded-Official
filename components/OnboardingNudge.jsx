@@ -110,7 +110,7 @@ function OnboardingNudge() {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: wp(5),
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: hp(2.2),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     marginTop: hp(1),
     textAlign: 'center',
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
 })
 

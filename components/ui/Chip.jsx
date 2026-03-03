@@ -40,7 +40,7 @@ export default function Chip({
           {
             fontSize: chip.textSize,
             color,
-            fontWeight: '600',
+            fontFamily: theme.typography.fontFamily.semibold,
           },
           textStyle,
         ]}

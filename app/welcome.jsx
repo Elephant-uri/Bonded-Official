@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Animated, Easing, ImageBackground, StyleSheet, Text, useColorScheme, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native'
 import AnimatedLogo from '../components/AnimatedLogo'
 import Button from '../components/Button'
+import CachedImageBackground from '../components/CachedImageBackground'
 import ScreenWrapper from '../components/ScreenWrapper'
 import { hp, wp } from '../helpers/common'
-import { useAppTheme, useThemeMode } from './theme'
+import { useAppTheme } from './theme'
 
 const phrases = [
   'New friends.',
@@ -24,17 +25,6 @@ const welcome = () => {
   const phraseAnim = useRef(new Animated.Value(1)).current
   const [phraseIndex, setPhraseIndex] = useState(0)
   const router = useRouter()
-  const { setMode } = useThemeMode()
-  const systemScheme = useColorScheme() || 'light'
-
-  // Force light mode while welcome screen is displayed, then restore system preference
-  // Use useLayoutEffect to ensure theme changes BEFORE render
-  useLayoutEffect(() => {
-    setMode('light')
-    return () => {
-      setMode(systemScheme)
-    }
-  }, [setMode, systemScheme])
 
   useEffect(() => {
     const hoverAnimation = Animated.loop(
@@ -87,10 +77,9 @@ const welcome = () => {
   })
 
   return (
-    <ImageBackground
+    <CachedImageBackground
       source={require('../assets/images/bonded-gradient.jpg')}
       style={styles.background}
-      resizeMode='cover'
     >
       <ScreenWrapper bg='transparent' >
         <StatusBar style='light' />
@@ -135,7 +124,7 @@ const welcome = () => {
         </View>
 
       </ScreenWrapper>
-    </ImageBackground>
+    </CachedImageBackground>
   )
 }
 
@@ -163,18 +152,16 @@ const createStyles = (theme) => StyleSheet.create({
   title: {
     color: theme.colors.textPrimary,
     fontSize: hp(5),
-    fontWeight: '800',
     textAlign: 'center',
     letterSpacing: -0.5,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.extrabold,
   },
   punchline: {
     textAlign: 'center',
     fontSize: hp(3),
     paddingHorizontal: wp(4),
-    fontWeight: '500',
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   metricsPill: {
     flexDirection: 'row',
@@ -195,9 +182,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   metricsFigure: {
     fontSize: hp(2.2),
-    fontWeight: '800',
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.extrabold,
   },
   metricsLabel: {
     fontSize: hp(1.8),

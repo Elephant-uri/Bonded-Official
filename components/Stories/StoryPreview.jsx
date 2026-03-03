@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Image as ExpoImage } from 'expo-image'
 import { hp, wp } from '../../helpers/common'
 import { useAppTheme } from '../../app/theme'
+import { Logger } from '../../utils/logger'
 
 export default function StoryPreview({
   visible,
@@ -37,7 +38,7 @@ export default function StoryPreview({
     try {
       await onPost()
     } catch (error) {
-      console.log('Post error:', error)
+      Logger.info('Post error:', error)
     } finally {
       setIsPosting(false)
     }
@@ -63,7 +64,7 @@ export default function StoryPreview({
         {/* Preview Canvas */}
         <View style={styles.preview}>
           <LinearGradient
-            colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.55)']}
+            colors={['rgba(0,0,0,0.55)', theme.colors.borderSecondary, 'rgba(0,0,0,0.55)']}
             style={styles.previewGradient}
             locations={[0, 0.5, 1]}
           />
@@ -178,7 +179,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   headerButton: {
     width: hp(3),
@@ -190,7 +191,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.9),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   headerSubtitle: {
     fontSize: hp(1.4),
@@ -223,7 +224,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   textElementText: {
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   stickerElement: {
     position: 'absolute',
@@ -231,7 +232,7 @@ const createStyles = (theme) => StyleSheet.create({
   footer: {
     paddingHorizontal: wp(6),
     paddingVertical: hp(2),
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   postButton: {
     flexDirection: 'row',
@@ -248,7 +249,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.9),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   videoPlaceholder: {
     color: theme.colors.white,

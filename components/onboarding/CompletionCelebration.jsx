@@ -142,7 +142,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(5),
-    fontWeight: '800',
+    fontFamily: theme.typography?.fontFamily?.extrabold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     marginBottom: hp(1.5),
@@ -151,7 +151,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   subtitle: {
     fontSize: hp(2.5),
-    fontWeight: '500',
+    fontFamily: theme.typography?.fontFamily?.medium,
     color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: hp(6),

@@ -1,13 +1,12 @@
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Alert, ImageBackground, StyleSheet, Text, useColorScheme, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, StyleSheet, Text, View } from 'react-native'
+import CachedImageBackground from '../components/CachedImageBackground'
 import ScreenWrapper from '../components/ScreenWrapper'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useSaveOnboarding } from '../hooks/useSaveOnboarding'
 import { getActiveOnboardingSteps, ONBOARDING_STEPS, STEP_METADATA, useOnboardingStore } from '../stores/onboardingStore'
-import { useThemeMode } from './theme'
-// Onboarding always uses light mode - don't use dynamic theme
 import BackButton from '../components/BackButton'
 import OnboardingCarousel from '../components/onboarding/OnboardingCarousel'
 import OnboardingNavigation from '../components/onboarding/OnboardingNavigation'
@@ -22,15 +21,14 @@ import { ONBOARDING_THEME } from '../constants/onboardingTheme'
 import { hp, wp } from '../helpers/common'
 import { useAuthStore } from '../stores/authStore'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
+import { Logger } from '../utils/logger'
 
 export default function Onboarding() {
   const styles = createStyles(ONBOARDING_THEME)
   const router = useRouter()
   const log = (...args) => {
-    if (__DEV__) console.log(...args)
+    Logger.info(...args)
   }
-  const { setMode } = useThemeMode()
-  const systemScheme = useColorScheme() || 'light'
   const { user } = useAuthStore()
   const { data: profile } = useCurrentUserProfile()
   const {
@@ -68,15 +66,6 @@ export default function Onboarding() {
       }
     }
   }, [user?.id, profile, hasSynced, setUserId, syncFromProfile, getNextIncompleteStep, setCurrentStep])
-
-  // Force light mode while onboarding is displayed, then restore system preference
-  // Use useLayoutEffect to ensure theme changes BEFORE render
-  useLayoutEffect(() => {
-    setMode('light')
-    return () => {
-      setMode(systemScheme)
-    }
-  }, [setMode, systemScheme])
 
   // Auto-save when form data changes (debounced) - save partial data always
   useEffect(() => {
@@ -122,7 +111,7 @@ export default function Onboarding() {
           }
         },
         onError: (error) => {
-          console.error('❌ Failed to save onboarding progress:', error)
+          Logger.error('Failed to save onboarding progress:', error)
           if (error.code === 'USERNAME_TAKEN') {
             Alert.alert('Username Taken', getFriendlyErrorMessage(error, 'This username is already taken.'))
           }
@@ -149,7 +138,7 @@ export default function Onboarding() {
                 resolve(data)
               },
               onError: (error) => {
-                console.error('Error uploading photos:', error)
+                Logger.error('Error uploading photos:', error)
                 reject(error)
               },
             }
@@ -165,7 +154,7 @@ export default function Onboarding() {
           )
         }
       } catch (error) {
-        console.error('Failed to upload photos:', error)
+        Logger.error('Failed to upload photos:', error)
         // Show user-friendly error and allow them to continue
         Alert.alert(
           'Photo Upload Failed',
@@ -319,41 +308,36 @@ export default function Onboarding() {
   // Show celebration screen
   if (showCelebration) {
     return (
-      <ImageBackground
+      <CachedImageBackground
         source={require('../assets/images/bonded-gradient.jpg')}
         style={styles.background}
-        resizeMode='cover'
       >
         <ScreenWrapper bg='transparent'>
           <StatusBar style='light' />
           <OnboardingCarousel onContinue={handleCelebrationContinue} />
         </ScreenWrapper>
-      </ImageBackground>
+      </CachedImageBackground>
     )
   }
 
   return (
-    <ImageBackground
+    <CachedImageBackground
       source={require('../assets/images/bonded-gradient.jpg')}
       style={styles.background}
-      resizeMode='cover'
     >
       <ScreenWrapper bg='transparent'>
         <StatusBar style='light' />
         <BackButton onPress={handleBack} visible={!isScrollingDown} theme={ONBOARDING_THEME} />
 
-        {/* Step Progress at Top */}
         <View style={styles.stepProgressBar}>
           {renderStepPills()}
         </View>
 
         <View style={styles.container}>
-          {/* Step Content - Conditional rendering */}
           <View style={styles.stepContainer}>
             {renderStepContent()}
           </View>
 
-          {/* Navigation Buttons - Fixed at bottom */}
           <OnboardingNavigation
             isFirstStep={isFirstStep}
             canContinue={canContinue}
@@ -363,7 +347,7 @@ export default function Onboarding() {
           />
         </View>
       </ScreenWrapper>
-    </ImageBackground>
+    </CachedImageBackground>
   )
 }
 
@@ -398,9 +382,9 @@ const createStyles = () => StyleSheet.create({
     justifyContent: 'center',
   },
   stepPillActive: {
-    backgroundColor: '#A45CFF',
-    borderColor: '#A45CFF',
-    shadowColor: '#A45CFF',
+    backgroundColor: theme.colors.brand,
+    borderColor: theme.colors.brand,
+    shadowColor: theme.colors.brand,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -412,7 +396,7 @@ const createStyles = () => StyleSheet.create({
   },
   stepPillText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     fontSize: hp(1.4),
   },
   stepPillTextActive: {

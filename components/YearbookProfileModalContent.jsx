@@ -50,6 +50,7 @@ import { formatTimeAgo } from '../utils/dateFormatters'
 import { useSharedClasses } from '../hooks/useClassMatching'
 import { useProfileModal } from '../contexts/ProfileModalContext'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
+import { Logger } from '../utils/logger'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -183,7 +184,7 @@ const YearbookProfileModalContent = ({
         await sendMessageRequest.mutateAsync({ receiverId: activeProfile.id })
         Alert.alert('Request Sent', 'Your message request has been sent.')
       } catch (error) {
-        console.error('Failed to send message request:', error)
+        Logger.error('Failed to send message request:', error)
         Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send message request'))
       }
       return
@@ -218,7 +219,7 @@ const YearbookProfileModalContent = ({
         },
       })
     } catch (error) {
-      console.error('Error creating conversation:', error)
+      Logger.error('Error creating conversation:', error)
       Alert.alert('Error', 'Failed to start conversation. Please try again.')
     }
   }
@@ -243,7 +244,7 @@ const YearbookProfileModalContent = ({
         message: `Check out ${activeProfile.name} on Bonded.`,
       })
     } catch (error) {
-      console.warn('Share failed:', error)
+      Logger.warn('Share failed:', error)
     }
   }
 
@@ -764,7 +765,6 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   name: {
     fontSize: hp(3.2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.5),
@@ -817,9 +817,8 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   actionButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   actionButtonTextAccept: {
     color: theme.colors.white,
@@ -836,9 +835,8 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   actionButtonPrimaryText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   metaRow: {
     flexDirection: 'row',
@@ -858,8 +856,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   metaPillText: {
     fontSize: hp(1.4),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   locationRow: {
     flexDirection: 'row',
@@ -880,7 +877,6 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   postsTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1.5),
@@ -900,8 +896,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   postCardTitle: {
     fontSize: hp(1.6),
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: hp(0.6),
   },
   postCardMeta: {
@@ -911,7 +906,6 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   tagsTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1.5),
@@ -942,7 +936,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   tagTextShared: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   sharedHint: {
     fontSize: hp(1.3),
@@ -985,7 +979,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   friendAvatarText: {
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   friendName: {
@@ -996,7 +990,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   seeAllText: {
     fontSize: hp(1.4),
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   modalOverlay: {
     flex: 1,
@@ -1021,7 +1015,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   friendsModalTitle: {
     fontSize: hp(2),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   friendRow: {
@@ -1052,7 +1046,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
   },
   friendRowName: {
     fontSize: hp(1.7),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   friendRowMeta: {

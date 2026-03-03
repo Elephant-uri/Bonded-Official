@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to send 6-digit email OTP
@@ -14,7 +15,7 @@ export const useSendOTP = () => {
 
       const cleanEmail = email.toLowerCase().trim()
 
-      console.log('📧 Sending OTP to:', cleanEmail)
+      Logger.info('Sending OTP to:', cleanEmail)
 
       const { data, error } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
@@ -24,11 +25,11 @@ export const useSendOTP = () => {
       })
 
       if (error) {
-        console.error('❌ Error sending OTP:', error)
+        Logger.error('Error sending OTP:', error)
         throw error
       }
 
-      console.log('✅ OTP sent successfully to:', cleanEmail)
+      Logger.info('OTP sent successfully to:', cleanEmail)
       return data
     },
     retry: 1,

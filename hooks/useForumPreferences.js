@@ -6,6 +6,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Get user's forum preferences
@@ -25,7 +26,7 @@ export function useForumPreferences() {
         .single()
       
       if (error) {
-        console.error('Error fetching forum preferences:', error)
+        Logger.error('Error fetching forum preferences:', error)
         return {
           autoJoinCourseForums: true,
           autoJoinSectionChats: true

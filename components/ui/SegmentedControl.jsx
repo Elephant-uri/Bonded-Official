@@ -41,7 +41,7 @@ export default function SegmentedControl({ options = [], value, onChange, style 
               style={{
                 color: selected ? theme.colors.white : theme.colors.textSecondary,
                 fontSize: theme.typography.sizes.sm,
-                fontWeight: '600',
+                fontFamily: theme.typography.fontFamily.semibold,
               }}
             >
               {opt.label}

@@ -130,8 +130,8 @@ const createStyles = (theme) => StyleSheet.create({
   stepIndicator: {
     fontSize: hp(1.8),
     color: theme.colors.textSecondary,
-    fontFamily: 'System',
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
+    fontFamily: theme.typography?.fontFamily?.semibold,
   },
   badge: {
     paddingHorizontal: wp(3),
@@ -145,8 +145,8 @@ const createStyles = (theme) => StyleSheet.create({
   badgeText: {
     fontSize: hp(1.5),
     color: theme.colors.textSecondary,
-    fontWeight: '600',
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.semibold,
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
   },
   requiredBadgeText: {
     color: theme.colors.bondedPurple,
@@ -171,10 +171,10 @@ const createStyles = (theme) => StyleSheet.create({
   percentageText: {
     fontSize: hp(1.6),
     color: theme.colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold,
     minWidth: wp(10),
     textAlign: 'right',
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
   },
   valueProp: {
     fontSize: hp(1.7),
@@ -182,7 +182,7 @@ const createStyles = (theme) => StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     marginTop: hp(0.5),
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
   },
 })
 

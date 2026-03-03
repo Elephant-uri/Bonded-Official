@@ -1,7 +1,11 @@
 /**
  * Unsplash API Service
  * Fetches college-aged photos for yearbook demo
- * 
+ */
+
+import { Logger } from '../utils/logger'
+
+/**
  * Setup Instructions:
  * 1. Go to https://unsplash.com/developers
  * 2. Create a free account (if you don't have one)
@@ -20,9 +24,9 @@ const UNSPLASH_ACCESS_KEY = process.env.EXPO_PUBLIC_UNSPLASH_ACCESS_KEY || null
 
 // Debug: Log if key is found (remove in production)
 if (__DEV__) {
-  console.log('Unsplash API Key loaded:', UNSPLASH_ACCESS_KEY ? `Yes (${UNSPLASH_ACCESS_KEY.substring(0, 10)}...)` : 'No (using fallback)')
+  Logger.info('Unsplash API Key loaded:', UNSPLASH_ACCESS_KEY ? `Yes (${UNSPLASH_ACCESS_KEY.substring(0, 10)}...)` : 'No (using fallback)')
   if (UNSPLASH_ACCESS_KEY) {
-    console.log('Full key length:', UNSPLASH_ACCESS_KEY.length)
+    Logger.info('Full key length:', UNSPLASH_ACCESS_KEY.length)
   }
 }
 const UNSPLASH_API_URL = 'https://api.unsplash.com'
@@ -81,7 +85,7 @@ const SEARCH_TERMS = [
 export const fetchUnsplashPhoto = async (searchTerm = null, width = 400, height = 400) => {
   // If no API key is set, use fallback immediately
   if (!UNSPLASH_ACCESS_KEY || UNSPLASH_ACCESS_KEY === 'YOUR_UNSPLASH_ACCESS_KEY') {
-    console.log('⚠️ No Unsplash API key found, using fallback')
+    Logger.info('No Unsplash API key found, using fallback')
     return getFallbackPhoto()
   }
 
@@ -99,8 +103,8 @@ export const fetchUnsplashPhoto = async (searchTerm = null, width = 400, height 
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.warn(`❌ Unsplash API failed (${response.status}):`, errorText.substring(0, 200))
-      console.warn('API Key present:', UNSPLASH_ACCESS_KEY ? 'Yes' : 'No')
+      Logger.warn(`Unsplash API failed (${response.status}):`, errorText.substring(0, 200))
+      Logger.warn('API Key present:', UNSPLASH_ACCESS_KEY ? 'Yes' : 'No')
       return getFallbackPhoto()
     }
 
@@ -116,8 +120,8 @@ export const fetchUnsplashPhoto = async (searchTerm = null, width = 400, height 
     
     return imageUrl || getFallbackPhoto()
   } catch (error) {
-    console.error('❌ Error fetching Unsplash photo:', error.message)
-    console.error('Full error:', error)
+    Logger.error('Error fetching Unsplash photo:', error.message)
+    Logger.error('Full error:', error)
     return getFallbackPhoto()
   }
 }
@@ -130,13 +134,13 @@ export const fetchUnsplashPhoto = async (searchTerm = null, width = 400, height 
 export const fetchMultiplePhotos = async (count = 10) => {
   // Check cache first - if we have enough cached photos, return them
   if (photoCache.urls && photoCache.urls.length >= count) {
-    console.log(`✅ Using cached Unsplash photos (${photoCache.urls.length} available)`)
+    Logger.info(`Using cached Unsplash photos (${photoCache.urls.length} available)`)
     return photoCache.urls.slice(0, count)
   }
 
   // If no API key is set, use fallback immediately
   if (!UNSPLASH_ACCESS_KEY || UNSPLASH_ACCESS_KEY === 'YOUR_UNSPLASH_ACCESS_KEY') {
-    console.log('⚠️ No Unsplash API key found, using Picsum Photos fallback')
+    Logger.info('No Unsplash API key found, using Picsum Photos fallback')
     const fallbackUrls = Array.from({ length: count }, (_, i) => getPhotoUrl(400, 400, `batch-${i}`))
     // Cache fallback URLs too
     photoCache = {
@@ -154,7 +158,7 @@ export const fetchMultiplePhotos = async (count = 10) => {
   const allUrls = []
 
   try {
-    console.log(`📸 Fetching ${fetchCount} photos from Unsplash (in ${batches} batches)...`)
+    Logger.info(`Fetching ${fetchCount} photos from Unsplash (in ${batches} batches)...`)
     
     // Diverse search terms array - rotates through different terms to ensure diversity
     // Includes specific terms for black male engineering seniors
@@ -207,7 +211,7 @@ export const fetchMultiplePhotos = async (count = 10) => {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.warn(`❌ Unsplash API batch ${i + 1} failed:`, response.status, errorText.substring(0, 100))
+        Logger.warn(`Unsplash API batch ${i + 1} failed:`, response.status, errorText.substring(0, 100))
         // Fill this batch with fallback photos
         const fallbackUrls = Array.from({ length: batchSize }, (_, j) => 
           getPhotoUrl(400, 400, `batch-${i * MAX_PER_REQUEST + j}`)
@@ -233,10 +237,10 @@ export const fetchMultiplePhotos = async (count = 10) => {
       timestamp: Date.now(),
     }
 
-    console.log(`✅ Successfully fetched and cached ${allUrls.length} photos from Unsplash`)
+    Logger.info(`Successfully fetched and cached ${allUrls.length} photos from Unsplash`)
     return allUrls.slice(0, count) // Return only the requested count
   } catch (error) {
-    console.error('❌ Error fetching multiple Unsplash photos:', error.message)
+    Logger.error('Error fetching multiple Unsplash photos:', error.message)
     const fallbackUrls = Array.from({ length: count }, (_, i) => getPhotoUrl(400, 400, `batch-${i}`))
     // Cache fallback URLs
     photoCache = {
@@ -257,7 +261,7 @@ export const clearPhotoCache = () => {
     count: 0,
     timestamp: null,
   }
-  console.log('🗑️ Photo cache cleared')
+  Logger.info('Photo cache cleared')
 }
 
 /**

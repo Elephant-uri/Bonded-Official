@@ -25,6 +25,7 @@ import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 import { supabase } from '../../../lib/supabase'
 import { ComponentDraft, ComponentType, CourseDraft } from '../../../utils/schedule/parseSchedule'
+import { Logger } from '../../../utils/logger'
 
 // Import JavaScript hook with require for TypeScript compatibility
 const useCurrentUserProfile: () => { data: { university_id: string } | null } = require('../../../hooks/useCurrentUserProfile').useCurrentUserProfile
@@ -107,7 +108,7 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
 
         setCourseSearchResults(transformedData)
       } catch (error) {
-        console.error('Error searching courses:', error)
+        Logger.error('Error searching courses:', error)
         setCourseSearchResults([])
       } finally {
         setSearchLoading(false)
@@ -317,12 +318,12 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
                     value={course.sectionId}
                     onChangeText={(text) => updateCourse(courseIndex, { sectionId: text })}
                     placeholder="0001"
-                    placeholderTextColor="#BDBDBD"
+                    placeholderTextColor=theme.colors.textTertiary
                   />
                 </View>
               </View>
               <TouchableOpacity onPress={() => deleteCourse(courseIndex)} style={styles.deleteButton}>
-                <Ionicons name="trash-outline" size={hp(2.5)} color="#FF3B30" />
+                <Ionicons name="trash-outline" size={hp(2.5)} color=theme.colors.destructive />
               </TouchableOpacity>
             </View>
 
@@ -335,7 +336,7 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
                     onPress={() => deleteComponent(courseIndex, componentIndex)}
                     style={styles.deleteComponentButton}
                   >
-                    <Ionicons name="close-circle-outline" size={hp(2)} color="#FF3B30" />
+                    <Ionicons name="close-circle-outline" size={hp(2)} color=theme.colors.destructive />
                   </TouchableOpacity>
                 </View>
 
@@ -401,7 +402,7 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
                     value={component.location}
                     onChangeText={(text) => updateComponent(courseIndex, componentIndex, { location: text })}
                     placeholder="Building Room"
-                    placeholderTextColor="#BDBDBD"
+                    placeholderTextColor=theme.colors.textTertiary
                   />
                 </View>
               </View>
@@ -443,24 +444,24 @@ export default function ScheduleEditStep({ courses: initialCourses, onSave, onSc
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Search Courses</Text>
             <TouchableOpacity onPress={() => setShowCourseSearch(false)} style={styles.modalCloseButton}>
-              <Ionicons name="close" size={hp(3)} color="#333" />
+              <Ionicons name="close" size={hp(3)} color=theme.colors.textPrimary />
             </TouchableOpacity>
           </View>
 
           <View style={styles.searchInputContainer}>
-            <Ionicons name="search" size={hp(2.5)} color="#999" style={styles.searchIcon} />
+            <Ionicons name="search" size={hp(2.5)} color=theme.colors.textTertiary style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               value={courseSearchQuery}
               onChangeText={setCourseSearchQuery}
               placeholder="Search by course code (e.g., CSC 305)"
-              placeholderTextColor="#999"
+              placeholderTextColor=theme.colors.textTertiary
               autoFocus
               autoCapitalize="characters"
             />
             {courseSearchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setCourseSearchQuery('')}>
-                <Ionicons name="close-circle" size={hp(2.5)} color="#999" />
+                <Ionicons name="close-circle" size={hp(2.5)} color=theme.colors.textTertiary />
               </TouchableOpacity>
             )}
           </View>
@@ -576,13 +577,13 @@ const createStyles = (theme: any) =>
     },
     title: {
       fontSize: hp(3.2),
-      fontWeight: '800',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
+      color: theme.colors.textPrimary,
       marginBottom: hp(0.5),
     },
     subtitle: {
       fontSize: hp(1.7),
-      color: '#8E8E8E',
+      color: theme.colors.textSecondary,
       marginBottom: hp(2.5),
       lineHeight: hp(2.4),
     },
@@ -591,7 +592,7 @@ const createStyles = (theme: any) =>
       borderRadius: 16,
       padding: hp(2),
       marginBottom: hp(2),
-      shadowColor: '#A45CFF',
+      shadowColor: theme.colors.brand,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
       shadowRadius: 12,
@@ -622,13 +623,13 @@ const createStyles = (theme: any) =>
     },
     courseCodeText: {
       fontSize: hp(2),
-      fontWeight: '700',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
+      color: theme.colors.textPrimary,
       flex: 1,
     },
     courseCodePlaceholder: {
-      color: '#BDBDBD',
-      fontWeight: '500',
+      color: theme.colors.textTertiary,
+      fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     sectionRow: {
       flexDirection: 'row',
@@ -637,15 +638,15 @@ const createStyles = (theme: any) =>
     },
     sectionLabel: {
       fontSize: hp(1.5),
-      color: '#BDBDBD',
+      color: theme.colors.textTertiary,
       marginRight: wp(1),
     },
     sectionInput: {
       fontSize: hp(1.5),
-      color: '#8E8E8E',
+      color: theme.colors.textSecondary,
       padding: 0,
       minWidth: wp(15),
-      fontWeight: '500',
+      fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     deleteButton: {
       padding: hp(1),
@@ -669,7 +670,7 @@ const createStyles = (theme: any) =>
     },
     componentType: {
       fontSize: hp(1.7),
-      fontWeight: '700',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
       color: theme.colors.primary,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
@@ -683,8 +684,8 @@ const createStyles = (theme: any) =>
     },
     fieldLabel: {
       fontSize: hp(1.5),
-      fontWeight: '600',
-      color: '#666',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
+      color: theme.colors.textSecondary,
       marginBottom: hp(0.8),
       textTransform: 'uppercase',
       letterSpacing: 0.3,
@@ -698,7 +699,7 @@ const createStyles = (theme: any) =>
       paddingVertical: hp(1),
       paddingHorizontal: wp(3.5),
       borderRadius: 20,
-      backgroundColor: '#F8F8F8',
+      backgroundColor: theme.colors.backgroundSecondary,
       borderWidth: 1.5,
       borderColor: '#D0D0D0',
     },
@@ -714,11 +715,11 @@ const createStyles = (theme: any) =>
     dayChipText: {
       fontSize: hp(1.4),
       color: '#4A4A4A',
-      fontWeight: '700',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
     },
     dayChipTextSelected: {
       color: '#FFFFFF',
-      fontWeight: '700',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
     },
     timeRow: {
       flexDirection: 'row',
@@ -741,11 +742,11 @@ const createStyles = (theme: any) =>
     },
     timePickerText: {
       fontSize: hp(1.7),
-      color: '#333',
-      fontWeight: '500',
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     timePlaceholder: {
-      color: '#BDBDBD',
+      color: theme.colors.textTertiary,
     },
     textInput: {
       borderWidth: 1.5,
@@ -755,7 +756,7 @@ const createStyles = (theme: any) =>
       paddingHorizontal: wp(3),
       fontSize: hp(1.7),
       backgroundColor: '#FFFFFF',
-      color: '#333',
+      color: theme.colors.textPrimary,
     },
     addComponentContainer: {
       flexDirection: 'row',
@@ -766,9 +767,9 @@ const createStyles = (theme: any) =>
     },
     addComponentLabel: {
       fontSize: hp(1.4),
-      color: '#BDBDBD',
+      color: theme.colors.textTertiary,
       marginRight: wp(0.5),
-      fontWeight: '500',
+      fontFamily: theme.typography?.fontFamily?.medium || 'System',
     },
     addComponentChip: {
       flexDirection: 'row',
@@ -781,7 +782,7 @@ const createStyles = (theme: any) =>
     addComponentText: {
       fontSize: hp(1.3),
       color: theme.colors.primary,
-      fontWeight: '600',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
       marginLeft: wp(0.5),
     },
     addCourseButton: {
@@ -798,7 +799,7 @@ const createStyles = (theme: any) =>
     addCourseText: {
       fontSize: hp(1.7),
       color: theme.colors.bondedPurple,
-      fontWeight: '600',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
       marginLeft: wp(2),
     },
     saveButton: {
@@ -818,7 +819,7 @@ const createStyles = (theme: any) =>
     },
     saveButtonText: {
       fontSize: hp(2.2),
-      fontWeight: '800',
+      fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
       color: '#FFFFFF',
       letterSpacing: 0.5,
     },
@@ -835,12 +836,12 @@ const createStyles = (theme: any) =>
       paddingVertical: hp(2),
       backgroundColor: '#FFFFFF',
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
+      borderBottomColor: theme.colors.backgroundSecondary,
     },
     modalTitle: {
       fontSize: hp(2.2),
-      fontWeight: '700',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
+      color: theme.colors.textPrimary,
     },
     modalCloseButton: {
       padding: hp(0.5),
@@ -863,7 +864,7 @@ const createStyles = (theme: any) =>
       flex: 1,
       paddingVertical: hp(1.5),
       fontSize: hp(1.8),
-      color: '#333',
+      color: theme.colors.textPrimary,
     },
     loadingContainer: {
       flex: 1,
@@ -872,7 +873,7 @@ const createStyles = (theme: any) =>
     },
     loadingText: {
       fontSize: hp(1.7),
-      color: '#999',
+      color: theme.colors.textTertiary,
     },
     emptyContainer: {
       flex: 1,
@@ -882,13 +883,13 @@ const createStyles = (theme: any) =>
     },
     emptyText: {
       fontSize: hp(1.9),
-      fontWeight: '600',
-      color: '#666',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
+      color: theme.colors.textSecondary,
       marginTop: hp(2),
     },
     emptySubtext: {
       fontSize: hp(1.5),
-      color: '#999',
+      color: theme.colors.textTertiary,
       marginTop: hp(0.5),
     },
     searchResultsList: {
@@ -904,19 +905,19 @@ const createStyles = (theme: any) =>
       borderRadius: 12,
       marginBottom: hp(1),
       borderWidth: 1,
-      borderColor: '#F0F0F0',
+      borderColor: theme.colors.backgroundSecondary,
     },
     courseSearchItemContent: {
       flex: 1,
     },
     courseSearchCode: {
       fontSize: hp(1.9),
-      fontWeight: '700',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
+      color: theme.colors.textPrimary,
     },
     courseSearchSubject: {
       fontSize: hp(1.4),
-      color: '#999',
+      color: theme.colors.textTertiary,
       marginTop: hp(0.3),
     },
     manualEntryButton: {
@@ -932,13 +933,13 @@ const createStyles = (theme: any) =>
     },
     manualEntryText: {
       fontSize: hp(1.6),
-      fontWeight: '600',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
       color: theme.colors.primary,
     },
     // Time Picker Modal Styles
     timePickerOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      backgroundColor: theme.colors.overlayLight,
       justifyContent: 'flex-end',
       zIndex: 1000,
       elevation: 1000,
@@ -958,20 +959,20 @@ const createStyles = (theme: any) =>
       paddingHorizontal: wp(5),
       paddingVertical: hp(1.5),
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
+      borderBottomColor: theme.colors.backgroundSecondary,
     },
     timePickerTitle: {
       fontSize: hp(1.9),
-      fontWeight: '700',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
+      color: theme.colors.textPrimary,
     },
     timePickerCancel: {
       fontSize: hp(1.7),
-      color: '#999',
+      color: theme.colors.textTertiary,
     },
     timePickerDone: {
       fontSize: hp(1.7),
-      fontWeight: '600',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
       color: theme.colors.primary,
     },
   })

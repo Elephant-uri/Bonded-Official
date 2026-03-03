@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Image, Share, StyleSheet, TouchableOpacity, View } from 'react-native'
+import { Share, StyleSheet, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { useRouter } from 'expo-router'
 import { useAppTheme } from '../../app/theme'
 import { hp, wp } from '../../helpers/common'
@@ -12,6 +13,7 @@ import { Calendar, Heart, HeartFill, MapPin, Share2, Users, Settings } from '../
 import Button from '../ui/Button'
 import Text from '../ui/Text'
 import { formatDate, formatTime } from '../../utils/dateFormatters'
+import { Logger } from '../../utils/logger'
 
 export default function EventCard({ event, onPress, currentUserId, attendanceStatus, onAction, isLiked, onToggleLike }) {
   const theme = useAppTheme()
@@ -41,7 +43,7 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
         title: event.title,
       })
     } catch (error) {
-      console.log('Share error:', error)
+      Logger.info('Share error:', error)
     }
   }
 
@@ -92,7 +94,7 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
         >
         {/* Event Image - Clean, no text overlay */}
         {event.image_url ? (
-          <Image source={{ uri: event.image_url }} style={styles.image} resizeMode="cover" />
+          <CachedImage source={{ uri: event.image_url }} style={styles.image} />
         ) : (
           <View style={styles.imagePlaceholder}>
             <Calendar size={hp(4)} color={theme.colors.textSecondary} strokeWidth={2} />
@@ -121,7 +123,7 @@ export default function EventCard({ event, onPress, currentUserId, attendanceSta
                 activeOpacity={0.7}
               >
                 {isLiked ? (
-                  <HeartFill size={hp(2.2)} color="#FF3B30" strokeWidth={2} fill="#FF3B30" />
+                  <HeartFill size={hp(2.2)} color=theme.colors.destructive strokeWidth={2} fill=theme.colors.destructive />
                 ) : (
                   <Heart size={hp(2.2)} color={theme.colors.textSecondary} strokeWidth={2} />
                 )}
@@ -343,7 +345,7 @@ const createStyles = (theme) =>
     title: {
       fontSize: theme.typography.sizes.xl,
       fontFamily: theme.typography.fontFamily.heading,
-      fontWeight: '700',
+      fontFamily: theme.typography.fontFamily.bold,
       color: theme.colors.textPrimary,
       flex: 1,
       lineHeight: hp(2.6),
@@ -400,7 +402,7 @@ const createStyles = (theme) =>
     priceText: {
       fontSize: theme.typography.sizes.sm,
       fontFamily: theme.typography.fontFamily.body,
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.warning,
     },
     freeBadge: {
@@ -414,7 +416,7 @@ const createStyles = (theme) =>
     freeText: {
       fontSize: theme.typography.sizes.sm,
       fontFamily: theme.typography.fontFamily.body,
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.success,
     },
     attendeesBadge: {
@@ -429,7 +431,7 @@ const createStyles = (theme) =>
     attendeesText: {
       fontSize: theme.typography.sizes.sm,
       fontFamily: theme.typography.fontFamily.body,
-      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily.medium,
       color: theme.colors.textSecondary,
     },
     goingBadge: {
@@ -443,7 +445,7 @@ const createStyles = (theme) =>
     goingText: {
       fontSize: theme.typography.sizes.sm,
       fontFamily: theme.typography.fontFamily.body,
-      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.accent,
     },
     actionContainer: {
@@ -477,7 +479,7 @@ const createStyles = (theme) =>
     joinButtonText: {
       fontSize: theme.typography.sizes.md,
       fontFamily: theme.typography.fontFamily.body,
-      fontWeight: '700',
+      fontFamily: theme.typography.fontFamily.bold,
       textAlign: 'center',
     },
     joinButtonTextActive: {

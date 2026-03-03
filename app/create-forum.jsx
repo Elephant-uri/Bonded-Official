@@ -157,9 +157,8 @@ const createStyles = (theme) => StyleSheet.create({
     marginTop: hp(1.5),
     marginBottom: hp(1.5),
     fontSize: hp(2.4),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   inputGroup: {
     marginBottom: hp(1.8),
@@ -219,14 +218,12 @@ const createStyles = (theme) => StyleSheet.create({
   secondaryText: {
     fontSize: hp(1.8),
     color: theme.colors.bondedPurple,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   primaryText: {
     fontSize: hp(1.8),
     color: theme.colors.white,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
 })
 

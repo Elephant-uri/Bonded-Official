@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { Logger } from '../../utils/logger'
 import { isRlsRecursionError, logRlsFixHint } from '../../utils/rlsHelpers'
 
 /**
@@ -15,11 +16,11 @@ export function useEvent(eventId) {
     queryKey: ['event', normalizedId],
     queryFn: async () => {
       if (!normalizedId) {
-        console.warn('⚠️ useEvent - No eventId provided')
+        Logger.warn('useEvent - No eventId provided')
         throw new Error('Event ID is required')
       }
 
-      console.log('🔍 useEvent - Fetching event with ID:', normalizedId, 'type:', typeof normalizedId)
+      Logger.info('useEvent - Fetching event with ID:', normalizedId, 'type:', typeof normalizedId)
 
       // Try full query with attendance first
       // Must specify explicit FK name because there are multiple relationships (organizer_id and created_by)
@@ -48,7 +49,7 @@ export function useEvent(eventId) {
       // If RLS recursion error, fall back to simpler query without attendance
       if (error && isRlsRecursionError(error)) {
         logRlsFixHint('event_attendance')
-        console.warn('⚠️ Falling back to simpler query without attendance join')
+        Logger.warn('Falling back to simpler query without attendance join')
         
         // Try without attendance join
         query = supabase
@@ -67,7 +68,7 @@ export function useEvent(eventId) {
 
         // If still error, try even simpler query
         if (error && isRlsRecursionError(error)) {
-          console.warn('⚠️ Trying minimal query without any joins')
+          Logger.warn('Trying minimal query without any joins')
           query = supabase
             .from('events')
             .select('*')
@@ -81,8 +82,8 @@ export function useEvent(eventId) {
       }
 
       if (error) {
-        console.error('❌ useEvent - Supabase error:', error)
-        console.error('Error details:', {
+        Logger.error('useEvent - Supabase error:', error)
+        Logger.error('Error details:', {
           code: error.code,
           message: error.message,
           details: error.details,
@@ -92,11 +93,11 @@ export function useEvent(eventId) {
       }
 
       if (!data) {
-        console.warn('⚠️ useEvent - No data returned for event ID:', normalizedId)
+        Logger.warn('useEvent - No data returned for event ID:', normalizedId)
         return null
       }
 
-      console.log('✅ useEvent - Event fetched successfully:', { id: data.id, title: data.title })
+      Logger.info('useEvent - Event fetched successfully:', { id: data.id, title: data.title })
 
       let org = null
       if (data.org_id) {
@@ -107,7 +108,7 @@ export function useEvent(eventId) {
           .single()
 
         if (orgError) {
-          console.warn('⚠️ useEvent - Failed to load org:', orgError)
+          Logger.warn('useEvent - Failed to load org:', orgError)
         } else {
           org = orgData
         }

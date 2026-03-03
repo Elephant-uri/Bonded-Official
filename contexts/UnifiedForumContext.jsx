@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createSignedUrlForPath } from '../helpers/mediaStorage'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 const UnifiedForumContext = createContext()
 
@@ -35,7 +36,7 @@ export function UnifiedForumProvider({ children }) {
         .single()
 
       if (profileError || !profile?.university_id) {
-        console.warn('Failed to fetch user university:', profileError)
+        Logger.warn('Failed to fetch user university:', profileError)
         setForums([])
         setLoading(false)
         return
@@ -49,12 +50,12 @@ export function UnifiedForumProvider({ children }) {
         .eq('type', 'main')
         .single()
 
-      console.log('Main forum fetch result:', mainForum, 'Error:', mainError, 'University ID:', profile.university_id)
+      Logger.info('Main forum fetch result:', mainForum, 'Error:', mainError, 'University ID:', profile.university_id)
 
       // If main forum not found, try campus type
       let campusForum = null
       if (mainError) {
-        console.log('Main forum not found, trying campus type...')
+        Logger.info('Main forum not found, trying campus type...')
         const { data: campusData, error: campusError } = await supabase
           .from('forums')
           .select('*')
@@ -62,7 +63,7 @@ export function UnifiedForumProvider({ children }) {
           .eq('type', 'campus')
           .single()
         
-        console.log('Campus forum fetch result:', campusData, 'Error:', campusError)
+        Logger.info('Campus forum fetch result:', campusData, 'Error:', campusError)
         if (!campusError) {
           campusForum = campusData
         }
@@ -72,12 +73,12 @@ export function UnifiedForumProvider({ children }) {
       let { data: userMemberships, error: membershipError } = await supabase
         .rpc('get_user_org_memberships', { p_user_id: user.id })
 
-      console.log('User org memberships:', userMemberships, 'Error:', membershipError)
+      Logger.info('User org memberships:', userMemberships, 'Error:', membershipError)
 
       let orgForums = []
       if (!membershipError && userMemberships?.length > 0) {
         const orgIds = userMemberships.map(m => m.organization_id)
-        console.log('Fetching org forums for orgIds:', orgIds)
+        Logger.info('Fetching org forums for orgIds:', orgIds)
         const { data: forumsData } = await supabase
           .from('forums')
           .select('*')
@@ -85,7 +86,7 @@ export function UnifiedForumProvider({ children }) {
           .eq('type', 'org')
         
         orgForums = forumsData || []
-        console.log('Org forums found:', orgForums)
+        Logger.info('Org forums found:', orgForums)
       }
 
       const extractStoragePath = (value) => {
@@ -148,7 +149,7 @@ export function UnifiedForumProvider({ children }) {
         .eq('is_active', true)
 
       if (enrollmentError) {
-        console.warn('Failed to fetch class enrollments:', enrollmentError)
+        Logger.warn('Failed to fetch class enrollments:', enrollmentError)
       } else {
         const classIds = [...new Set((enrollments || []).map((row) => row.class_id).filter(Boolean))]
         if (classIds.length > 0) {
@@ -159,7 +160,7 @@ export function UnifiedForumProvider({ children }) {
             .eq('type', 'class')
 
           if (classForumError) {
-            console.warn('Failed to fetch class forums:', classForumError)
+            Logger.warn('Failed to fetch class forums:', classForumError)
           } else {
             classForums = classForumData || []
           }
@@ -178,7 +179,7 @@ export function UnifiedForumProvider({ children }) {
         new Map(allForums.filter(Boolean).map((forum) => [forum.id, forum])).values()
       )
 
-      console.log('All forums combined:', uniqueForums)
+      Logger.info('All forums combined:', uniqueForums)
 
       const memberCountsMap = {}
 
@@ -255,7 +256,7 @@ export function UnifiedForumProvider({ children }) {
       }
 
     } catch (err) {
-      console.error('Error fetching forums:', err)
+      Logger.error('Error fetching forums:', err)
       setError(err.message)
     } finally {
       fetchInFlightRef.current = false

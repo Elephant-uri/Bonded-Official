@@ -20,6 +20,7 @@ import { hp, wp } from '../helpers/common'
 import { queryLink } from '../services/linkService'
 import { useAuthStore } from '../stores/authStore'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
+import { Logger } from '../utils/logger'
 
 // Quick suggestion prompts
 const QUICK_SUGGESTIONS = [
@@ -133,7 +134,7 @@ export default function LinkAI() {
 
       setMessages((prev) => [...prev, aiMessage])
     } catch (error) {
-      console.error('Failed to query Link:', error)
+      Logger.error('Failed to query Link:', error)
       setIsTyping(false)
       const aiMessage = {
         id: (Date.now() + 1).toString(),
@@ -421,9 +422,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   resultName: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: hp(0.3),
   },
   resultMeta: {
@@ -447,8 +447,7 @@ const createStyles = (theme) => StyleSheet.create({
   groupjamText: {
     fontSize: hp(1.3),
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   connectButton: {
     paddingHorizontal: wp(4),
@@ -459,8 +458,7 @@ const createStyles = (theme) => StyleSheet.create({
   connectButtonText: {
     fontSize: hp(1.5),
     color: theme.colors.white,
-    fontWeight: '600',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   clubCard: {
     backgroundColor: theme.colors.background,
@@ -478,16 +476,14 @@ const createStyles = (theme) => StyleSheet.create({
   },
   clubName: {
     fontSize: hp(1.9),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: hp(0.3),
   },
   clubCategory: {
     fontSize: hp(1.4),
     color: theme.colors.bondedPurple,
-    fontWeight: '500',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     marginBottom: hp(0.5),
   },
   clubDescription: {
@@ -547,9 +543,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   suggestionsTitle: {
     fontSize: hp(1.6),
-    fontWeight: '600',
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
     marginBottom: hp(1.5),
   },
   suggestionsList: {

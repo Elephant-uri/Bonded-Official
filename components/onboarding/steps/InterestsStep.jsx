@@ -81,8 +81,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(3.5),
-    fontWeight: '800',
-    color: theme.colors.textPrimary || '#1A1A1A',
+    fontFamily: theme.typography?.fontFamily?.extrabold,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography?.fontFamily?.heading || 'System',
     marginBottom: hp(1),
     textAlign: 'center',
@@ -90,7 +90,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   subtitle: {
     fontSize: hp(2),
-    color: theme.colors.textSecondary || '#8E8E8E',
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginBottom: hp(5),
     textAlign: 'center',
@@ -100,14 +100,14 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(2.2),
-    fontWeight: '700',
-    color: theme.colors.textPrimary || '#1A1A1A',
+    fontFamily: theme.typography?.fontFamily?.bold,
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography?.fontFamily?.heading || 'System',
     marginBottom: hp(0.5),
   },
   sectionSubtitle: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary || '#8E8E8E',
+    color: theme.colors.textSecondary,
     fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginBottom: hp(2.5),
     opacity: 0.7,
@@ -126,17 +126,17 @@ const createStyles = (theme) => StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   tagSelected: {
-    backgroundColor: theme.colors.primary || '#A45CFF',
-    borderColor: theme.colors.primary || '#A45CFF',
+    backgroundColor: theme.colors.primary || theme.colors.brand,
+    borderColor: theme.colors.primary || theme.colors.brand,
   },
   tagText: {
     fontSize: hp(1.7),
-    color: theme.colors.textPrimary || '#1A1A1A',
+    color: theme.colors.textPrimary,
     fontFamily: theme.typography?.fontFamily?.body || 'System',
-    fontWeight: '500',
+    fontFamily: theme.typography?.fontFamily?.medium,
   },
   tagTextSelected: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold,
   },
 })

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { isSuperAdminEmail } from '../utils/admin'
+import { Logger } from '../utils/logger'
 import { isRlsRecursionError } from '../utils/rlsHelpers'
 import { createSignedUrlForPath } from '../helpers/mediaStorage'
 
@@ -32,10 +33,10 @@ export function useForums() {
 
         if (profileError) {
           if (isRlsRecursionError(profileError)) {
-            console.warn('⚠️ RLS recursion detected on profiles – cannot resolve university_id')
+            Logger.warn('RLS recursion detected on profiles – cannot resolve university_id')
           } else {
-            console.error('Error fetching user profile:', profileError)
-            console.error('User ID:', user.id)
+            Logger.error('Error fetching user profile:', profileError)
+            Logger.error('User ID:', user.id)
           }
         }
 
@@ -43,16 +44,16 @@ export function useForums() {
       }
 
       if (!universityId && !isSuperAdmin) {
-        console.warn('User has no university_id, cannot fetch forums')
-        console.warn('User ID:', user.id)
-        console.warn('User may need to complete onboarding to set university')
+        Logger.warn('User has no university_id, cannot fetch forums')
+        Logger.warn('User ID:', user.id)
+        Logger.warn('User may need to complete onboarding to set university')
         return []
       }
 
       if (isSuperAdmin) {
-        console.log('Fetching forums as super admin')
+        Logger.info('Fetching forums as super admin')
       } else {
-        console.log('Fetching forums for university_id:', universityId)
+        Logger.info('Fetching forums for university_id:', universityId)
       }
 
       // Fetch forums for the user's university
@@ -107,14 +108,14 @@ export function useForums() {
       }
 
       if (error) {
-        console.error('Error fetching forums:', error)
-        console.error('University ID used:', universityId)
+        Logger.error('Error fetching forums:', error)
+        Logger.error('University ID used:', universityId)
         throw error
       }
 
       // Auto-seed a default campus forum if none exists for this university
       if (!isSuperAdmin && universityId && (!data || data.length === 0)) {
-        console.warn('⚠️ No forums found for university. Seeding default "Main" forum…')
+        Logger.warn('No forums found for university. Seeding default "Main" forum...')
         const { data: seededForum, error: seedError } = await supabase
           .from('forums')
           .insert({
@@ -128,15 +129,15 @@ export function useForums() {
           .single()
 
         if (seedError) {
-          console.error('❌ Failed to seed default campus forum:', seedError)
-          console.error('Seed error details:', JSON.stringify(seedError, null, 2))
+          Logger.error('Failed to seed default campus forum:', seedError)
+          Logger.error('Seed error details:', JSON.stringify(seedError, null, 2))
         } else if (seededForum) {
-          console.log('✅ Seeded default "Main" forum:', seededForum.id)
+          Logger.info('Seeded default "Main" forum:', seededForum.id)
           data = [seededForum]
         }
       }
 
-      console.log(`✅ Fetched ${data?.length || 0} forums for university ${universityId}`)
+      Logger.info(`Fetched ${data?.length || 0} forums for university ${universityId}`)
 
       // Restrict org forums to membership only (prevents private org forums from leaking)
       let userOrgIds = []
@@ -293,16 +294,16 @@ export function useForums() {
 
               if (enrollmentError) {
                 if (isRlsRecursionError(enrollmentError)) {
-                  console.warn('⚠️ RLS recursion on user_class_enrollments - skipping class member count')
+                  Logger.warn('RLS recursion on user_class_enrollments - skipping class member count')
                 } else {
-                  console.error('Error fetching class enrollment count:', enrollmentError)
+                  Logger.error('Error fetching class enrollment count:', enrollmentError)
                 }
                 memberCountsMap[forum.id] = memberCountsMap[forum.id] || 0
               } else {
                 memberCountsMap[forum.id] = enrolledCount || 0
               }
             } catch (countError) {
-              console.warn('⚠️ Failed to fetch class enrollment count, defaulting to 0')
+              Logger.warn('Failed to fetch class enrollment count, defaulting to 0')
               memberCountsMap[forum.id] = memberCountsMap[forum.id] || 0
             }
           }
@@ -334,16 +335,16 @@ export function useForums() {
 
               if (orgCountError) {
                 if (isRlsRecursionError(orgCountError)) {
-                  console.warn('⚠️ RLS recursion on org_members - skipping org member count')
+                  Logger.warn('RLS recursion on org_members - skipping org member count')
                 } else {
-                  console.error('Error fetching org member count:', orgCountError)
+                  Logger.error('Error fetching org member count:', orgCountError)
                 }
                 memberCountsMap[forum.id] = memberCountsMap[forum.id] || 0
               } else {
                 memberCountsMap[forum.id] = orgMemberCount || 0
               }
             } catch (countError) {
-              console.warn('⚠️ Failed to fetch org member count, defaulting to 0')
+              Logger.warn('Failed to fetch org member count, defaulting to 0')
               memberCountsMap[forum.id] = memberCountsMap[forum.id] || 0
             }
           }

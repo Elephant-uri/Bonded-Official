@@ -2,10 +2,12 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImageManipulator from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../../CachedImage'
 import { ONBOARDING_THEME } from '../../../constants/onboardingTheme'
 import { hp, wp } from '../../../helpers/common'
 import { ONBOARDING_STEPS } from '../../../stores/onboardingStore'
+import { Logger } from '../../../utils/logger'
 
 const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
   const styles = createStyles(ONBOARDING_THEME)
@@ -73,7 +75,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
 
       return manipResult.uri
     } catch (error) {
-      console.error('Error processing image:', error)
+      Logger.error('Error processing image:', error)
       return uri // Return original if processing fails
     }
   }
@@ -108,7 +110,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
         syncPhotosToFormData(photo, galleryPhotos)
       }
     } catch (error) {
-      console.error('Error selecting yearbook photo:', error)
+      Logger.error('Error selecting yearbook photo:', error)
       Alert.alert('Error', 'Failed to select photo. Please try again.')
     } finally {
       setIsProcessing(false)
@@ -151,7 +153,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
         syncPhotosToFormData(yearbookPhoto, updatedGallery)
       }
     } catch (error) {
-      console.error('Error selecting gallery photos:', error)
+      Logger.error('Error selecting gallery photos:', error)
       Alert.alert('Error', 'Failed to select photos. Please try again.')
     } finally {
       setIsProcessing(false)
@@ -197,10 +199,10 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
       <View style={styles.previewCard}>
         <View style={styles.previewImageWrapper}>
           {yearbookPhoto?.localUri ? (
-            <Image source={{ uri: yearbookPhoto.localUri }} style={styles.previewImage} />
+            <CachedImage source={{ uri: yearbookPhoto.localUri }} style={styles.previewImage} />
           ) : (
             <View style={styles.previewPlaceholder}>
-              <Ionicons name="person-circle-outline" size={hp(8)} color="#A45CFF" />
+              <Ionicons name="person-circle-outline" size={hp(8)} color=theme.colors.brand />
               <Text style={styles.previewPlaceholderText}>Your yearbook photo</Text>
               <Text style={styles.previewPlaceholderSubtext}>A generic avatar will be used if you skip</Text>
             </View>
@@ -229,7 +231,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
 
       {isProcessing && (
         <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color="#A45CFF" />
+          <ActivityIndicator size="large" color=theme.colors.brand />
           <Text style={styles.processingText}>Processing photo...</Text>
         </View>
       )}
@@ -249,7 +251,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
             disabled={isProcessing}
             activeOpacity={0.7}
           >
-            <Ionicons name="add-circle" size={hp(3)} color="#A45CFF" />
+            <Ionicons name="add-circle" size={hp(3)} color=theme.colors.brand />
             <Text style={styles.addGalleryText}>Add</Text>
           </TouchableOpacity>
         </View>
@@ -258,7 +260,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
           <View style={styles.photoGrid}>
             {galleryPhotos.map((photo, index) => (
           <View key={index} style={styles.photoCard}>
-            <Image source={{ uri: photo.localUri }} style={styles.photoImage} />
+            <CachedImage source={{ uri: photo.localUri }} style={styles.photoImage} />
             <TouchableOpacity
                   style={styles.removeButton}
                   onPress={() => handleRemoveGalleryPhoto(index)}
@@ -270,7 +272,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
           </View>
         ) : (
           <View style={styles.emptyGalleryState}>
-            <Ionicons name="images-outline" size={hp(4)} color="#8E8E8E" />
+            <Ionicons name="images-outline" size={hp(4)} color=theme.colors.textSecondary />
             <Text style={styles.emptyGalleryText}>No photos yet</Text>
             <Text style={styles.emptyGallerySubtext}>
               Add multiple photos to create your album
@@ -282,15 +284,15 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
       {/* Tips Section */}
       <View style={styles.tipsContainer}>
         <View style={styles.tipRow}>
-          <Ionicons name="checkmark-circle" size={hp(2.5)} color="#4CAF50" />
+          <Ionicons name="checkmark-circle" size={hp(2.5)} color=theme.colors.success />
           <Text style={styles.tipText}>Use a clear, recent photo for your yearbook photo</Text>
         </View>
         <View style={styles.tipRow}>
-          <Ionicons name="checkmark-circle" size={hp(2.5)} color="#4CAF50" />
+          <Ionicons name="checkmark-circle" size={hp(2.5)} color=theme.colors.success />
           <Text style={styles.tipText}>Make sure your face is visible and well-lit</Text>
         </View>
         <View style={styles.tipRow}>
-          <Ionicons name="checkmark-circle" size={hp(2.5)} color="#4CAF50" />
+          <Ionicons name="checkmark-circle" size={hp(2.5)} color=theme.colors.success />
           <Text style={styles.tipText}>Add multiple photos to show different sides of you</Text>
         </View>
       </View>
@@ -306,7 +308,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
               value={quote}
               onChangeText={handleQuoteChange}
           placeholder="Enter your yearbook quote..."
-          placeholderTextColor="#8E8E8E"
+          placeholderTextColor=theme.colors.textSecondary
               multiline
               maxLength={150}
             />
@@ -316,7 +318,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
       {/* Skip Option */}
       {!yearbookPhoto && (
         <View style={styles.skipContainer}>
-          <Ionicons name="information-circle-outline" size={hp(2.5)} color="#8E8E8E" />
+          <Ionicons name="information-circle-outline" size={hp(2.5)} color=theme.colors.textSecondary />
           <Text style={styles.skipText}>
             You can skip the yearbook photo and a generic avatar will be used. You can add photos later in settings.
             </Text>
@@ -328,7 +330,7 @@ const PhotoSelectionStep = ({ formData, updateFormData, onScroll }) => {
 
 export default PhotoSelectionStep
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -354,21 +356,20 @@ const createStyles = () => StyleSheet.create({
   pillText: {
     fontSize: hp(1.5),
     color: '#6F42C1',
-    fontWeight: '700',
+    fontFamily: theme.typography?.fontFamily?.bold || 'System',
     letterSpacing: 0.2,
   },
   title: {
     fontSize: hp(3.6),
-    fontWeight: '800',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
     marginBottom: hp(1),
     textAlign: 'left',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginBottom: hp(2),
     textAlign: 'left',
   },
@@ -401,11 +402,11 @@ const createStyles = () => StyleSheet.create({
   previewPlaceholderText: {
     color: '#2A2A2A',
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
     marginTop: hp(1),
   },
   previewPlaceholderSubtext: {
-    color: '#8E8E8E',
+    color: theme.colors.textSecondary,
     fontSize: hp(1.6),
     marginTop: hp(0.5),
     textAlign: 'center',
@@ -415,14 +416,14 @@ const createStyles = () => StyleSheet.create({
     position: 'absolute',
     top: wp(3),
     left: wp(3),
-    backgroundColor: '#A45CFF',
+    backgroundColor: theme.colors.brand,
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.7),
     borderRadius: 999,
   },
   previewBadgeText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: theme.typography?.fontFamily?.bold || 'System',
     fontSize: hp(1.4),
   },
   previewActions: {
@@ -439,7 +440,7 @@ const createStyles = () => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#A45CFF',
+    backgroundColor: theme.colors.brand,
     borderRadius: 14,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.6),
@@ -447,13 +448,13 @@ const createStyles = () => StyleSheet.create({
   },
   addPrimaryText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: theme.typography?.fontFamily?.bold || 'System',
     fontSize: hp(2),
     flex: 1,
   },
   addPrimaryCount: {
     color: '#F5E8FF',
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
     fontSize: hp(1.8),
   },
   processingContainer: {
@@ -463,8 +464,8 @@ const createStyles = () => StyleSheet.create({
   processingText: {
     marginTop: hp(2),
     fontSize: hp(2),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
   },
   photoGrid: {
     flexDirection: 'row',
@@ -480,7 +481,7 @@ const createStyles = () => StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#A45CFF',
+    borderColor: theme.colors.brand,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -489,9 +490,8 @@ const createStyles = () => StyleSheet.create({
   },
   addPhotoText: {
     fontSize: hp(1.8),
-    color: '#A45CFF',
-    fontFamily: 'System',
-    fontWeight: '600',
+    color: theme.colors.brand,
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
   },
   addPhotoSubtext: {
     fontSize: hp(1.5),
@@ -515,7 +515,7 @@ const createStyles = () => StyleSheet.create({
     position: 'absolute',
     top: wp(2),
     left: wp(2),
-    backgroundColor: '#A45CFF',
+    backgroundColor: theme.colors.brand,
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.5),
     borderRadius: 9999,
@@ -523,14 +523,13 @@ const createStyles = () => StyleSheet.create({
   yearbookBadgeText: {
     fontSize: hp(1.3),
     color: '#FFFFFF',
-    fontFamily: 'System',
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
   },
   removeButton: {
     position: 'absolute',
     top: wp(2),
     right: wp(2),
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     borderRadius: hp(1.5),
     padding: hp(0.3),
     zIndex: 10,
@@ -552,8 +551,7 @@ const createStyles = () => StyleSheet.create({
   setYearbookText: {
     fontSize: hp(1.6),
     color: '#FFFFFF',
-    fontFamily: 'System',
-    fontWeight: '600',
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
   },
   instructionsContainer: {
     flexDirection: 'row',
@@ -568,14 +566,14 @@ const createStyles = () => StyleSheet.create({
   instructionsText: {
     flex: 1,
     fontSize: hp(1.8),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     lineHeight: hp(2.5),
   },
   photoCount: {
     fontSize: hp(2),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     textAlign: 'left',
     marginTop: hp(1),
     marginHorizontal: wp(4),
@@ -588,15 +586,14 @@ const createStyles = () => StyleSheet.create({
   },
   quoteLabel: {
     fontSize: hp(2.2),
-    fontWeight: '700',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.bold || 'System',
     marginBottom: hp(1),
   },
   quoteHint: {
     fontSize: hp(1.8),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginBottom: hp(2),
     lineHeight: hp(2.5),
   },
@@ -605,17 +602,17 @@ const createStyles = () => StyleSheet.create({
     borderRadius: 12,
     padding: wp(4),
     fontSize: hp(2),
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: theme.colors.border,
     minHeight: hp(10),
     textAlignVertical: 'top',
   },
   characterCount: {
     fontSize: hp(1.6),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     textAlign: 'right',
     marginTop: hp(1),
     opacity: 0.7,
@@ -637,7 +634,7 @@ const createStyles = () => StyleSheet.create({
     flex: 1,
     fontSize: hp(1.8),
     color: '#2A2A2A',
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     lineHeight: hp(2.4),
   },
   skipContainer: {
@@ -653,8 +650,8 @@ const createStyles = () => StyleSheet.create({
   skipText: {
     flex: 1,
     fontSize: hp(1.7),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     lineHeight: hp(2.3),
   },
   gallerySection: {
@@ -678,15 +675,14 @@ const createStyles = () => StyleSheet.create({
   },
   gallerySectionTitle: {
     fontSize: hp(2),
-    fontWeight: '700',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.bold || 'System',
     marginBottom: hp(0.5),
   },
   gallerySectionSubtitle: {
     fontSize: hp(1.5),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     lineHeight: hp(2),
   },
   addGalleryButton: {
@@ -701,9 +697,8 @@ const createStyles = () => StyleSheet.create({
   },
   addGalleryText: {
     fontSize: hp(1.6),
-    color: '#A45CFF',
-    fontFamily: 'System',
-    fontWeight: '700',
+    color: theme.colors.brand,
+    fontFamily: theme.typography?.fontFamily?.bold || 'System',
   },
   emptyGalleryState: {
     paddingVertical: hp(4),
@@ -712,14 +707,13 @@ const createStyles = () => StyleSheet.create({
   },
   emptyGalleryText: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: '#2A2A2A',
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.semibold || 'System',
   },
   emptyGallerySubtext: {
     fontSize: hp(1.5),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     textAlign: 'center',
     paddingHorizontal: wp(4),
   },

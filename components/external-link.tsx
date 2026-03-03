@@ -1,6 +1,7 @@
 import { Linking, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import React from 'react';
+import { Logger } from '../utils/logger';
 
 type ExternalLinkProps = {
   href: string;
@@ -19,7 +20,7 @@ export function ExternalLink({ href, children, style }: ExternalLinkProps) {
       if (supported) {
         await Linking.openURL(href);
       } else {
-        console.error(`Cannot open URL: ${href}`);
+        Logger.error(`Cannot open URL: ${href}`);
       }
     }
   };

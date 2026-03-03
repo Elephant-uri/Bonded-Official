@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import { useAppTheme } from '../app/theme'
 import { hp, wp } from '../helpers/common'
+import { Logger } from '../utils/logger'
 
 const Picker = ({ 
   label, 
@@ -26,7 +27,7 @@ const Picker = ({
   
   // Debug: Log if options are empty
   if (safeOptions.length === 0 && options) {
-    console.warn('Picker: Options array is empty or invalid', { options, label })
+    Logger.warn('Picker: Options array is empty or invalid', { options, label })
   }
   
   const filteredOptions = searchable && searchQuery
@@ -172,7 +173,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
@@ -201,7 +202,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -222,7 +223,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalTitle: {
     fontSize: hp(2.5),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -287,7 +288,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   optionTextSelected: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
 })
 

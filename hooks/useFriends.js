@@ -8,6 +8,7 @@ import { Alert } from 'react-native'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to get all friends for the current user
@@ -20,7 +21,7 @@ export function useFriends() {
     queryFn: async () => {
       if (!user?.id) return []
 
-      console.log('👥 Fetching friends for user:', user.id)
+      Logger.info('Fetching friends for user:', user.id)
 
       // Get friendships where user is either user1 or user2
       const { data, error } = await supabase
@@ -34,7 +35,7 @@ export function useFriends() {
         .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
 
       if (error) {
-        console.error('❌ Error fetching friendships:', error)
+        Logger.error('Error fetching friendships:', error)
         throw error
       }
 
@@ -44,7 +45,7 @@ export function useFriends() {
       )
 
       if (friendIds.length === 0) {
-        console.log('✅ No friends found')
+        Logger.info('No friends found')
         return []
       }
 
@@ -55,11 +56,11 @@ export function useFriends() {
         .in('id', friendIds)
 
       if (profileError) {
-        console.error('❌ Error fetching friend profiles:', profileError)
+        Logger.error('Error fetching friend profiles:', profileError)
         throw profileError
       }
 
-      console.log(`✅ Found ${profiles?.length || 0} friends`)
+      Logger.info(`Found ${profiles?.length || 0} friends`)
       return profiles || []
     },
     enabled: !!user?.id,
@@ -78,7 +79,7 @@ export function useFriendRequests() {
     queryFn: async () => {
       if (!user?.id) return []
 
-      console.log('📬 Fetching friend requests for user:', user.id)
+      Logger.info('Fetching friend requests for user:', user.id)
 
       const { data, error } = await supabase
         .from('friend_requests')
@@ -101,11 +102,11 @@ export function useFriendRequests() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('❌ Error fetching friend requests:', error)
+        Logger.error('Error fetching friend requests:', error)
         throw error
       }
 
-      console.log(`✅ Found ${data?.length || 0} pending friend requests`)
+      Logger.info(`Found ${data?.length || 0} pending friend requests`)
       return data || []
     },
     enabled: !!user?.id,
@@ -131,7 +132,7 @@ export function useSentFriendRequests() {
         .eq('status', 'pending')
 
       if (error) {
-        console.error('❌ Error fetching sent requests:', error)
+        Logger.error('Error fetching sent requests:', error)
         throw error
       }
 
@@ -286,7 +287,7 @@ export function useFriendsRealtime(profileId) {
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Friends realtime subscription error:', err)
+          Logger.error('Friends realtime subscription error:', err)
         }
       })
 
@@ -308,7 +309,7 @@ export function useSendFriendRequest() {
       if (!user?.id) throw new Error('Must be logged in')
       if (user.id === receiverId) throw new Error('Cannot send request to yourself')
 
-      console.log('📤 Sending friend request to:', receiverId)
+      Logger.info('Sending friend request to:', receiverId)
 
       // Block if already friends
       const smallerId = user.id < receiverId ? user.id : receiverId
@@ -375,7 +376,7 @@ export function useSendFriendRequest() {
       }
 
       // If RLS blocked the select, the insert still succeeded
-      console.log('✅ Friend request sent:', data?.id || 'success')
+      Logger.info('Friend request sent:', data?.id || 'success')
       return data || { id: 'created', success: true }
     },
     onSuccess: (_, variables) => {
@@ -384,7 +385,7 @@ export function useSendFriendRequest() {
       // No alert needed - button changes to "Pending" which is clear enough
     },
     onError: (error) => {
-      console.error('❌ Error sending friend request:', error)
+      Logger.error('Error sending friend request:', error)
       Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send friend request'))
     },
   })
@@ -401,7 +402,7 @@ export function useAcceptFriendRequest() {
     mutationFn: async ({ requestId, senderId }) => {
       if (!user?.id) throw new Error('Must be logged in')
 
-      console.log('✅ Accepting friend request:', requestId)
+      Logger.info('Accepting friend request:', requestId)
 
       // Create friendship (ensure user1_id < user2_id)
       const smallerId = user.id < senderId ? user.id : senderId
@@ -428,7 +429,7 @@ export function useAcceptFriendRequest() {
         throw updateError
       }
 
-      console.log('✅ Friend request accepted')
+      Logger.info('Friend request accepted')
       return { success: true }
     },
     onSuccess: (_, variables) => {
@@ -438,7 +439,7 @@ export function useAcceptFriendRequest() {
       // No alert needed - button changes to "Friends" which is clear enough
     },
     onError: (error) => {
-      console.error('❌ Error accepting friend request:', error)
+      Logger.error('Error accepting friend request:', error)
       Alert.alert('Error', 'Failed to accept friend request')
     },
   })
@@ -455,7 +456,7 @@ export function useDeclineFriendRequest() {
     mutationFn: async ({ requestId }) => {
       if (!user?.id) throw new Error('Must be logged in')
 
-      console.log('❌ Declining friend request:', requestId)
+      Logger.info('Declining friend request:', requestId)
 
       const { error } = await supabase
         .from('friend_requests')
@@ -464,14 +465,14 @@ export function useDeclineFriendRequest() {
 
       if (error) throw error
 
-      console.log('✅ Friend request declined')
+      Logger.info('Friend request declined')
       return { success: true }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['friendRequests'] })
     },
     onError: (error) => {
-      console.error('❌ Error declining friend request:', error)
+      Logger.error('Error declining friend request:', error)
       Alert.alert('Error', 'Failed to decline friend request')
     },
   })
@@ -503,7 +504,7 @@ export function useCancelFriendRequest() {
       queryClient.invalidateQueries({ queryKey: ['friendshipStatus'] })
     },
     onError: (error) => {
-      console.error('❌ Error canceling friend request:', error)
+      Logger.error('Error canceling friend request:', error)
       Alert.alert('Error', 'Failed to cancel friend request')
     },
   })
@@ -539,7 +540,7 @@ export function useRemoveFriend() {
         )
 
       if (requestCleanupError) {
-        console.error('❌ Error cleaning friend requests:', requestCleanupError)
+        Logger.error('Error cleaning friend requests:', requestCleanupError)
       }
 
       return { success: true }
@@ -552,7 +553,7 @@ export function useRemoveFriend() {
       // No alert - UI already confirmed the action
     },
     onError: (error) => {
-      console.error('❌ Error removing friend:', error)
+      Logger.error('Error removing friend:', error)
       Alert.alert('Error', 'Failed to remove friend')
     },
   })

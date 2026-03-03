@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native'
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native'
+import CachedImage from '../components/CachedImage'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import ChatHeader from '../components/Chat/ChatHeader'
@@ -14,6 +15,7 @@ import { useProfileModal } from '../contexts/ProfileModalContext'
 import { useClubsContext } from '../contexts/ClubsContext'
 import { hp, wp } from '../helpers/common'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
+import { Logger } from '../utils/logger'
 
 export default function Chat() {
   const theme = useAppTheme()
@@ -23,7 +25,7 @@ export default function Chat() {
   const { user } = useAuthStore()
   const { getClub } = useClubsContext()
   const log = (...args) => {
-    if (__DEV__) console.log(...args)
+    Logger.info(...args)
   }
 
   // Params
@@ -120,7 +122,7 @@ export default function Chat() {
             })
 
             if (error) {
-              console.error('❌ Error creating direct chat:', error)
+              Logger.error('Error creating direct chat:', error)
               throw error
             }
 
@@ -139,7 +141,7 @@ export default function Chat() {
               .maybeSingle()
 
             if (error) {
-              console.error('❌ Error finding class chat:', error)
+              Logger.error('Error finding class chat:', error)
               throw error
             }
 
@@ -162,7 +164,7 @@ export default function Chat() {
               .maybeSingle()
 
             if (error) {
-              console.error('❌ Error finding org chat:', error)
+              Logger.error('Error finding org chat:', error)
               throw error
             }
 
@@ -185,7 +187,7 @@ export default function Chat() {
         await fetchConversationInfo(targetId)
 
       } catch (error) {
-        console.error('❌ Failed to initialize conversation:', error)
+        Logger.error('Failed to initialize conversation:', error)
         setInitError(getFriendlyErrorMessage(error, 'Unable to open this chat right now.'))
       } finally {
         setIsInitializing(false)
@@ -222,7 +224,7 @@ export default function Chat() {
         .single()
 
       if (error) {
-        console.error('❌ Error fetching conversation:', error)
+        Logger.error('Error fetching conversation:', error)
         throw error
       }
 
@@ -262,7 +264,7 @@ export default function Chat() {
         })
       }
     } catch (error) {
-      console.error('❌ Error fetching conversation info:', error)
+      Logger.error('Error fetching conversation info:', error)
     }
   }
 
@@ -275,13 +277,25 @@ export default function Chat() {
 
   // Handlers
   const handleSendMessage = (text) => {
-    if (!conversationId || !text.trim() || !user?.id) return
+    if (!conversationId || !text.trim() || !user?.id) {
+      if (!conversationId) {
+        Alert.alert('Error', 'Unable to send message. Please go back and try again.')
+      }
+      return
+    }
 
-    sendMessageMutation.mutate({
-      conversationId,
-      content: text.trim(),
-      senderId: user.id
-    })
+    sendMessageMutation.mutate(
+      {
+        conversationId,
+        content: text.trim(),
+      },
+      {
+        onError: (error) => {
+          Logger.error('Error sending message:', error)
+          Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send message. Please try again.'))
+        }
+      }
+    )
   }
 
   const handleLoadMore = () => {
@@ -447,7 +461,7 @@ export default function Chat() {
                 activeOpacity={0.7}
               >
                 {item.avatar_url ? (
-                  <Image source={{ uri: item.avatar_url }} style={styles.memberAvatar} />
+                  <CachedImage source={{ uri: item.avatar_url }} style={styles.memberAvatar} />
                 ) : (
                   <View style={styles.memberAvatarPlaceholder}>
                     <Text style={styles.memberAvatarText}>
@@ -489,18 +503,18 @@ const createStyles = (theme) => StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: theme.colors.textPrimary || '#000',
+    color: theme.colors.textPrimary,
   },
   errorText: {
     fontSize: 16,
-    color: theme.colors.error || '#FF3B30',
+    color: theme.colors.error,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
     fontSize: 16,
-    color: theme.colors.bondedPurple || '#6B4EFF',
-    fontWeight: '600',
+    color: theme.colors.brand,
+    fontFamily: theme.typography.fontFamily.semibold,
     padding: 12,
   },
   modalContainer: {
@@ -509,7 +523,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   waveOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: wp(6),
@@ -523,7 +537,7 @@ const createStyles = (theme) => StyleSheet.create({
   waveTitle: {
     fontSize: hp(2.2),
     color: theme.colors.textPrimary,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     marginBottom: hp(0.8),
   },
   waveSubtitle: {
@@ -544,7 +558,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   wavePrimaryText: {
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   waveSecondary: {
     paddingVertical: hp(1.2),
@@ -555,7 +569,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   waveSecondaryText: {
     color: theme.colors.textPrimary,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -571,9 +585,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalTitle: {
     fontSize: hp(2),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.heading,
+    fontFamily: theme.typography.fontFamily.bold,
   },
   modalPlaceholder: {
     width: hp(3),
@@ -602,7 +615,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   memberAvatarText: {
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   memberInfo: {
@@ -610,9 +623,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   memberName: {
     fontSize: hp(1.8),
-    fontWeight: '600',
     color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   memberUsername: {
     fontSize: hp(1.5),

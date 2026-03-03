@@ -1,5 +1,6 @@
 import React from 'react'
-import { TouchableOpacity, View, Text, StyleSheet, Image, Platform, Animated } from 'react-native'
+import { TouchableOpacity, View, Text, StyleSheet, Platform, Animated } from 'react-native'
+import CachedImage from '../CachedImage'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { hp, wp } from '../../helpers/common'
@@ -24,7 +25,7 @@ export default function StoryCircle({ story, onPress, isOwn = false }) {
         >
           <View style={styles.innerCircle}>
             {story.thumbnail ? (
-              <Image source={{ uri: story.thumbnail }} style={styles.image} />
+              <CachedImage source={{ uri: story.thumbnail }} style={styles.image} />
             ) : (
               <View style={styles.placeholder}>
                 <Text style={styles.placeholderText}>
@@ -39,7 +40,7 @@ export default function StoryCircle({ story, onPress, isOwn = false }) {
         <View style={[styles.gradientBorder, styles.viewedBorder]}>
           <View style={styles.innerCircle}>
             {story.thumbnail ? (
-              <Image source={{ uri: story.thumbnail }} style={styles.image} />
+              <CachedImage source={{ uri: story.thumbnail }} style={styles.image} />
             ) : (
               <View style={styles.placeholder}>
                 <Text style={styles.placeholderText}>
@@ -128,7 +129,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(2.8),
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   ownBadge: {
     position: 'absolute',
@@ -158,7 +159,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.4),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     textAlign: 'center',
     maxWidth: wp(18),
   },

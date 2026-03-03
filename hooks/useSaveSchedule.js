@@ -6,6 +6,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 export function useSaveSchedule() {
   const queryClient = useQueryClient()
@@ -23,8 +24,8 @@ export function useSaveSchedule() {
         }
 
         const sectionKeys = new Set(selectedSections)
-        console.log(`📋 Saving schedule: ${courses.length} courses, ${selectedSections.length} selected sections`)
-        console.log(`📋 Selected sections:`, Array.from(sectionKeys))
+        Logger.info(`Saving schedule: ${courses.length} courses, ${selectedSections.length} selected sections`)
+        Logger.info(`Selected sections:`, Array.from(sectionKeys))
 
         let displayName =
           user?.user_metadata?.full_name ||
@@ -45,7 +46,7 @@ export function useSaveSchedule() {
             .single()
 
           if (profileError) {
-            console.warn('⚠️ Could not load forum preferences, using defaults:', profileError)
+            Logger.warn('Could not load forum preferences, using defaults:', profileError)
           } else if (profileData) {
             displayName = profileData.full_name || profileData.username || displayName
             if (profileData.forum_preferences) {
@@ -56,7 +57,7 @@ export function useSaveSchedule() {
             }
           }
         } catch (err) {
-          console.warn('⚠️ Could not load forum preferences (exception), using defaults:', err)
+          Logger.warn('Could not load forum preferences (exception), using defaults:', err)
         }
 
         const semester = getCurrentSemester()
@@ -85,7 +86,7 @@ export function useSaveSchedule() {
             cleanCourseCode = codeMatch[1].trim()
           }
 
-          console.log(`📚 Processing course: ${course.courseCode} -> cleaned: ${cleanCourseCode}, sectionId: ${course.sectionId}`)
+          Logger.info(`Processing course: ${course.courseCode} -> cleaned: ${cleanCourseCode}, sectionId: ${course.sectionId}`)
 
           // 1. Find or create class
           // Using classes table (not courses) with CLEANED class_code
@@ -99,7 +100,7 @@ export function useSaveSchedule() {
 
           if (classError && classError.code !== 'PGRST116') {
             // PGRST116 = no rows found, which is fine
-            console.error('Error finding class:', classError)
+            Logger.error('Error finding class:', classError)
             throw classError
           }
 
@@ -117,7 +118,7 @@ export function useSaveSchedule() {
               .single()
 
             if (createError) {
-              console.error('Error creating class:', createError)
+              Logger.error('Error creating class:', createError)
               throw createError
             }
             classId = newClass.id
@@ -138,7 +139,7 @@ export function useSaveSchedule() {
             .maybeSingle()
 
           if (sectionError && sectionError.code !== 'PGRST116') {
-            console.error('Error finding section:', sectionError)
+            Logger.error('Error finding section:', sectionError)
             throw sectionError
           }
 
@@ -164,7 +165,7 @@ export function useSaveSchedule() {
               .single()
 
             if (createError) {
-              console.error('Error creating section:', createError)
+              Logger.error('Error creating section:', createError)
               throw createError
             }
             sectionId = newSection.id
@@ -193,7 +194,7 @@ export function useSaveSchedule() {
 
           // Ignore duplicate key errors (user already enrolled)
           if (memberError && memberError.code !== '23505') {
-            console.error('Error adding user to class enrollment:', memberError)
+            Logger.error('Error adding user to class enrollment:', memberError)
             throw memberError
           }
 
@@ -227,10 +228,10 @@ export function useSaveSchedule() {
                 .single()
 
               if (forumError && forumError.code !== '23505') {
-                console.error('Error creating class forum:', forumError)
+                Logger.error('Error creating class forum:', forumError)
               } else if (newForum) {
                 forumId = newForum.id
-                console.log(`✅ Created class forum for ${cleanCourseCode} (ID: ${forumId})`)
+                Logger.info(`Created class forum for ${cleanCourseCode} (ID: ${forumId})`)
 
                 // Auto-add user to forum if preferences allow
                 if (preferences.autoJoinCourseForums) {
@@ -243,14 +244,14 @@ export function useSaveSchedule() {
                     })
                     .select()
                     .single()
-                  console.log(`✅ Auto-added user to course forum for ${cleanCourseCode}`)
+                  Logger.info(`Auto-added user to course forum for ${cleanCourseCode}`)
                 } else {
-                  console.log(`⚠️ User opted out of auto-joining course forum for ${cleanCourseCode}`)
+                  Logger.info(`User opted out of auto-joining course forum for ${cleanCourseCode}`)
                 }
               }
             } else {
               forumId = existingForum.id
-              console.log(`✅ Class forum already exists for ${cleanCourseCode}`)
+              Logger.info(`Class forum already exists for ${cleanCourseCode}`)
 
               // Add user to existing forum if preferences allow and not already member
               if (preferences.autoJoinCourseForums) {
@@ -271,12 +272,12 @@ export function useSaveSchedule() {
                     })
                     .select()
                     .single()
-                  console.log(`✅ Added user to existing course forum for ${cleanCourseCode}`)
+                  Logger.info(`Added user to existing course forum for ${cleanCourseCode}`)
                 }
               }
             }
           } catch (forumErr) {
-            console.error('Exception creating forum:', forumErr)
+            Logger.error('Exception creating forum:', forumErr)
             // Continue - don't block enrollment
           }
 
@@ -286,7 +287,7 @@ export function useSaveSchedule() {
           const hasLecture = course.components.some((c) => c.type === 'Lecture')
 
           // Debug logging
-          console.log(`🔍 Checking section: ${sectionKey}, hasLecture: ${hasLecture}, in selectedSections: ${sectionKeys.has(sectionKey)}`)
+          Logger.info(`Checking section: ${sectionKey}, hasLecture: ${hasLecture}, in selectedSections: ${sectionKeys.has(sectionKey)}`)
 
           if (sectionKeys.has(sectionKey) && hasLecture) {
             try {
@@ -304,13 +305,13 @@ export function useSaveSchedule() {
                 .maybeSingle()
 
               if (checkError && checkError.code !== 'PGRST116') {
-                console.error('Error checking for existing conversation:', checkError)
+                Logger.error('Error checking for existing conversation:', checkError)
               }
 
               let conversationId
               if (existingConv) {
                 conversationId = existingConv.id
-                console.log(`✅ Found existing chat for ${chatName} (ID: ${conversationId})`)
+                Logger.info(`Found existing chat for ${chatName} (ID: ${conversationId})`)
 
                 // Add user to existing chat if preferences allow and not already participant
                 if (preferences.autoJoinSectionChats) {
@@ -336,15 +337,15 @@ export function useSaveSchedule() {
                         content: `${displayName} joined the chat`,
                         metadata: { type: 'system', action: 'joined' },
                       })
-                      console.log(`✅ Added user to existing section chat ${chatName}`)
+                      Logger.info(`Added user to existing section chat ${chatName}`)
                     } else {
-                      console.error('Error adding user to existing chat:', participantError)
+                      Logger.error('Error adding user to existing chat:', participantError)
                     }
                   } else {
-                    console.log(`✅ User already in section chat ${chatName}`)
+                    Logger.info(`User already in section chat ${chatName}`)
                   }
                 } else {
-                  console.log(`⚠️ User opted out of auto-joining section chat for ${chatName}`)
+                  Logger.info(`User opted out of auto-joining section chat for ${chatName}`)
                 }
               } else {
                 // Create new group conversation for this section
@@ -360,10 +361,10 @@ export function useSaveSchedule() {
                   .single()
 
                 if (convError) {
-                  console.error('Error creating section chat:', convError)
+                  Logger.error('Error creating section chat:', convError)
                 } else if (newConv) {
                   conversationId = newConv.id
-                  console.log(`✅ Created section chat for ${chatName} (ID: ${conversationId})`)
+                  Logger.info(`Created section chat for ${chatName} (ID: ${conversationId})`)
 
                   // Auto-add user to new chat if preferences allow
                   if (preferences.autoJoinSectionChats) {
@@ -375,29 +376,29 @@ export function useSaveSchedule() {
                       })
 
                     if (!participantError) {
-                      console.log(`✅ Auto-added user to new section chat ${chatName}`)
+                      Logger.info(`Auto-added user to new section chat ${chatName}`)
                     } else {
-                      console.error('Error adding user to new chat:', participantError)
+                      Logger.error('Error adding user to new chat:', participantError)
                     }
                   } else {
-                    console.log(`⚠️ User opted out of auto-joining new section chat for ${chatName}`)
+                    Logger.info(`User opted out of auto-joining new section chat for ${chatName}`)
                   }
                 }
               }
             } catch (chatErr) {
-              console.error('Exception creating section chat:', chatErr)
+              Logger.error('Exception creating section chat:', chatErr)
               // Continue - don't block enrollment
             }
           } else {
-            console.log(`⏭️ Skipping chat creation for ${sectionKey} - not selected or no lecture`)
+            Logger.info(`Skipping chat creation for ${sectionKey} - not selected or no lecture`)
           }
 
         }
 
-        console.log('✅ Finished saving schedule')
+        Logger.info('Finished saving schedule')
         return { success: true }
       } catch (err) {
-        console.error('❌ Schedule save failed:', err)
+        Logger.error('Schedule save failed:', err)
         throw err
       }
     },
@@ -407,7 +408,7 @@ export function useSaveSchedule() {
       queryClient.invalidateQueries({ queryKey: ['sections'] })
       queryClient.invalidateQueries({ queryKey: ['chats'] })
       queryClient.invalidateQueries({ queryKey: ['forums'] }) // Refresh sidebar
-      console.log('✅ Schedule saved successfully')
+      Logger.info('Schedule saved successfully')
     },
     retry: 1,
   })

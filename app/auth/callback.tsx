@@ -2,15 +2,16 @@ import * as Linking from 'expo-linking'
 import { useEffect } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { supabase } from '../../lib/supabase'
+import { Logger } from '../../utils/logger'
 
 export default function AuthCallback() {
   useEffect(() => {
     const log = (...args: any[]) => {
-      if (__DEV__) console.log(...args)
+      Logger.info(...args)
     }
     // Handle deep link URL manually (since detectSessionInUrl: false)
     const handleDeepLink = async (url: string) => {
-      log('🔗 Deep link received')
+      log('Deep link received')
       
       // Parse URL to extract tokens
       const { queryParams } = Linking.parse(url)
@@ -20,20 +21,20 @@ export default function AuthCallback() {
       }
 
       if (access_token && refresh_token) {
-        log('🔑 Tokens found in URL, setting session...')
+        log('Tokens found in URL, setting session...')
         const { data, error } = await supabase.auth.setSession({
           access_token,
           refresh_token,
         })
 
         if (error) {
-          console.error('❌ Error setting session:', error)
+          Logger.error('Error setting session:', error)
           return
         }
 
-        log('✅ Session established')
+        log('Session established')
       } else {
-        console.warn('⚠️ No tokens found in URL')
+        Logger.warn('No tokens found in URL')
       }
     }
 
@@ -52,21 +53,21 @@ export default function AuthCallback() {
     // Also check existing session
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) {
-        console.error('❌ Session Error:', error)
+        Logger.error('Session Error:', error)
         return
       }
       if (data.session) {
-        log('✅ Existing session found')
+        log('Existing session found')
       } else {
-        log('ℹ️ No existing session')
+        log('No existing session')
       }
     })
 
     // Listen for auth state changes
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      log('🔔 Auth Event:', event)
+      log('Auth Event:', event)
       if (session) {
-        log('✅ Session updated')
+        log('Session updated')
       }
     })
 

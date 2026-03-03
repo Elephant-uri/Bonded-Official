@@ -197,7 +197,7 @@ const createStyles = (theme) => StyleSheet.create({
     avatarPlaceholderText: {
         fontSize: hp(2.5),
         color: theme.colors.textSecondary,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     content: {
         flex: 1,
@@ -218,7 +218,7 @@ const createStyles = (theme) => StyleSheet.create({
     name: {
         fontSize: hp(1.9),
         fontFamily: theme.typography.fontFamily.heading,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     linkBadge: {
@@ -233,13 +233,13 @@ const createStyles = (theme) => StyleSheet.create({
     linkBadgeText: {
         fontSize: hp(1.2),
         color: theme.colors.bondedPurple,
-        fontWeight: '700',
+        fontFamily: theme.typography.fontFamily.bold,
         fontFamily: theme.typography.fontFamily.heading,
     },
     orgBadge: {
         fontSize: hp(1.4),
         color: theme.colors.textSecondary,
-        fontWeight: '400',
+        fontFamily: theme.typography.fontFamily.body,
     },
     time: {
         fontSize: hp(1.5),
@@ -248,7 +248,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     timeUnread: {
         color: theme.colors.bondedPurple,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     bottomRow: {
         flexDirection: 'row',
@@ -262,11 +262,11 @@ const createStyles = (theme) => StyleSheet.create({
     },
     messageRead: {
         color: theme.colors.textSecondary,
-        fontWeight: '400',
+        fontFamily: theme.typography.fontFamily.body,
     },
     messageUnread: {
         color: theme.colors.textPrimary,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         fontFamily: theme.typography.fontFamily.body,
     },
     unreadDot: {

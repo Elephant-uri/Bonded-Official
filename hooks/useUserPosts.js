@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { resolveMediaUrls } from '../helpers/mediaStorage'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 export function useUserPosts(userId, limit = 3) {
   const { user } = useAuthStore()
@@ -44,7 +45,7 @@ export function useUserPosts(userId, limit = 3) {
         .limit(limit)
 
       if (error) {
-        console.error('Error fetching user posts:', error)
+        Logger.error('Error fetching user posts:', error)
         throw error
       }
 

@@ -244,7 +244,7 @@ const createStyles = (theme) => StyleSheet.create({
     height: hp(1.8),
     paddingHorizontal: hp(0.4),
     borderRadius: hp(0.9),
-    backgroundColor: '#FF3B30',
+    backgroundColor: theme.colors.destructive,
     borderWidth: 2,
     borderColor: theme.colors.surface,
     alignItems: 'center',
@@ -253,7 +253,7 @@ const createStyles = (theme) => StyleSheet.create({
   unreadBadgeText: {
     fontSize: hp(1.05),
     color: theme.colors.white,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   tabActive: {
     backgroundColor: 'transparent',
@@ -262,13 +262,12 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.1),
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '400',
     marginTop: hp(0.1),
     letterSpacing: -0.1,
   },
   tabLabelActive: {
     color: theme.colors.accent,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   activeIndicator: {
     position: 'absolute',

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
-import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from './CachedImage'
 import { useAppTheme } from '../app/theme'
 import { useUnifiedForum } from '../contexts/UnifiedForumContext'
 import { hp, wp } from '../helpers/common'
@@ -59,10 +60,9 @@ const ForumSwitcher = ({ currentForum, onPress, unreadCount = 0 }) => {
     >
       <View style={[styles.iconContainer, { backgroundColor: forum?.image ? 'transparent' : getForumColor(forum?.type || 'main') + '15' }]}>
         {forum?.image ? (
-          <Image
+          <CachedImage
             source={{ uri: forum.image }}
             style={styles.forumIconImage}
-            resizeMode="cover"
           />
         ) : (
           <Ionicons
@@ -147,7 +147,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   forumName: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -175,7 +175,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   badgeText: {
     fontSize: hp(1),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
 })

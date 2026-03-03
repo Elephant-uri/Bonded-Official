@@ -20,6 +20,7 @@ import { useFriends } from '../hooks/useFriends'
 import { useCreateConversation, useSendMessage } from '../hooks/useMessages'
 import AppCard from './AppCard'
 import AppHeader from './AppHeader'
+import { Logger } from '../utils/logger'
 
 export default function ShareModal({ visible, content, onClose, presentationStyle = 'pageSheet', transparent = false }) {
   const theme = useAppTheme()
@@ -120,7 +121,7 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
       const conversationIds = []
       
       // Debug: Log what we're about to send
-      console.log('📤 About to send message:', {
+      Logger.info('About to send message:', {
         shareText,
         userMessage,
         fullMessage,
@@ -186,7 +187,7 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
         } : baseMetadata
         
         // Debug: Log the final metadata
-        console.log('📋 Final metadata for post:', messageMetadata)
+        Logger.info('Final metadata for post:', messageMetadata)
 
         // Determine message type
         const messageType = content.type === 'post' ? 'post_share' :
@@ -220,7 +221,7 @@ export default function ShareModal({ visible, content, onClose, presentationStyl
       setSearchQuery('')
       onClose()
     } catch (error) {
-      console.error('Share send failed:', error)
+      Logger.error('Share send failed:', error)
       Alert.alert('Share failed', 'Could not send this to your friends. Please try again.')
     } finally {
       setIsSending(false)
@@ -456,7 +457,7 @@ const createStyles = (theme) => StyleSheet.create({
   previewTitle: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
@@ -473,7 +474,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   messageLabel: {
     fontSize: hp(1.4),
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
@@ -481,7 +482,7 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.background,
     borderRadius: hp(1.2),
     borderWidth: 1,
-    borderColor: theme.colors.border || 'rgba(0, 0, 0, 0.05)',
+    borderColor: theme.colors.border,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -508,7 +509,7 @@ const createStyles = (theme) => StyleSheet.create({
     paddingVertical: hp(1.2),
     borderRadius: 9999,
     borderWidth: 1,
-    borderColor: theme.colors.border || 'rgba(0, 0, 0, 0.05)',
+    borderColor: theme.colors.border,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -547,7 +548,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   emptySubtitle: {
@@ -586,7 +587,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(1.5),
     height: hp(1.5),
     borderRadius: hp(0.75),
-    backgroundColor: '#2ecc71',
+    backgroundColor: theme.colors.success,
     borderWidth: 2,
     borderColor: theme.colors.white,
   },
@@ -594,7 +595,7 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   checkbox: {

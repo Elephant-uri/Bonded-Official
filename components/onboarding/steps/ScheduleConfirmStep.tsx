@@ -172,18 +172,18 @@ const createStyles = (theme: any) =>
     },
     title: {
       fontSize: hp(3.5),
-      fontWeight: '800',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
+      color: theme.colors.textPrimary,
       marginBottom: hp(1),
     },
     subtitle: {
       fontSize: hp(1.8),
-      color: '#8E8E8E',
+      color: theme.colors.textSecondary,
       marginBottom: hp(3),
     },
     infoBanner: {
       flexDirection: 'row',
-      backgroundColor: '#F0F0FF',
+      backgroundColor: theme.colors.backgroundSecondary,
       borderRadius: 8,
       padding: hp(1.5),
       marginBottom: hp(3),
@@ -192,7 +192,7 @@ const createStyles = (theme: any) =>
     infoText: {
       flex: 1,
       fontSize: hp(1.6),
-      color: '#1A1A1A',
+      color: theme.colors.textPrimary,
       lineHeight: hp(2.2),
     },
     section: {
@@ -200,13 +200,13 @@ const createStyles = (theme: any) =>
     },
     sectionTitle: {
       fontSize: hp(2.2),
-      fontWeight: '700',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
+      color: theme.colors.textPrimary,
       marginBottom: hp(1),
     },
     sectionSubtitle: {
       fontSize: hp(1.6),
-      color: '#8E8E8E',
+      color: theme.colors.textSecondary,
       marginBottom: hp(1.5),
     },
     sectionCard: {
@@ -228,23 +228,23 @@ const createStyles = (theme: any) =>
     },
     courseCode: {
       fontSize: hp(2),
-      fontWeight: '700',
-      color: '#1A1A1A',
+      fontFamily: theme.typography?.fontFamily?.bold || 'System',
+      color: theme.colors.textPrimary,
       marginBottom: hp(0.5),
     },
     sectionDetails: {
       fontSize: hp(1.5),
-      color: '#8E8E8E',
+      color: theme.colors.textSecondary,
     },
     metadataCard: {
-      backgroundColor: '#F9F9F9',
+      backgroundColor: theme.colors.backgroundSecondary,
       borderRadius: 8,
       padding: hp(1.5),
       marginBottom: hp(1),
     },
     metadataDetails: {
       fontSize: hp(1.5),
-      color: '#8E8E8E',
+      color: theme.colors.textSecondary,
       marginTop: hp(0.5),
     },
     confirmButton: {
@@ -267,7 +267,7 @@ const createStyles = (theme: any) =>
     },
     confirmButtonText: {
       fontSize: hp(2.2),
-      fontWeight: '800',
+      fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
       color: '#FFFFFF',
       letterSpacing: 0.5,
     },
@@ -282,7 +282,7 @@ const createStyles = (theme: any) =>
     },
     editButtonText: {
       fontSize: hp(1.8),
-      fontWeight: '600',
+      fontFamily: theme.typography?.fontFamily?.semibold || 'System',
       color: theme.colors.bondedPurple,
     },
   })

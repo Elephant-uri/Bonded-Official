@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to verify 6-digit email OTP
@@ -22,7 +23,7 @@ export const useVerifyOTP = () => {
       })
 
       if (error) {
-        console.error('❌ Error verifying OTP:', error)
+        Logger.error('Error verifying OTP:', error)
         throw error
       }
 

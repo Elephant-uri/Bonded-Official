@@ -21,6 +21,7 @@ import { useEventLikes, useToggleEventLike } from '../../hooks/events/useEventLi
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { isFeatureEnabled } from '../../utils/featureGates'
+import { Logger } from '../../utils/logger'
 import ThemedText from '../components/ThemedText'
 import ThemedView from '../components/ThemedView'
 import { useAppTheme } from '../theme'
@@ -66,7 +67,7 @@ export default function EventsHome() {
 
   // Flatten paginated data into a single array
   const events = useMemo(() => {
-    console.log('📊 Events data structure:', {
+    Logger.info('Events data structure:', {
       hasPagesArray: !!data?.pages,
       pagesCount: data?.pages?.length || 0,
       firstPageEvents: data?.pages?.[0]?.events?.length || 0,
@@ -74,12 +75,12 @@ export default function EventsHome() {
     })
 
     if (!data?.pages) {
-      console.log('⚠️ No pages data available')
+      Logger.info('No pages data available')
       return []
     }
 
     const flattenedEvents = data.pages.flatMap((page) => page.events || [])
-    console.log('✅ Flattened events count:', flattenedEvents.length)
+    Logger.info('Flattened events count:', flattenedEvents.length)
 
     return flattenedEvents
   }, [data])
@@ -107,7 +108,7 @@ export default function EventsHome() {
           .in('event_id', events.map(e => e.id))
 
         if (attendanceError) {
-          console.error('Error loading attendance:', attendanceError)
+          Logger.error('Error loading attendance:', attendanceError)
           return
         }
 
@@ -123,7 +124,7 @@ export default function EventsHome() {
 
         setEventAttendance(attendanceMap)
       } catch (err) {
-        console.error('Error loading event attendance:', err)
+        Logger.error('Error loading event attendance:', err)
       }
     }
 
@@ -132,7 +133,7 @@ export default function EventsHome() {
 
   // Log loading state and errors
   React.useEffect(() => {
-    console.log('📡 Events loading state:', { isLoading, hasData: !!data, eventCount: events?.length || 0, error: error?.message })
+    Logger.info('Events loading state:', { isLoading, hasData: !!data, eventCount: events?.length || 0, error: error?.message })
   }, [isLoading, data, events?.length, error])
 
   const onRefresh = async () => {
@@ -380,7 +381,7 @@ export default function EventsHome() {
           activeOpacity={0.7}
         >
           {showLikedOnly ? (
-            <HeartFill size={hp(2)} color="#FF3B30" strokeWidth={2} fill="#FF3B30" />
+            <HeartFill size={hp(2)} color=theme.colors.destructive strokeWidth={2} fill=theme.colors.destructive />
           ) : (
             <Heart size={hp(2)} color={theme.colors.textSecondary} strokeWidth={2} />
           )}
@@ -449,7 +450,7 @@ export default function EventsHome() {
           iconColor={theme.colors.textPrimary}
         />
         {hasRlsError && (
-          <View style={[styles.rlsWarningBanner, { backgroundColor: theme.colors.warning || '#FFA500' }]}>
+          <View style={[styles.rlsWarningBanner, { backgroundColor: theme.colors.warning }]}>
             <Text style={styles.rlsWarningText}>
               Some events may not be visible. Pull to refresh or try again later.
             </Text>
@@ -525,7 +526,7 @@ const createStyles = (theme) => StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: theme.radius.xl, paddingHorizontal: wp(4), paddingVertical: hp(1.2), gap: wp(2), ...theme.shadows.sm },
   searchInput: { flex: 1, fontSize: hp(1.6), fontFamily: theme.typography.fontFamily.body, color: theme.colors.textPrimary },
   clearButton: { paddingHorizontal: wp(2) },
-  clearButtonText: { fontSize: hp(1.4), fontFamily: theme.typography.fontFamily.body, color: theme.colors.accent, fontWeight: '600' },
+  clearButtonText: { fontSize: hp(1.4), fontFamily: theme.typography.fontFamily.semibold, color: theme.colors.accent },
 
   // Messages-style tabs
   tabContainer: {
@@ -547,8 +548,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   tabText: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   activeTabText: {
@@ -588,8 +588,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   dateFilterText: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   dateFilterTextActive: {
@@ -597,18 +596,18 @@ const createStyles = (theme) => StyleSheet.create({
   },
 
   manageButton: { marginTop: hp(1), paddingVertical: hp(1), paddingHorizontal: wp(4), backgroundColor: theme.colors.accent, borderRadius: theme.radius.lg, alignItems: 'center' },
-  manageButtonText: { fontSize: hp(1.5), fontFamily: theme.typography.fontFamily.body, fontWeight: '700', color: theme.colors.white },
+  manageButtonText: { fontSize: hp(1.5), fontFamily: theme.typography.fontFamily.bold, color: theme.colors.white },
   listContent: { paddingBottom: hp(12), paddingHorizontal: wp(4) },
   section: { marginBottom: hp(3) },
-  sectionTitle: { fontSize: hp(2.2), fontFamily: theme.typography.fontFamily.heading, fontWeight: '700', color: theme.colors.textPrimary, paddingHorizontal: wp(5), marginBottom: hp(1.5) },
+  sectionTitle: { fontSize: hp(2.2), fontFamily: theme.typography.fontFamily.bold, color: theme.colors.textPrimary, paddingHorizontal: wp(5), marginBottom: hp(1.5) },
   eventCardWrapper: { paddingHorizontal: wp(4), marginBottom: hp(2) },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: hp(10) },
   loadingText: { fontSize: hp(1.8), fontFamily: theme.typography.fontFamily.body, color: theme.colors.textSecondary },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: hp(10), paddingHorizontal: wp(4) },
-  emptyText: { fontSize: hp(2), fontFamily: theme.typography.fontFamily.heading, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: hp(1) },
+  emptyText: { fontSize: hp(2), fontFamily: theme.typography.fontFamily.semibold, color: theme.colors.textPrimary, marginBottom: hp(1) },
   emptySubtext: { fontSize: hp(1.5), fontFamily: theme.typography.fontFamily.body, color: theme.colors.textSecondary, textAlign: 'center', marginTop: hp(0.5) },
   createFirstButton: { marginTop: hp(3), backgroundColor: theme.colors.accent, paddingHorizontal: wp(6), paddingVertical: hp(1.5), borderRadius: theme.radius.xl },
-  createFirstButtonText: { fontSize: hp(1.7), fontFamily: theme.typography.fontFamily.body, fontWeight: '700', color: theme.colors.white },
+  createFirstButtonText: { fontSize: hp(1.7), fontFamily: theme.typography.fontFamily.bold, color: theme.colors.white },
   createEventIconButton: { padding: hp(0.5) },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: hp(12) },

@@ -33,8 +33,8 @@ export function useMessageRequests() {
       return data || []
     },
     enabled: !!user?.id,
-    staleTime: 15 * 1000,
-    refetchInterval: 15000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   })
 }
 
@@ -62,7 +62,7 @@ export function useMessageRequestStatus(otherUserId) {
       return { status: 'received', requestId: data.id }
     },
     enabled: !!user?.id && !!otherUserId,
-    staleTime: 10 * 1000,
+    staleTime: 60_000,
   })
 }
 

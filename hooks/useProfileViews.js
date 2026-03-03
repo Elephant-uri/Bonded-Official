@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 const recordedViews = new Set()
 
@@ -35,7 +36,7 @@ export function useProfileViewTracker(viewedUserId, source, enabled = true) {
       )
       .then(({ error }) => {
         if (error) {
-          console.warn('Failed to record profile view:', error)
+          Logger.warn('Failed to record profile view:', error)
         }
       })
   }, [enabled, source, user?.id, viewedUserId])
@@ -57,7 +58,7 @@ export function useProfileViewersCount(userId, { windowDays = 30 } = {}) {
         .gte('viewed_at', since.toISOString())
 
       if (error) {
-        console.warn('Failed to fetch profile viewers:', error)
+        Logger.warn('Failed to fetch profile viewers:', error)
         return 0
       }
 

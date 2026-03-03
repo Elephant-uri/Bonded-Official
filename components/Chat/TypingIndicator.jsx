@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useEffect, useRef } from 'react'
-import { Animated, Image, StyleSheet, Text, View } from 'react-native'
+import { Animated, StyleSheet, Text, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { hp, wp } from '../../helpers/common'
 
 export default function TypingIndicator({ theme, isOtherTyping, typingUserName, typingUserAvatar }) {
@@ -47,7 +48,7 @@ export default function TypingIndicator({ theme, isOtherTyping, typingUserName, 
             <View style={styles.typingBubble}>
                 <View style={styles.typingHeader}>
                     {typingUserAvatar ? (
-                        <Image source={{ uri: typingUserAvatar }} style={styles.typingAvatar} />
+                        <CachedImage source={{ uri: typingUserAvatar }} style={styles.typingAvatar} />
                     ) : (
                         <View style={styles.typingAvatarPlaceholder}>
                             <Ionicons name="person" size={hp(1.5)} color={theme.colors.textSecondary} />
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
     typingUserName: {
         fontSize: hp(1.4),
         color: 'rgba(0,0,0,0.6)',
-        fontWeight: '500',
+        fontFamily: 'Inter_500Medium',
     },
     typingDots: {
         flexDirection: 'row',

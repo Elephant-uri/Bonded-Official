@@ -1,7 +1,11 @@
 /**
  * Brightspace Integration Service
  * Parses syllabus data from Brightspace to extract assignments, deadlines, and important dates
- * 
+ */
+
+import { Logger } from '../utils/logger'
+
+/**
  * Note: This requires Brightspace API access or manual syllabus upload
  * For now, this provides a structure for future integration
  */
@@ -116,7 +120,7 @@ export const fetchBrightspaceAssignments = async (courseId, apiKey) => {
     // Parse and convert to calendar events
     return convertAssignmentsToEvents(parseBrightspaceData(data))
   } catch (error) {
-    console.error('Error fetching Brightspace assignments:', error)
+    Logger.error('Error fetching Brightspace assignments:', error)
     return []
   }
 }
@@ -150,7 +154,7 @@ export const uploadSyllabus = async (file) => {
     const assignments = parseSyllabus(syllabusText)
     return convertAssignmentsToEvents(assignments)
   } catch (error) {
-    console.error('Error parsing syllabus:', error)
+    Logger.error('Error parsing syllabus:', error)
     return []
   }
 }

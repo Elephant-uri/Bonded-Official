@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 import { isNetworkError } from '../utils/rlsHelpers'
 
 export function useNotificationCount() {
@@ -33,39 +34,39 @@ export function useNotificationCount() {
       if (notificationsResult.error) {
         if (isNetworkError(notificationsResult.error)) {
           // Network error - silently return 0, don't log as error
-          console.warn('⚠️ Network error fetching notifications, returning 0')
+          Logger.warn('Network error fetching notifications, returning 0')
         } else if (
           notificationsResult.error?.code !== 'PGRST205' &&
           notificationsResult.error?.code !== '42P01' &&
           !notificationsResult.error?.message?.includes('does not exist')
         ) {
-          console.error('Error fetching notification count:', notificationsResult.error)
+          Logger.error('Error fetching notification count:', notificationsResult.error)
         } else if (!warned) {
           warned = true
-          console.warn('Notifications table missing or blocked by RLS. Run database/notifications-schema.sql.')
+          Logger.warn('Notifications table missing or blocked by RLS. Run database/notifications-schema.sql.')
         }
       }
 
       if (friendRequestsResult.error) {
         if (isNetworkError(friendRequestsResult.error)) {
-          console.warn('⚠️ Network error fetching friend requests, returning 0')
+          Logger.warn('Network error fetching friend requests, returning 0')
         } else {
-          console.error('Error fetching friend request count:', friendRequestsResult.error)
+          Logger.error('Error fetching friend request count:', friendRequestsResult.error)
         }
       }
 
       if (messageRequestsResult.error) {
         if (isNetworkError(messageRequestsResult.error)) {
-          console.warn('⚠️ Network error fetching message requests, returning 0')
+          Logger.warn('Network error fetching message requests, returning 0')
         } else if (
           messageRequestsResult.error?.code !== 'PGRST205' &&
           messageRequestsResult.error?.code !== '42P01' &&
           !messageRequestsResult.error?.message?.includes('does not exist')
         ) {
-          console.error('Error fetching message request count:', messageRequestsResult.error)
+          Logger.error('Error fetching message request count:', messageRequestsResult.error)
         } else if (!warned) {
           warned = true
-          console.warn('Message requests table missing or blocked by RLS.')
+          Logger.warn('Message requests table missing or blocked by RLS.')
         }
       }
 
@@ -76,8 +77,8 @@ export function useNotificationCount() {
       return notificationCount + friendRequestCount + messageRequestCount
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always consider stale to allow immediate refetch
-    refetchInterval: 5000, // Poll every 5 seconds for real-time feel
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     retry: (failureCount, error) => {
       // Don't retry on network errors - they'll resolve when connection is restored
       if (isNetworkError(error)) {

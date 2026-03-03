@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { isSuperAdminEmail } from '../utils/admin'
+import { Logger } from '../utils/logger'
 
 export function useUniversities() {
   const { user } = useAuthStore()
@@ -18,7 +19,7 @@ export function useUniversities() {
         .order('name', { ascending: true })
 
       if (error) {
-        console.error('Error fetching universities:', error)
+        Logger.error('Error fetching universities:', error)
         throw error
       }
 

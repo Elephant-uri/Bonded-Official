@@ -2,6 +2,8 @@
  * Map utilities for generating static map images and location handling
  */
 
+import { Logger } from '../utils/logger'
+
 /**
  * Generate a static map image URL with coordinates
  * This is more accurate than using address strings
@@ -94,7 +96,7 @@ export const geocodeLocation = async (locationName) => {
         }
       }
     } catch (error) {
-      console.log('Google Geocoding error:', error)
+      Logger.info('Google Geocoding error:', error)
       // Fall through to OpenStreetMap
     }
   }
@@ -119,7 +121,7 @@ export const geocodeLocation = async (locationName) => {
       }
     }
   } catch (error) {
-    console.log('OpenStreetMap Geocoding error:', error)
+    Logger.info('OpenStreetMap Geocoding error:', error)
   }
   
   return null

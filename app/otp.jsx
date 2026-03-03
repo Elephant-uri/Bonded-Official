@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Alert, ImageBackground, Keyboard, StyleSheet, Text, TextInput, TouchableWithoutFeedback, View, useColorScheme } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableWithoutFeedback, View } from 'react-native'
 import AnimatedLogo from '../components/AnimatedLogo'
+import CachedImageBackground from '../components/CachedImageBackground'
 import BackButton from '../components/BackButton'
 import Button from '../components/Button'
 import ScreenWrapper from '../components/ScreenWrapper'
@@ -11,7 +12,8 @@ import { useSendOTP } from '../hooks/useSendOTP'
 import { useVerifyOTP } from '../hooks/useVerifyOTP'
 import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile'
 import { useAuthStore } from '../stores/authStore'
-import { useAppTheme, useThemeMode } from './theme'
+import { Logger } from '../utils/logger'
+import { useAppTheme } from './theme'
 
 const getFriendlyOtpError = (error) => {
   const raw = (error?.message || '').toLowerCase()
@@ -43,19 +45,14 @@ export default function OTP() {
   const { data: profile, isLoading: profileLoading, error: profileError } = useCurrentUserProfile()
   const cooldownTimerRef = useRef(null)
   const navigationTimeoutRef = useRef(null)
-  const hasNavigatedRef = useRef(false) // Prevent multiple navigations
-  const { setMode } = useThemeMode()
-  const systemScheme = useColorScheme() || 'light'
-  
-  // Add error boundary to catch any unexpected errors
+  const hasNavigatedRef = useRef(false)
+
   useEffect(() => {
     if (profileError) {
-      console.error('❌ Profile error in OTP screen:', profileError)
-      // Don't crash - just log the error
+      Logger.error('Profile error in OTP screen:', profileError)
     }
   }, [profileError])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (navigationTimeoutRef.current) {
@@ -64,15 +61,6 @@ export default function OTP() {
       hasNavigatedRef.current = false
     }
   }, [])
-
-  // Force light mode while OTP screen is displayed, then restore system preference
-  // Use useLayoutEffect to ensure theme changes BEFORE render
-  useLayoutEffect(() => {
-    setMode('light')
-    return () => {
-      setMode(systemScheme)
-    }
-  }, [setMode, systemScheme])
 
   // Handle resend cooldown timer
   useEffect(() => {
@@ -98,14 +86,14 @@ export default function OTP() {
   useEffect(() => {
     // Prevent multiple navigations
     if (hasNavigatedRef.current) {
-      console.log('⏭️ Navigation already completed, skipping')
+      Logger.info('Navigation already completed, skipping')
       return
     }
 
     if (!isNavigating) return
     if (!user) {
       // User not set yet, wait a bit
-      console.log('⏳ Waiting for user to be set...')
+      Logger.info('Waiting for user to be set...')
       return
     }
     
@@ -117,13 +105,13 @@ export default function OTP() {
     // Timeout fallback - if profile doesn't load within 5 seconds, navigate to onboarding
     navigationTimeoutRef.current = setTimeout(() => {
       if (isNavigating && !hasNavigatedRef.current) {
-        console.warn('⚠️ Profile load timeout, navigating to onboarding')
+        Logger.warn('Profile load timeout, navigating to onboarding')
         hasNavigatedRef.current = true
         setIsNavigating(false)
         try {
           router.replace('/onboarding')
         } catch (error) {
-          console.error('❌ Navigation error:', error)
+          Logger.error('Navigation error:', error)
           hasNavigatedRef.current = false // Reset on error
         }
       }
@@ -131,7 +119,7 @@ export default function OTP() {
     
     // If there's an error, still try to navigate (profile might not exist yet)
     if (profileError) {
-      console.warn('⚠️ Profile error, navigating to onboarding:', profileError)
+      Logger.warn('Profile error, navigating to onboarding:', profileError)
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current)
       }
@@ -141,7 +129,7 @@ export default function OTP() {
         try {
           router.replace('/onboarding')
         } catch (error) {
-          console.error('❌ Navigation error:', error)
+          Logger.error('Navigation error:', error)
           hasNavigatedRef.current = false // Reset on error
         }
       }
@@ -154,7 +142,7 @@ export default function OTP() {
       }
       
       if (hasNavigatedRef.current) {
-        console.log('⏭️ Already navigated, skipping')
+        Logger.info('Already navigated, skipping')
         return
       }
 
@@ -164,7 +152,7 @@ export default function OTP() {
       try {
         // Handle null profile (user not authenticated or profile doesn't exist)
         if (!profile || profile === null) {
-          console.warn('⚠️ Profile is null, navigating to onboarding')
+          Logger.warn('Profile is null, navigating to onboarding')
           router.replace('/onboarding')
           return
         }
@@ -176,26 +164,26 @@ export default function OTP() {
         // Navigate based on profile status
         if (hasBasicProfileData) {
           // User has basic profile - go to home
-          console.log('✅ User has basic profile, navigating to yearbook')
+          Logger.info('User has basic profile, navigating to yearbook')
           router.replace('/yearbook')
         } else if (profile?.onboarding_complete) {
           // Onboarding complete but no basic data (edge case) - go to home
-          console.log('✅ Onboarding complete, navigating to yearbook')
+          Logger.info('Onboarding complete, navigating to yearbook')
           router.replace('/yearbook')
         } else {
           // New user or incomplete profile - go to onboarding
-          console.log('✅ New user, navigating to onboarding')
+          Logger.info('New user, navigating to onboarding')
           router.replace('/onboarding')
         }
       } catch (error) {
-        console.error('❌ Navigation error after profile load:', error)
+        Logger.error('Navigation error after profile load:', error)
         hasNavigatedRef.current = false // Reset on error to allow retry
         // Fallback navigation
         try {
           router.replace('/onboarding')
           hasNavigatedRef.current = true
         } catch (fallbackError) {
-          console.error('❌ Fallback navigation also failed:', fallbackError)
+          Logger.error('Fallback navigation also failed:', fallbackError)
         }
       }
     }
@@ -222,7 +210,7 @@ export default function OTP() {
       { email: String(email), token: code },
       {
         onSuccess: () => {
-          console.log('✅ OTP verified successfully')
+          Logger.info('OTP verified successfully')
           // Reset navigation flag
           hasNavigatedRef.current = false
           // Small delay to ensure auth store is updated before fetching profile
@@ -232,7 +220,7 @@ export default function OTP() {
           }, 500) // Increased delay to ensure auth store is fully updated
         },
         onError: (error) => {
-          console.error('Error verifying OTP:', error)
+          Logger.error('Error verifying OTP:', error)
           const message = getFriendlyOtpError(error)
           Alert.alert('Couldn\'t verify code', message)
           setIsNavigating(false)
@@ -253,17 +241,17 @@ export default function OTP() {
       return
     }
 
-    console.log('🔄 Resending OTP to:', email)
+    Logger.info('Resending OTP to:', email)
 
     sendOTP(String(email), {
       onSuccess: () => {
-        console.log('✅ OTP resent successfully')
+        Logger.info('OTP resent successfully')
         setCode('') // Clear old code
         setResendCooldown(60) // Set 60 second cooldown
         Alert.alert('Code sent!', 'Check your email for a new 6-digit code.\n\nNote: Codes expire after 60 seconds.')
       },
       onError: (error) => {
-        console.error('❌ Error resending OTP:', error)
+        Logger.error('Error resending OTP:', error)
         const errorMessage = error?.message || ''
         if (errorMessage.includes('security purposes')) {
           Alert.alert('Too many requests', 'Please wait a minute before requesting another code.')
@@ -275,10 +263,9 @@ export default function OTP() {
   }
 
   return (
-    <ImageBackground
+    <CachedImageBackground
       source={require('../assets/images/bonded-gradient.jpg')}
       style={styles.background}
-      resizeMode="cover"
     >
       <ScreenWrapper bg="transparent">
         <StatusBar style="light" />
@@ -324,7 +311,7 @@ export default function OTP() {
           </View>
         </TouchableWithoutFeedback>
       </ScreenWrapper>
-    </ImageBackground>
+    </CachedImageBackground>
   )
 }
 
@@ -347,10 +334,9 @@ const createStyles = (theme) =>
     title: {
       color: theme.colors.textPrimary,
       fontSize: theme.typography.sizes.xxl,
-      fontWeight: theme.typography.weights.extrabold,
       textAlign: 'center',
       letterSpacing: -0.5,
-      fontFamily: theme.typography.fontFamily.heading,
+      fontFamily: theme.typography.fontFamily.extrabold,
       marginBottom: theme.spacing.md,
       paddingHorizontal: theme.spacing.lg,
     },
@@ -376,7 +362,7 @@ const createStyles = (theme) =>
       backgroundColor: 'rgba(255,255,255,0.9)',
       color: '#000',
       fontSize: theme.typography.sizes.xxl,
-      fontWeight: theme.typography.weights.bold,
+      fontFamily: theme.typography.fontFamily.bold,
       letterSpacing: 8,
     },
     button: {

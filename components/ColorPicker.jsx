@@ -13,19 +13,19 @@ export default function ColorPicker({ value, onChange, label = 'Color' }) {
   const theme = useAppTheme()
   const styles = createStyles(theme)
   const [showColorPicker, setShowColorPicker] = useState(false)
-  const [customHex, setCustomHex] = useState(value || '#A45CFF')
+  const [customHex, setCustomHex] = useState(value || theme.colors.brand)
   const [showCustomInput, setShowCustomInput] = useState(false)
 
   // Predefined color palette (Google Calendar inspired + extras)
   const presetColors = [
-    { hex: '#A45CFF', name: 'Purple' },
+    { hex: theme.colors.brand, name: 'Purple' },
     { hex: '#34C759', name: 'Green' },
-    { hex: '#007AFF', name: 'Blue' },
+    { hex: theme.colors.info, name: 'Blue' },
     { hex: '#FF9500', name: 'Orange' },
-    { hex: '#FF3B30', name: 'Red' },
+    { hex: theme.colors.destructive, name: 'Red' },
     { hex: '#FF69B4', name: 'Pink' },
     { hex: '#00CED1', name: 'Turquoise' },
-    { hex: '#FFD700', name: 'Gold' },
+    { hex: theme.colors.warning, name: 'Gold' },
     { hex: '#8B4513', name: 'Brown' },
     { hex: '#808080', name: 'Gray' },
     { hex: '#4B0082', name: 'Indigo' },
@@ -68,7 +68,7 @@ export default function ColorPicker({ value, onChange, label = 'Color' }) {
       : null
   }
 
-  const currentColor = value || '#A45CFF'
+  const currentColor = value || theme.colors.brand
   const rgb = hexToRgb(currentColor)
   const selectedColorName = presetColors.find(c => c.hex === currentColor)?.name || 'Custom'
 
@@ -241,8 +241,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
     textTransform: 'uppercase',
@@ -271,8 +270,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   colorName: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   colorHexSmall: {
@@ -290,7 +288,7 @@ const createStyles = (theme) => StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -311,13 +309,11 @@ const createStyles = (theme) => StyleSheet.create({
   modalTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
     color: theme.colors.textPrimary,
   },
   modalButton: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   modalButtonDone: {
@@ -352,8 +348,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   currentColorHex: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   currentColorRgb: {
@@ -365,8 +360,7 @@ const createStyles = (theme) => StyleSheet.create({
   // Section Title
   sectionTitle: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginTop: hp(1.5),
     marginBottom: hp(1),
@@ -403,8 +397,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   colorOptionName: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   colorOptionHex: {
@@ -430,7 +423,7 @@ const createStyles = (theme) => StyleSheet.create({
   colorCheckmarkText: {
     fontSize: hp(1.5),
     color: theme.colors.white,
-    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   // Custom Color Input
   customColorToggle: {
@@ -444,8 +437,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   customColorToggleText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   customColorInputContainer: {
@@ -496,8 +488,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   submitButtonText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   customColorRgb: {

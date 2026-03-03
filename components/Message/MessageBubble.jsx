@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../CachedImage'
 import { hp } from '../../helpers/common'
 import { useAuthStore } from '../../stores/authStore'
 import RichMessagePreview from './RichMessagePreviewSimple'
@@ -70,7 +71,7 @@ export default function MessageBubble({
                             onPress={() => onAvatarPress && message.sender?.id && onAvatarPress(message.sender.id)}
                         >
                             {senderAvatar ? (
-                                <Image source={{ uri: senderAvatar }} style={styles.avatar} />
+                                <CachedImage source={{ uri: senderAvatar }} style={styles.avatar} />
                             ) : (
                                 <View style={[styles.avatar, styles.avatarPlaceholder]}>
                                     <Text style={styles.avatarText}>
@@ -179,7 +180,7 @@ const createStyles = (theme) => StyleSheet.create({
     },
     avatarText: {
         fontSize: 12,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textSecondary,
     },
     bubbleWrapper: {
@@ -196,7 +197,7 @@ const createStyles = (theme) => StyleSheet.create({
         backgroundColor: theme.colors.bondedPurple, // iMessage Blue/Purple equivalent
     },
     bubbleOther: {
-        backgroundColor: theme.colors.backgroundSecondary || '#E5E5EA', // iMessage Gray
+        backgroundColor: theme.colors.backgroundSecondary, // iMessage Gray
     },
     bubbleHighlighted: {
         borderWidth: 2,
@@ -214,7 +215,7 @@ const createStyles = (theme) => StyleSheet.create({
         color: '#FFFFFF',
     },
     textOther: {
-        color: theme.colors.textPrimary || '#000000',
+        color: theme.colors.textPrimary,
     },
     textUnsent: {
         fontStyle: 'italic',
@@ -260,6 +261,6 @@ const createStyles = (theme) => StyleSheet.create({
     reactionCount: {
         fontSize: hp(1.3),
         color: theme.colors.textSecondary,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
 })

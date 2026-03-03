@@ -3,6 +3,8 @@
  * Utility functions to abstract color logic and component styling
  */
 
+import { Logger } from '../utils/logger'
+
 /**
  * Get event color based on event type and visibility
  * @param {Object} event - Event object with visibility, org_id, type, and optional color
@@ -101,13 +103,13 @@ export const getComponentStyles = (variant, componentType, theme) => {
   
   const componentVariants = variants[componentType]
   if (!componentVariants) {
-    console.warn(`Component type "${componentType}" not found`)
+    Logger.warn(`Component type "${componentType}" not found`)
     return {}
   }
   
   const variantStyle = componentVariants[variant]
   if (!variantStyle) {
-    console.warn(`Variant "${variant}" not found for component type "${componentType}"`)
+    Logger.warn(`Variant "${variant}" not found for component type "${componentType}"`)
     return componentVariants.default || {}
   }
   

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getDefaultAvatar } from '../constants/defaultAvatar'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 import { isRlsRecursionError, logRlsFixHint } from '../utils/rlsHelpers'
 
 const normalizeProfilePhotos = (photos, avatarUrl, yearbookPhotoUrl) => {
@@ -38,11 +39,11 @@ export function useCurrentUserProfile() {
       try {
         if (!user) {
           // Return null instead of throwing to prevent crashes
-          console.warn('⚠️ useCurrentUserProfile called without user')
+          Logger.warn('useCurrentUserProfile called without user')
           return null
         }
 
-        console.log('🔍 Fetching profile for user:', user.id, user.email)
+        Logger.info('Fetching profile for user:', user.id, user.email)
 
         // Fetch profile data
         const { data: profile, error: profileError } = await supabase
@@ -89,7 +90,7 @@ export function useCurrentUserProfile() {
       if (profileError) {
         // Handle case where profile doesn't exist (PGRST116 = no rows returned)
         if (profileError.code === 'PGRST116' || profileError.message?.includes('No rows')) {
-          console.warn('⚠️ No profile found for user:', user.id, '- User needs to complete onboarding')
+          Logger.warn('No profile found for user:', user.id, '- User needs to complete onboarding')
           // Profile doesn't exist - return minimal profile so UI can show onboarding prompt
           return {
             id: user.id,
@@ -140,15 +141,15 @@ export function useCurrentUserProfile() {
         }
         
         // For other errors, log and throw
-        console.error('❌ Error fetching profile:', profileError)
-        console.error('Error code:', profileError.code)
-        console.error('Error message:', profileError.message)
-        console.error('Error details:', profileError.details)
+        Logger.error('Error fetching profile:', profileError)
+        Logger.error('Error code:', profileError.code)
+        Logger.error('Error message:', profileError.message)
+        Logger.error('Error details:', profileError.details)
         throw profileError
       }
 
       if (!profile) {
-        console.warn('⚠️ Profile query returned null for user:', user.id)
+        Logger.warn('Profile query returned null for user:', user.id)
         // Return minimal profile with default avatar
         const displayName = user.email?.split('@')[0] || 'User'
         const defaultAvatar = getDefaultAvatar(displayName)
@@ -169,7 +170,7 @@ export function useCurrentUserProfile() {
         }
       }
 
-      console.log('✅ Profile fetched successfully:', {
+      Logger.info('Profile fetched successfully:', {
         id: profile.id,
         name: profile.full_name,
         onboarding_complete: profile.onboarding_complete,
@@ -213,7 +214,7 @@ export function useCurrentUserProfile() {
                 const signedUrl = await createSignedUrlForPath(media.path)
                 return signedUrl
               } catch (error) {
-                console.warn('Failed to get signed URL for media:', media.id, error)
+                Logger.warn('Failed to get signed URL for media:', media.id, error)
                 return null
               }
             })
@@ -266,7 +267,7 @@ export function useCurrentUserProfile() {
       }
     } catch (error) {
         // Catch any unexpected errors to prevent crashes
-        console.error('❌ Unexpected error in useCurrentUserProfile:', error)
+        Logger.error('Unexpected error in useCurrentUserProfile:', error)
         // Return minimal profile instead of throwing
         const displayName = user?.email?.split('@')[0] || 'User'
         return {

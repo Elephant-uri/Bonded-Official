@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { uploadPhotosToSupabase } from '../helpers/uploadPhotos'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Hook to save onboarding data to the profile
@@ -11,10 +12,10 @@ export const useSaveOnboarding = () => {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const logDebug = (...args) => {
-    if (__DEV__) console.log(...args)
+    if (__DEV__) Logger.debug(...args)
   }
   const logError = (...args) => {
-    if (__DEV__) console.error(...args)
+    if (__DEV__) Logger.error(...args)
   }
 
   return useMutation({
@@ -35,12 +36,12 @@ export const useSaveOnboarding = () => {
           .maybeSingle()
 
         if (uniError) {
-          console.warn('⚠️ Error looking up university:', uniError.message)
+          Logger.warn('Error looking up university:', uniError.message)
         }
 
         if (university?.id) {
           universityId = university.id
-          console.log('✅ Resolved university_id for photo upload:', universityId)
+          Logger.info('Resolved university_id for photo upload:', universityId)
         } else if (formData.school.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
           // If school is already a UUID, use it directly
           universityId = formData.school
@@ -57,7 +58,7 @@ export const useSaveOnboarding = () => {
 
         if (existingProfile?.university_id) {
           universityId = existingProfile.university_id
-          console.log('✅ Resolved university_id from existing profile:', universityId)
+          Logger.info('Resolved university_id from existing profile:', universityId)
         }
       }
 
@@ -68,14 +69,14 @@ export const useSaveOnboarding = () => {
         const needsUpload = formData.photos.some(photo => !photo.uploadedUrl)
         if (needsUpload) {
           if (!universityId) {
-            console.warn('⚠️ Skipping photo upload - university_id not yet resolved. Photos will be uploaded once a school is selected.')
+            Logger.warn('Skipping photo upload - university_id not yet resolved. Photos will be uploaded once a school is selected.')
             photoUploadError = 'Photos will be uploaded once you select your school.'
           } else {
-            console.log(`📸 Uploading ${formData.photos.length} photo(s) to Supabase...`)
+            Logger.info(`Uploading ${formData.photos.length} photo(s) to Supabase...`)
             try {
               uploadedPhotos = await uploadPhotosToSupabase(formData.photos, user.id, universityId)
               const uploadedCount = uploadedPhotos.filter(p => p.uploadedUrl).length
-              console.log(`✅ Successfully uploaded ${uploadedCount} photo(s)`)
+              Logger.info(`Successfully uploaded ${uploadedCount} photo(s)`)
 
               // Update formData with uploaded photos to prevent re-upload
               formData.photos = uploadedPhotos
@@ -84,18 +85,18 @@ export const useSaveOnboarding = () => {
               const failedCount = formData.photos.length - uploadedCount
               if (failedCount > 0) {
                 photoUploadError = `${failedCount} photo(s) failed to upload. They will be retried automatically.`
-                console.warn(`⚠️ ${failedCount} photo(s) failed to upload`)
+                Logger.warn(`${failedCount} photo(s) failed to upload`)
               }
             } catch (error) {
-              console.error('❌ Photo upload failed:', error)
+              Logger.error('Photo upload failed:', error)
               // Don't throw - allow onboarding to continue even if photos fail
               // Photos will be retried on next save
               photoUploadError = 'Photos failed to upload. They will be retried automatically.'
-              console.warn('⚠️ Continuing onboarding without photos - will retry on next save')
+              Logger.warn('Continuing onboarding without photos - will retry on next save')
             }
           }
         } else {
-          console.log('✅ All photos already uploaded, skipping upload step')
+          Logger.info('All photos already uploaded, skipping upload step')
         }
       }
 
@@ -176,14 +177,14 @@ export const useSaveOnboarding = () => {
         updateData.onboarding_complete = true
       }
 
-      logDebug('🧾 Onboarding upsert meta:', {
+      logDebug('Onboarding upsert meta:', {
         userId: user.id,
         hasEmail: !!user.email,
         hasUniversityId: !!universityId,
         completedStepsCount: completedSteps?.length || 0,
         completionPercentage,
       })
-      logDebug('🧾 Onboarding upsert payload keys:', Object.keys(updateData))
+      logDebug('Onboarding upsert payload keys:', Object.keys(updateData))
 
       // Use upsert to create profile if it doesn't exist, or update if it does
       const { data, error } = await supabase
@@ -200,19 +201,19 @@ export const useSaveOnboarding = () => {
 
       if (error) {
         if (error.code === '23505' && error.message.includes('profiles_username_key')) {
-          console.error('❌ Username taken:', formData.username)
+          Logger.error('Username taken:', formData.username)
           const usernameTakenError = new Error('This username is already taken. Please pick another one.')
           usernameTakenError.code = 'USERNAME_TAKEN'
           throw usernameTakenError
         }
-        logError('❌ Onboarding save failed (supabase error):', {
+        logError('Onboarding save failed (supabase error):', {
           message: error?.message,
           code: error?.code,
           details: error?.details,
           hint: error?.hint,
           status: error?.status,
         })
-        logError('❌ Onboarding save failed (raw error):', error)
+        logError('Onboarding save failed (raw error):', error)
         throw error
       }
 
@@ -224,7 +225,7 @@ export const useSaveOnboarding = () => {
       queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile', user?.id] })
-      console.log('✅ Profile queries invalidated after onboarding save')
+      Logger.info('Profile queries invalidated after onboarding save')
     },
   })
 }

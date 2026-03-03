@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import CachedImage from '../CachedImage'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { hp, wp } from '../../helpers/common'
@@ -41,7 +42,7 @@ export default function EventPost({ event, forumId }) {
     >
       {/* Cover Image or Placeholder */}
       {event.coverImage ? (
-        <Image source={{ uri: event.coverImage }} style={styles.coverImage} />
+        <CachedImage source={{ uri: event.coverImage }} style={styles.coverImage} />
       ) : (
         <View style={styles.coverImagePlaceholder}>
           <Ionicons name="calendar" size={hp(4)} color={theme.colors.bondedPurple} />
@@ -275,7 +276,7 @@ const createStyles = (theme) => StyleSheet.create({
   clubBadgeText: {
     fontSize: hp(1.2),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   eventBadge: {
@@ -287,7 +288,7 @@ const createStyles = (theme) => StyleSheet.create({
   eventBadgeText: {
     fontSize: hp(1),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
     letterSpacing: 0.5,
   },
@@ -301,7 +302,7 @@ const createStyles = (theme) => StyleSheet.create({
   title: {
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
@@ -388,13 +389,13 @@ const createStyles = (theme) => StyleSheet.create({
   rsvpButtonText: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   rsvpButtonTextInterested: {
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.bondedPurple,
   },
   shareButton: {

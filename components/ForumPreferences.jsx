@@ -5,8 +5,11 @@
 
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { useForumPreferences, useUpdateForumPreferences } from '../hooks/useForumPreferences'
+import { useAppTheme } from '../app/theme'
 
 export default function ForumPreferences() {
+  const theme = useAppTheme()
+  const styles = createStyles(theme)
   const { data: preferences, isLoading } = useForumPreferences()
   const updatePreferences = useUpdateForumPreferences()
 
@@ -52,8 +55,8 @@ export default function ForumPreferences() {
           <Switch
             value={preferences?.autoJoinCourseForums ?? true}
             onValueChange={handleToggleCourseForums}
-            trackColor={{ true: '#7C3AED', false: '#E5E7EB' }}
-            thumbColor={preferences?.autoJoinCourseForums ? '#FFFFFF' : '#9CA3AF'}
+            trackColor={{ true: theme.colors.brand, false: theme.colors.border }}
+            thumbColor={preferences?.autoJoinCourseForums ? '#FFFFFF' : theme.colors.textTertiary}
           />
         </View>
       </View>
@@ -69,8 +72,8 @@ export default function ForumPreferences() {
           <Switch
             value={preferences?.autoJoinSectionChats ?? true}
             onValueChange={handleToggleSectionChats}
-            trackColor={{ true: '#7C3AED', false: '#E5E7EB' }}
-            thumbColor={preferences?.autoJoinSectionChats ? '#FFFFFF' : '#9CA3AF'}
+            trackColor={{ true: theme.colors.brand, false: theme.colors.border }}
+            thumbColor={preferences?.autoJoinSectionChats ? '#FFFFFF' : theme.colors.textTertiary}
           />
         </View>
       </View>
@@ -102,31 +105,31 @@ export default function ForumPreferences() {
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   header: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.colors.border,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     lineHeight: 22,
   },
   section: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: theme.colors.backgroundSecondary,
   },
   settingRow: {
     flexDirection: 'row',
@@ -139,23 +142,23 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: theme.typography.fontFamily.semibold,
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   settingDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     lineHeight: 20,
   },
   infoSection: {
     padding: 20,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.backgroundSecondary,
   },
   infoTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: theme.typography.fontFamily.semibold,
+    color: theme.colors.textPrimary,
     marginBottom: 16,
   },
   infoItem: {
@@ -163,13 +166,13 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#7C3AED',
+    fontFamily: theme.typography.fontFamily.semibold,
+    color: theme.colors.brand,
     marginBottom: 4,
   },
   infoText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: theme.colors.textSecondary,
     lineHeight: 20,
   },
   noteSection: {
@@ -185,8 +188,9 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginTop: 20,
   },
 })
+

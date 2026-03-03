@@ -45,7 +45,7 @@ export function useNotifications() {
       return data || []
     },
     enabled: !!user?.id,
-    staleTime: 15 * 1000,
-    refetchInterval: 15000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   })
 }

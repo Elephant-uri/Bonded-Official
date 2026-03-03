@@ -32,6 +32,7 @@ import {
   Calendar as CalendarIcon,
   MoreVertical,
 } from '../../../components/Icons'
+import { Logger } from '../../../utils/logger'
 
 export default function ManageEvent() {
   const theme = useAppTheme()
@@ -70,7 +71,7 @@ export default function ManageEvent() {
       ])
     },
     onError: (error) => {
-      console.error('Failed to delete event:', error)
+      Logger.error('Failed to delete event:', error)
       Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to delete event'))
     }
   })
@@ -97,7 +98,7 @@ export default function ManageEvent() {
         title: event?.title,
       })
     } catch (error) {
-      console.error('Error sharing:', error)
+      Logger.error('Error sharing:', error)
     }
   }
 
@@ -470,8 +471,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   backButtonText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   header: {
@@ -488,8 +488,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   headerTitle: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   optionsMenu: {
@@ -551,8 +550,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   statNumber: {
     fontSize: hp(2.5),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginTop: hp(1),
   },
@@ -570,8 +568,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: hp(2),
   },
@@ -597,9 +594,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   detailValue: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textPrimary,
-    fontWeight: '500',
   },
   detailSubtext: {
     fontSize: hp(1.5),
@@ -639,8 +635,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   tabText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   tabTextActive: {
@@ -660,8 +655,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   overviewTitle: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
@@ -694,9 +688,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   actionButtonText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textPrimary,
-    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
@@ -704,8 +697,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyStateText: {
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginTop: hp(2),
   },
@@ -747,8 +739,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   primaryActionText: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   secondaryAction: {

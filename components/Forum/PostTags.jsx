@@ -65,7 +65,7 @@ const createStyles = (theme) => StyleSheet.create({
   tagText: {
     fontSize: hp(1.05),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   moreTag: {
     paddingHorizontal: wp(1.8),
@@ -78,7 +78,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.05),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     opacity: 0.7,
   },
 })

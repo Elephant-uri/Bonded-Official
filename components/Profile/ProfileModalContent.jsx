@@ -56,6 +56,7 @@ import {
     UserPlus
 } from '../Icons'
 import { Ionicons } from '@expo/vector-icons'
+import { Logger } from '../../utils/logger'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -228,7 +229,7 @@ const ProfileModalContent = ({
                         },
                     })
                 } catch (error) {
-                    console.error('Failed to accept friend request:', error)
+                    Logger.error('Failed to accept friend request:', error)
                     Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to accept friend request'))
                 }
                 break
@@ -266,7 +267,7 @@ const ProfileModalContent = ({
                 await sendMessageRequest.mutateAsync({ receiverId: activeProfile.id })
                 Alert.alert('Request Sent', 'Your message request has been sent.')
             } catch (error) {
-                console.error('Failed to send message request:', error)
+                Logger.error('Failed to send message request:', error)
                 Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send message request'))
             }
             return
@@ -291,7 +292,7 @@ const ProfileModalContent = ({
                 },
             })
         } catch (error) {
-            console.error('Error creating conversation:', error)
+            Logger.error('Error creating conversation:', error)
             Alert.alert('Error', 'Failed to start conversation. Please try again.')
         }
     }
@@ -302,7 +303,7 @@ const ProfileModalContent = ({
                 message: `Check out ${activeProfile.full_name || activeProfile.name} on Bonded.`,
             })
         } catch (error) {
-            console.warn('Share failed:', error)
+            Logger.warn('Share failed:', error)
         }
     }
 
@@ -478,7 +479,7 @@ const ProfileModalContent = ({
                         />
                     )}
                     <LinearGradient
-                        colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
+                        colors={[theme.colors.overlayLight, 'transparent', 'transparent', theme.colors.overlay]}
                         style={styles.heroGradient}
                         pointerEvents="none"
                     />
@@ -865,7 +866,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
         width: hp(4.5),
         height: hp(4.5),
         borderRadius: hp(2.25),
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backgroundColor: theme.colors.overlayLight,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -879,7 +880,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
         width: hp(4.5),
         height: hp(4.5),
         borderRadius: hp(2.25),
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backgroundColor: theme.colors.overlayLight,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -914,7 +915,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     name: {
         fontSize: hp(3.2),
-        fontWeight: '700',
+        fontFamily: theme.typography.fontFamily.bold,
         color: theme.colors.textPrimary,
         marginBottom: hp(0.5),
     },
@@ -963,7 +964,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     actionButtonText: {
         fontSize: hp(1.6),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     actionButtonTextAccept: {
@@ -981,7 +982,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     actionButtonPrimaryText: {
         fontSize: hp(1.6),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.white,
     },
     metaRow: {
@@ -1002,7 +1003,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     metaPillText: {
         fontSize: hp(1.4),
         color: theme.colors.textSecondary,
-        fontWeight: '500',
+        fontFamily: theme.typography.fontFamily.medium,
     },
     locationRow: {
         flexDirection: 'row',
@@ -1019,7 +1020,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     tagsTitle: {
         fontSize: hp(1.8),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
         marginBottom: hp(1.5),
     },
@@ -1063,7 +1064,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     friendAvatarText: {
         fontSize: hp(2),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textSecondary,
     },
     friendName: {
@@ -1077,11 +1078,11 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     seeAllText: {
         fontSize: hp(1.4),
         color: theme.colors.bondedPurple,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: theme.colors.overlay,
         justifyContent: 'center',
         paddingHorizontal: wp(6),
     },
@@ -1140,7 +1141,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     friendsModalTitle: {
         fontSize: hp(2),
-        fontWeight: '700',
+        fontFamily: theme.typography.fontFamily.bold,
         color: theme.colors.textPrimary,
     },
     friendRow: {
@@ -1171,7 +1172,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     friendRowName: {
         fontSize: hp(1.7),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
     },
     friendRowMeta: {
@@ -1198,7 +1199,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     tagTextShared: {
         color: theme.colors.bondedPurple,
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
     },
     tagSkeleton: {
         marginBottom: hp(0.6),
@@ -1213,7 +1214,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     postsTitle: {
         fontSize: hp(1.8),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
         marginBottom: hp(1.5),
     },
@@ -1233,7 +1234,7 @@ const createProfileModalStyles = (theme) => StyleSheet.create({
     },
     postCardTitle: {
         fontSize: hp(1.6),
-        fontWeight: '600',
+        fontFamily: theme.typography.fontFamily.semibold,
         color: theme.colors.textPrimary,
         marginBottom: hp(0.5),
     },

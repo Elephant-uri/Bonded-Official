@@ -33,6 +33,7 @@ import { useAuthStore } from '../stores/authStore'
 import { formatDate, formatDateShort, formatTime } from '../utils/dateFormatters'
 import { useAppTheme } from './theme'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
+import { Logger } from '../utils/logger'
 
 const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -154,7 +155,7 @@ export default function Calendar() {
   const calendarEvents = useMemo(() => {
     // Ensure allEvents is always an array
     if (!Array.isArray(allEvents)) {
-      console.warn('⚠️ allEvents is not an array:', allEvents)
+      Logger.warn('allEvents is not an array:', allEvents)
       return []
     }
 
@@ -1199,7 +1200,7 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
     // Create event in database
     try {
       setIsCreating(true)
-      console.log('Creating event:', newEvent)
+      Logger.info('Creating event:', newEvent)
 
       // Map to database schema
       const eventData = {
@@ -1213,7 +1214,8 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
         location_address: newEvent.location_name,
         visibility: newEvent.visibility,
         org_id: eventType === 'org' ? selectedOrgId : null,
-        type: eventType, // 'personal', 'social', 'org', 'event', 'task'
+        // Persist canonical content kind so calendar filters remain reliable.
+        type: itemType, // 'event' | 'task'
         university_id: userProfile?.university_id,
         ticket_types: [],
         invites: selectedInvitees.map(id => ({ user_id: id })),
@@ -1224,7 +1226,7 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
         recurring_end_date: isRecurring && recurringEndDate ? recurringEndDate.toISOString() : null,
       }
 
-      console.log('Creating event with data:', eventData)
+      Logger.info('Creating event with data:', eventData)
       await createEventMutation.mutateAsync(eventData)
 
       showSuccess('Success!', 'Event created successfully!')
@@ -1233,7 +1235,7 @@ function CreateCalendarEventModal({ visible, onClose, selectedDate, userOrgs, on
       onClose()
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-      console.error('Error creating event:', error)
+      Logger.error('Error creating event:', error)
       showError('Error', getFriendlyErrorMessage(error, 'Failed to create event. Please try again.'))
     } finally {
       setIsCreating(false)
@@ -2159,8 +2161,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   eventTypeTabText: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
   },
   eventTypeTabTextActive: {
@@ -2200,8 +2201,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   monthTitle: {
     fontSize: theme.typography.sizes.xl,
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     letterSpacing: -0.3,
   },
@@ -2224,7 +2224,6 @@ const createStyles = (theme) => StyleSheet.create({
   weekTitle: {
     fontSize: theme.typography.sizes.lg,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.textPrimary,
   },
   dayNavigation: {
@@ -2246,7 +2245,6 @@ const createStyles = (theme) => StyleSheet.create({
   dayTitle: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   fab: {
@@ -2289,8 +2287,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   monthDayHeaderText: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textSecondary,
     letterSpacing: 0.2,
   },
@@ -2310,7 +2307,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: hp(2.2),
     ...Platform.select({
       ios: {
-        shadowColor: '#007AFF',
+        shadowColor: theme.colors.info,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
@@ -2328,16 +2325,15 @@ const createStyles = (theme) => StyleSheet.create({
   monthDayNumber: {
     fontSize: hp(1.7),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '400',
     color: theme.colors.textPrimary,
   },
   monthDayNumberOtherMonth: {
     color: theme.colors.textSecondary,
-    fontWeight: '300',
+    fontFamily: theme.typography.fontFamily.body,
   },
   monthDayNumberSelected: {
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   monthDaySticker: {
     fontSize: hp(1.4),
@@ -2359,8 +2355,7 @@ const createStyles = (theme) => StyleSheet.create({
   monthEventDotMore: {
     fontSize: hp(0.9),
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     marginLeft: wp(0.2),
   },
   monthEventsList: {
@@ -2407,16 +2402,14 @@ const createStyles = (theme) => StyleSheet.create({
   },
   monthEventTitle: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     flex: 1,
     letterSpacing: -0.2,
   },
   monthEventTypeBadge: {
     fontSize: hp(1.1),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     marginLeft: wp(2),
     textTransform: 'uppercase',
     letterSpacing: 0.3,
@@ -2425,14 +2418,12 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
-    fontWeight: '400',
     marginBottom: hp(0.2),
   },
   monthEventLocation: {
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
-    fontWeight: '400',
   },
   noEventsContainer: {
     paddingVertical: hp(4),
@@ -2442,7 +2433,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.5),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
-    fontWeight: '400',
   },
   // Week View Styles - Modern iOS Design
   weekContainer: {
@@ -2473,7 +2463,7 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.eventColors.campus,
     ...Platform.select({
       ios: {
-        shadowColor: '#007AFF',
+        shadowColor: theme.colors.info,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.2,
         shadowRadius: 2,
@@ -2482,26 +2472,24 @@ const createStyles = (theme) => StyleSheet.create({
   },
   weekHeaderDayName: {
     fontSize: hp(1.3),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
     marginBottom: hp(0.4),
     letterSpacing: 0.2,
   },
   weekHeaderDayNameSelected: {
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   weekHeaderDayNumber: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     letterSpacing: -0.3,
   },
   weekHeaderDayNumberSelected: {
     color: theme.colors.white,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   weekTimeline: {
     flex: 1,
@@ -2529,7 +2517,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.3),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
-    fontWeight: '400',
   },
   weekHourContent: {
     flex: 1,
@@ -2560,8 +2547,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   weekEventTitle: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
     marginBottom: hp(0.2),
     letterSpacing: -0.2,
@@ -2571,7 +2557,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.white,
     opacity: 0.85,
-    fontWeight: '400',
   },
   // Day View Styles - Modern iOS Design
   dayContainer: {
@@ -2587,8 +2572,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   dayHeaderDate: {
     fontSize: hp(2.8),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     letterSpacing: -0.5,
   },
@@ -2617,7 +2601,6 @@ const createStyles = (theme) => StyleSheet.create({
   dayHourText: {
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '400',
     color: theme.colors.textSecondary,
   },
   dayHourContent: {
@@ -2662,8 +2645,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   dayEventTitle: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
     letterSpacing: -0.2,
@@ -2672,7 +2654,6 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.4),
     fontFamily: theme.typography.fontFamily.body,
     color: theme.colors.textSecondary,
-    fontWeight: '400',
   },
   dayTaskItem: {
     borderLeftWidth: 0,
@@ -2707,7 +2688,7 @@ const createStyles = (theme) => StyleSheet.create({
   taskCheckmark: {
     fontSize: hp(1.5),
     color: theme.colors.white,
-    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   // Schedule View Styles - Google Calendar Style
   scheduleContainer: {
@@ -2733,15 +2714,13 @@ const createStyles = (theme) => StyleSheet.create({
   },
   scheduleSectionTitle: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   scheduleSectionCount: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
   },
   scheduleTaskItem: {
     flexDirection: 'row',
@@ -2776,15 +2755,14 @@ const createStyles = (theme) => StyleSheet.create({
   taskCheckmark: {
     fontSize: hp(1.5),
     color: theme.colors.white,
-    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   scheduleTaskContent: {
     flex: 1,
   },
   scheduleTaskTitle: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.3),
   },
@@ -2817,14 +2795,12 @@ const createStyles = (theme) => StyleSheet.create({
   scheduleDateTitle: {
     fontSize: hp(2.2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: theme.typography.weights.semibold,
     color: theme.colors.textPrimary,
   },
   scheduleDateSubtitle: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
   },
   scheduleEventItem: {
     flexDirection: 'row',
@@ -2856,8 +2832,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   scheduleEventTime: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
@@ -2879,8 +2854,7 @@ const createStyles = (theme) => StyleSheet.create({
   scheduleEventTitle: {
     flex: 1,
     fontSize: hp(1.8),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     lineHeight: hp(2.4),
   },
@@ -2911,14 +2885,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   scheduleEventTypeText: {
     fontSize: hp(1.2),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   scheduleEventDuration: {
     fontSize: hp(1.3),
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
-    fontWeight: '500',
   },
   scheduleEmptyState: {
     paddingVertical: hp(8),
@@ -2928,7 +2900,6 @@ const createStyles = (theme) => StyleSheet.create({
   scheduleEmptyText: {
     fontSize: hp(2),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
@@ -2939,7 +2910,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   createEventModalContent: {
@@ -2959,18 +2930,16 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createEventModalTitle: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   modalCancelText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.accent,
   },
   modalCreateText: {
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   createEventModalBody: {
     paddingHorizontal: wp(4),
@@ -2981,8 +2950,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   createEventLabel: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
     textTransform: 'uppercase',
@@ -3008,13 +2976,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   eventTypeOptionText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
   },
   eventTypeOptionTextActive: {
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   createEventInput: {
     backgroundColor: theme.colors.background,
@@ -3062,8 +3029,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   recurringOptionLabel: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
   },
@@ -3087,13 +3053,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   recurringFrequencyOptionText: {
     fontSize: hp(1.4),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
   },
   recurringFrequencyOptionTextActive: {
     color: theme.colors.bondedPurple,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   recurringDaysSelector: {
     flexDirection: 'row',
@@ -3116,13 +3081,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   recurringDayChipText: {
     fontSize: hp(1.3),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
   },
   recurringDayChipTextActive: {
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   recurringEndDateButton: {
     flexDirection: 'row',
@@ -3185,7 +3149,7 @@ const createStyles = (theme) => StyleSheet.create({
   stickerCheckmarkText: {
     fontSize: hp(1.2),
     color: theme.colors.white,
-    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   removeStickerButton: {
     paddingHorizontal: wp(2),
@@ -3194,7 +3158,7 @@ const createStyles = (theme) => StyleSheet.create({
   removeStickerButtonText: {
     fontSize: hp(2.5),
     color: theme.colors.error,
-    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   pickerModalBody: {
     maxHeight: hp(60),
@@ -3216,14 +3180,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalTitle: {
     fontSize: hp(2),
-    fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
   },
   modalCloseText: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.accent,
   },
   modalBody: {
@@ -3254,7 +3216,7 @@ const createStyles = (theme) => StyleSheet.create({
   checkmark: {
     fontSize: hp(2),
     color: theme.colors.accent,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   inviteeRow: {
     flexDirection: 'row',
@@ -3294,20 +3256,18 @@ const createStyles = (theme) => StyleSheet.create({
   },
   inviteeAvatarText: {
     fontSize: hp(1.5),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.white,
   },
   inviteeName: {
     fontSize: hp(1.7),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   pickerModalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   pickerModalContent: {
     backgroundColor: theme.colors.background,
@@ -3327,18 +3287,16 @@ const createStyles = (theme) => StyleSheet.create({
   pickerModalTitle: {
     fontSize: hp(1.8),
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   pickerModalButton: {
     fontSize: hp(1.6),
-    fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.textSecondary,
   },
   pickerModalButtonDone: {
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   timeRow: {
     flexDirection: 'row',

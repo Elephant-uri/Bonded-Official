@@ -1,16 +1,18 @@
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Alert, Animated, ImageBackground, Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View, useColorScheme } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { Alert, Animated, Keyboard, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native'
 import AnimatedLogo from '../components/AnimatedLogo'
 import BackButton from '../components/BackButton'
+import CachedImageBackground from '../components/CachedImageBackground'
 import Button from '../components/Button'
 import Input from '../components/Input'
 import ScreenWrapper from '../components/ScreenWrapper'
 import { hp } from '../helpers/common'
 import { useSendOTP } from '../hooks/useSendOTP'
 import { getFriendlyErrorMessage } from '../utils/userFacingErrors'
-import { useAppTheme, useThemeMode } from './theme'
+import { Logger } from '../utils/logger'
+import { useAppTheme } from './theme'
 
 export default function Login() {
   const theme = useAppTheme()
@@ -20,17 +22,6 @@ export default function Login() {
   const [isSending, setIsSending] = useState(false)
   const hoverValue = useRef(new Animated.Value(0)).current
   const { mutate: sendOTP } = useSendOTP()
-  const { setMode } = useThemeMode()
-  const systemScheme = useColorScheme() || 'light'
-
-  // Force light mode while login screen is displayed, then restore system preference
-  // Use useLayoutEffect to ensure theme changes BEFORE render
-  useLayoutEffect(() => {
-    setMode('light')
-    return () => {
-      setMode(systemScheme)
-    }
-  }, [setMode, systemScheme])
 
   useEffect(() => {
     const hoverAnimation = Animated.loop(
@@ -82,7 +73,7 @@ export default function Login() {
         router.push(`/otp?email=${encodeURIComponent(trimmedEmail)}`)
       },
       onError: (error) => {
-        console.error('❌ Error sending OTP:', error)
+        Logger.error('Error sending OTP:', error)
         Alert.alert('Error', getFriendlyErrorMessage(error, 'Failed to send code'))
         setIsSending(false)
       },
@@ -90,10 +81,9 @@ export default function Login() {
   }
 
   return (
-    <ImageBackground
+    <CachedImageBackground
       source={require('../assets/images/bonded-gradient.jpg')}
       style={styles.background}
-      resizeMode="cover"
     >
       <ScreenWrapper bg="transparent">
         <StatusBar style="light" />
@@ -129,7 +119,7 @@ export default function Login() {
           </View>
         </TouchableWithoutFeedback>
       </ScreenWrapper>
-    </ImageBackground>
+    </CachedImageBackground>
   )
 }
 
@@ -152,10 +142,9 @@ const createStyles = (theme) =>
     title: {
       color: theme.colors.textPrimary,
       fontSize: theme.typography.sizes.xxl,
-      fontWeight: theme.typography.weights.extrabold,
       textAlign: 'center',
       letterSpacing: -0.5,
-      fontFamily: theme.typography.fontFamily.heading,
+      fontFamily: theme.typography.fontFamily.extrabold,
       marginBottom: theme.spacing.xxxl,
       paddingHorizontal: theme.spacing.lg,
     },

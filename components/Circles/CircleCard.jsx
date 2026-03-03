@@ -24,7 +24,7 @@ export default function CircleCard({
       onPress={userAnswer ? onPress : onSubmitAnswer}
     >
       <LinearGradient
-        colors={isLive ? ['#8B5CF6', '#6366F1'] : ['#6B7280', '#4B5563']}
+        colors={isLive ? [theme.colors.brand, theme.colors.brandLight] : [theme.colors.textSecondary, theme.colors.textSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -62,7 +62,7 @@ export default function CircleCard({
         {/* User answer badge */}
         {userAnswer && (
           <View style={styles.answerBadge}>
-            <Ionicons name="checkmark-circle" size={hp(2)} color="#10B981" />
+            <Ionicons name="checkmark-circle" size={hp(2)} color=theme.colors.success />
             <Text style={styles.answerBadgeText}>Your answer submitted</Text>
           </View>
         )}
@@ -101,7 +101,7 @@ const createStyles = (theme) => StyleSheet.create({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.06,
         shadowRadius: 16,
       },
       android: {
@@ -135,7 +135,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   liveText: {
     fontSize: hp(1.5),
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.extrabold,
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: 1.2,
@@ -149,7 +149,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   topicTitle: {
     fontSize: hp(2.6),
-    fontWeight: '800',
+    fontFamily: theme.typography.fontFamily.extrabold,
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.heading,
     lineHeight: hp(3.2),
@@ -171,7 +171,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   statText: {
     fontSize: hp(1.6),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -188,7 +188,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   answerBadgeText: {
     fontSize: hp(1.5),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -204,7 +204,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   ctaText: {
     fontSize: hp(1.8),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: '#FFFFFF',
     fontFamily: theme.typography.fontFamily.body,
   },

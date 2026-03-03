@@ -2,7 +2,11 @@
  * School Events Scraper
  * Generic scraper for syncing events from external school event platforms
  * Works with any university's event system
- * 
+ */
+
+import { Logger } from '../utils/logger'
+
+/**
  * Features:
  * - Fetches events with description, date, time, location, organization
  * - Matches organizations to Bonded clubs
@@ -28,7 +32,7 @@ import { supabase } from '../lib/supabase'
  */
 export async function scrapeSchoolEvents(eventSourceUrl) {
   if (!eventSourceUrl) {
-    console.warn('⚠️  No event source URL provided')
+    Logger.warn('No event source URL provided')
     return []
   }
 
@@ -53,10 +57,10 @@ export async function scrapeSchoolEvents(eventSourceUrl) {
     // - Or use a headless browser like Puppeteer if the page is JS-rendered
     const events = parseEventsFromHTML(html)
     
-    console.log(`✅ Scraped ${events.length} events from school platform`)
+    Logger.info(`Scraped ${events.length} events from school platform`)
     return events
   } catch (error) {
-    console.error('❌ Error scraping school events:', error)
+    Logger.error('Error scraping school events:', error)
     throw error
   }
 }
@@ -101,7 +105,7 @@ function parseEventsFromHTML(html) {
   // })
   
   // For now, return empty array - implement based on actual page structure
-  console.warn('⚠️  parseEventsFromHTML not implemented - inspect school event platform HTML structure first')
+  Logger.warn('parseEventsFromHTML not implemented - inspect school event platform HTML structure first')
   return events
 }
 
@@ -126,18 +130,18 @@ export async function matchOrganizationToClub(orgName, universityId) {
       .limit(1)
 
     if (error) {
-      console.error('Error matching organization to club:', error)
+      Logger.error('Error matching organization to club:', error)
       return null
     }
 
     if (clubs && clubs.length > 0) {
-      console.log(`✅ Matched "${orgName}" to club: ${clubs[0].name} (${clubs[0].id})`)
+      Logger.info(`Matched "${orgName}" to club: ${clubs[0].name} (${clubs[0].id})`)
       return clubs[0].id
     }
 
     return null
   } catch (error) {
-    console.error('Error in matchOrganizationToClub:', error)
+    Logger.error('Error in matchOrganizationToClub:', error)
     return null
   }
 }
@@ -163,13 +167,13 @@ export async function eventExists(title, startAt, universityId) {
       .maybeSingle()
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error checking if event exists:', error)
+      Logger.error('Error checking if event exists:', error)
       return false
     }
 
     return !!data
   } catch (error) {
-    console.error('Error in eventExists:', error)
+    Logger.error('Error in eventExists:', error)
     return false
   }
 }
@@ -188,7 +192,7 @@ export async function saveScrapedEvent(event, universityId, systemUserId) {
     // Check if event already exists
     const exists = await eventExists(event.title, event.start_at, universityId)
     if (exists) {
-      console.log(`⏭️  Skipping duplicate event: ${event.title}`)
+      Logger.info(`Skipping duplicate event: ${event.title}`)
       return null
     }
 
@@ -227,14 +231,14 @@ export async function saveScrapedEvent(event, universityId, systemUserId) {
       .single()
 
     if (error) {
-      console.error('Error saving event:', error)
+      Logger.error('Error saving event:', error)
       throw error
     }
 
-    console.log(`✅ Saved event: ${event.title}${orgId ? ` (linked to club)` : ''}`)
+    Logger.info(`Saved event: ${event.title}${orgId ? ` (linked to club)` : ''}`)
     return data
   } catch (error) {
-    console.error('Error in saveScrapedEvent:', error)
+    Logger.error('Error in saveScrapedEvent:', error)
     throw error
   }
 }
@@ -249,7 +253,7 @@ export async function saveScrapedEvent(event, universityId, systemUserId) {
  */
 export async function syncSchoolEvents(universityDomain, eventSourceUrl) {
   try {
-    console.log(`🔄 Starting school events sync for ${universityDomain}...`)
+    Logger.info(`Starting school events sync for ${universityDomain}...`)
 
     // Get university by domain
     const { data: university, error: uniError } = await supabase
@@ -278,7 +282,7 @@ export async function syncSchoolEvents(universityDomain, eventSourceUrl) {
     const scrapedEvents = await scrapeSchoolEvents(eventSourceUrl)
 
     if (scrapedEvents.length === 0) {
-      console.log('ℹ️  No events found to sync')
+      Logger.info('No events found to sync')
       return { synced: 0, skipped: 0, errors: 0 }
     }
 
@@ -296,15 +300,15 @@ export async function syncSchoolEvents(universityDomain, eventSourceUrl) {
           skipped++
         }
       } catch (error) {
-        console.error(`❌ Error saving event "${event.title}":`, error)
+        Logger.error(`Error saving event "${event.title}":`, error)
         errors++
       }
     }
 
-    console.log(`✅ Sync complete: ${synced} synced, ${skipped} skipped, ${errors} errors`)
+    Logger.info(`Sync complete: ${synced} synced, ${skipped} skipped, ${errors} errors`)
     return { synced, skipped, errors }
   } catch (error) {
-    console.error('❌ Error in syncSchoolEvents:', error)
+    Logger.error('Error in syncSchoolEvents:', error)
     throw error
   }
 }
@@ -330,7 +334,7 @@ export function parseSchoolDate(dateString, timeString) {
     }
     return date.toISOString()
   } catch (error) {
-    console.error('Error parsing date:', error, { dateString, timeString })
+    Logger.error('Error parsing date:', error, { dateString, timeString })
     return new Date().toISOString()
   }
 }

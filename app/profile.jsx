@@ -3,7 +3,8 @@ import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import CachedImage from '../components/CachedImage'
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AppCard from '../components/AppCard'
@@ -17,6 +18,7 @@ import { useProfile, useProfilePhotos } from '../hooks/useProfiles'
 import { useProfileViewTracker, useProfileViewersCount } from '../hooks/useProfileViews'
 import { useUpdateProfile } from '../hooks/useUpdateProfile'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 import { useAppTheme } from './theme'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -278,7 +280,7 @@ export default function Profile() {
         setShowEditModal(false)
       }
     } catch (error) {
-      console.error('Error saving profile:', error)
+      Logger.error('Error saving profile:', error)
       Alert.alert('Error', 'Failed to save profile changes. Please try again.')
       setIsUploadingAvatar(false)
       setIsUploadingBanner(false)
@@ -388,7 +390,7 @@ export default function Profile() {
 
       await handleSaveProfile()
     } catch (error) {
-      console.error('Error saving changes:', error)
+      Logger.error('Error saving changes:', error)
       Alert.alert('Error', 'Failed to save changes. Please try again.')
       setIsUploadingPhoto(false)
     }
@@ -494,21 +496,21 @@ export default function Profile() {
                 setActivePhotoIndex(newIndex)
               }}
               renderItem={({ item }) => (
-                <Image
+                <CachedImage
                   source={{ uri: item }}
                   style={styles.heroImage}
                 />
               )}
             />
           ) : avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.heroImage} />
+            <CachedImage source={{ uri: avatarUrl }} style={styles.heroImage} />
           ) : (
             <View style={[styles.heroImage, { backgroundColor: theme.colors.backgroundSecondary }]}>
               <Ionicons name="person" size={hp(10)} color={theme.colors.textSecondary} />
             </View>
           )}
           <LinearGradient
-            colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
+            colors={[theme.colors.overlayLight, 'transparent', 'transparent', theme.colors.overlay]}
             style={styles.heroGradient}
             pointerEvents="none"
           />
@@ -519,7 +521,7 @@ export default function Profile() {
           {/* Avatar + Name */}
           <View style={styles.avatarRow}>
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+              <CachedImage source={{ uri: avatarUrl }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatarFallback}>
                 <Text style={styles.avatarInitial}>
@@ -547,7 +549,7 @@ export default function Profile() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: wp(1) }}
                 renderItem={({ item }) => (
-                  <Image source={{ uri: item }} style={styles.galleryThumbnail} />
+                  <CachedImage source={{ uri: item }} style={styles.galleryThumbnail} />
                 )}
               />
             </View>
@@ -686,7 +688,7 @@ export default function Profile() {
                   }}
                 >
                   {item.avatar ? (
-                    <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+                    <CachedImage source={{ uri: item.avatar }} style={styles.friendAvatar} />
                   ) : (
                     <View style={[styles.friendAvatar, styles.friendAvatarPlaceholder]}>
                       <Ionicons name="person" size={hp(2.5)} color={theme.colors.textSecondary} />
@@ -733,7 +735,7 @@ export default function Profile() {
             <AppCard style={styles.editCard}>
               <Text style={styles.editLabel}>Profile Avatar</Text>
               <View style={styles.imagePreviewContainer}>
-                <Image
+                <CachedImage
                   source={{ uri: newAvatarUri || avatarUrl }}
                   style={styles.avatarPreview}
                 />
@@ -800,7 +802,7 @@ export default function Profile() {
                 <View style={styles.photoGalleryGrid}>
                   {galleryPhotos.map((photo) => (
                     <View key={photo.id} style={styles.galleryPhotoItem}>
-                      <Image source={{ uri: photo.url }} style={styles.galleryPhotoImage} />
+                      <CachedImage source={{ uri: photo.url }} style={styles.galleryPhotoImage} />
                       {photo.url === avatarUrl && (
                         <View style={styles.yearbookPhotoBadge}>
                           <Text style={styles.yearbookPhotoBadgeText}>Yearbook</Text>
@@ -880,7 +882,7 @@ const createStyles = (theme) => StyleSheet.create({
   errorText: {
     marginTop: hp(2),
     fontSize: hp(2),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.error,
   },
   errorSubtext: {
@@ -898,7 +900,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   retryButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     fontSize: hp(1.6),
   },
   backButton: {
@@ -911,7 +913,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -923,7 +925,7 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(4.5),
     height: hp(4.5),
     borderRadius: hp(2.25),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -987,7 +989,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   avatarInitial: {
     fontSize: hp(3),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textSecondary,
   },
   avatarInfo: {
@@ -995,7 +997,6 @@ const createStyles = (theme) => StyleSheet.create({
   },
   profileName: {
     fontSize: hp(2.8),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     letterSpacing: -0.3,
@@ -1031,7 +1032,6 @@ const createStyles = (theme) => StyleSheet.create({
   },
   quoteTitle: {
     fontSize: hp(1.6),
-    fontWeight: '700',
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -1045,7 +1045,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   quoteEditText: {
     fontSize: hp(1.4),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   quote: {
@@ -1078,7 +1078,7 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
     fontSize: hp(1.5),
     color: theme.colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   metaRow: {
     flexDirection: 'row',
@@ -1100,7 +1100,7 @@ const createStyles = (theme) => StyleSheet.create({
   metaPillText: {
     fontSize: hp(1.4),
     color: theme.colors.textPrimary,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   locationRow: {
     flexDirection: 'row',
@@ -1117,7 +1117,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1.2),
   },
@@ -1137,7 +1137,7 @@ const createStyles = (theme) => StyleSheet.create({
   tagText: {
     fontSize: hp(1.5),
     color: theme.colors.textPrimary,
-    fontWeight: '500',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   onboardingWarning: {
     marginTop: hp(2),
@@ -1148,7 +1148,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   onboardingWarningTitle: {
     fontSize: hp(1.5),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.warning,
     marginBottom: hp(0.5),
   },
@@ -1166,7 +1166,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   onboardingButtonText: {
     fontSize: hp(1.4),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
   },
   // Modal styles
@@ -1185,7 +1185,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   modalTitle: {
     fontSize: hp(2.4),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     letterSpacing: -0.3,
   },
@@ -1235,7 +1235,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   friendName: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(0.2),
   },
@@ -1256,7 +1256,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   editLabel: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
@@ -1295,7 +1295,7 @@ const createStyles = (theme) => StyleSheet.create({
   changeImageText: {
     color: '#FFFFFF',
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   galleryHeader: {
     flexDirection: 'row',
@@ -1315,7 +1315,7 @@ const createStyles = (theme) => StyleSheet.create({
   addPhotosButtonText: {
     color: theme.colors.bondedPurple,
     fontSize: hp(1.5),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   photoGalleryGrid: {
     flexDirection: 'row',
@@ -1348,7 +1348,7 @@ const createStyles = (theme) => StyleSheet.create({
   yearbookPhotoBadgeText: {
     color: '#FFFFFF',
     fontSize: hp(1.1),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   galleryPhotoActions: {
     position: 'absolute',
@@ -1360,7 +1360,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   galleryActionButton: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: theme.colors.overlay,
     paddingVertical: hp(0.7),
     borderRadius: hp(0.6),
     alignItems: 'center',
@@ -1376,7 +1376,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   emptyGalleryText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
   },
   emptyGallerySubtext: {

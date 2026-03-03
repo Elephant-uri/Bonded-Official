@@ -13,6 +13,7 @@
  */
 
 import * as FileSystem from 'expo-file-system'
+import { Logger } from '../logger'
 import { TextBlock, OCRResult } from './extractText'
 
 const GOOGLE_VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate'
@@ -27,7 +28,7 @@ async function imageToBase64(imageUri: string): Promise<string> {
     })
     return base64
   } catch (error) {
-    console.error('Error converting image to base64:', error)
+    Logger.error(error, 'Error converting image to base64')
     throw new Error('Failed to convert image to base64')
   }
 }
@@ -47,8 +48,8 @@ export async function extractTextFromImageCloud(imageUri: string): Promise<OCRRe
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_VISION_API_KEY
 
   if (!apiKey) {
-    console.warn('⚠️ Google Vision API key not found. Set EXPO_PUBLIC_GOOGLE_VISION_API_KEY in .env')
-    console.log('💡 Alternative: Use Supabase Edge Function for OCR (see cloudOCR-supabase.ts)')
+    Logger.warn('Google Vision API key not found. Set EXPO_PUBLIC_GOOGLE_VISION_API_KEY in .env')
+    Logger.info('Alternative: Use Supabase Edge Function for OCR (see cloudOCR-supabase.ts)')
     
     // Return empty result - UI will show fallback message
     return {
@@ -59,7 +60,7 @@ export async function extractTextFromImageCloud(imageUri: string): Promise<OCRRe
   }
 
   try {
-    console.log('📷 Processing image with Google Cloud Vision API...')
+    Logger.info('Processing image with Google Cloud Vision API...')
     
     // Convert image to base64
     const base64Image = await imageToBase64(imageUri)
@@ -95,14 +96,15 @@ export async function extractTextFromImageCloud(imageUri: string): Promise<OCRRe
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ Google Vision API error:', response.status, errorText)
-      throw new Error(`Google Vision API error: ${response.status} - ${errorText}`)
+      const err = new Error(`Google Vision API error: ${response.status} - ${errorText}`)
+      Logger.error(err)
+      throw err
     }
 
     const data = await response.json()
 
     if (!data.responses || !data.responses[0]) {
-      console.warn('⚠️ No response from Google Vision API')
+      Logger.warn('No response from Google Vision API')
       return {
         rawText: '',
         blocks: [],
@@ -113,7 +115,7 @@ export async function extractTextFromImageCloud(imageUri: string): Promise<OCRRe
     const textAnnotations = data.responses[0].textAnnotations || []
     
     if (textAnnotations.length === 0) {
-      console.warn('⚠️ No text found in image')
+      Logger.warn('No text found in image')
       return {
         rawText: '',
         blocks: [],
@@ -145,8 +147,8 @@ export async function extractTextFromImageCloud(imageUri: string): Promise<OCRRe
       }
     })
 
-    console.log(`✅ Google Vision extracted ${fullText.length} characters`)
-    console.log(`📊 Found ${blocks.length} text blocks`)
+    Logger.info(`Google Vision extracted ${fullText.length} characters`)
+    Logger.info(`Found ${blocks.length} text blocks`)
 
     return {
       rawText: fullText,
@@ -154,7 +156,7 @@ export async function extractTextFromImageCloud(imageUri: string): Promise<OCRRe
       imageUri,
     }
   } catch (error) {
-    console.error('❌ Cloud OCR failed:', error)
+    Logger.error(error, 'Cloud OCR failed')
     
     // Return empty result on error - let UI show fallback
     return {

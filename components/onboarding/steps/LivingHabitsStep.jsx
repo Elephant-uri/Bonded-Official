@@ -110,7 +110,7 @@ const LivingHabitsStep = ({ formData, updateFormData, onScroll }) => {
 
 export default LivingHabitsStep
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -120,16 +120,16 @@ const createStyles = () => StyleSheet.create({
   },
   title: {
     fontSize: hp(4),
-    fontWeight: '800',
-    color: '#1A1A1A',
-    fontFamily: 'System',
+    fontFamily: theme.typography?.fontFamily?.extrabold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography?.fontFamily?.extrabold || 'System',
     marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: hp(2.2),
-    color: '#8E8E8E',
-    fontFamily: 'System',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography?.fontFamily?.body || 'System',
     marginBottom: hp(4),
     textAlign: 'center',
   },

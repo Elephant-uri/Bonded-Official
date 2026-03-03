@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 export const useUpdateProfile = () => {
   const queryClient = useQueryClient()
@@ -20,7 +21,7 @@ export const useUpdateProfile = () => {
         .single()
 
       if (error) {
-        console.error('Error updating profile:', error)
+        Logger.error('Error updating profile:', error)
         throw error
       }
 

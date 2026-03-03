@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { normalizeClassCode } from '../services/scheduleParser'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 
 /**
  * Match a class to the course catalog
@@ -418,7 +419,7 @@ export function useClassMatching() {
         .eq('is_active', true)
 
       if (enrollmentError) {
-        console.error('Error fetching user enrollments:', enrollmentError)
+        Logger.error('Error fetching user enrollments:', enrollmentError)
         return []
       }
 
@@ -454,7 +455,7 @@ export function useClassMatching() {
         .neq('user_id', user.id)
 
       if (classmatesError) {
-        console.error('Error fetching classmates:', classmatesError)
+        Logger.error('Error fetching classmates:', classmatesError)
         return []
       }
 
@@ -505,7 +506,7 @@ export function useUniversityProfiles() {
         .single()
 
       if (profileError || !currentProfile?.university_id) {
-        console.error('Error fetching user university:', profileError)
+        Logger.error('Error fetching user university:', profileError)
         return []
       }
 
@@ -530,7 +531,7 @@ export function useUniversityProfiles() {
         .limit(100)
 
       if (profilesError) {
-        console.error('Error fetching university profiles:', profilesError)
+        Logger.error('Error fetching university profiles:', profilesError)
         return []
       }
 

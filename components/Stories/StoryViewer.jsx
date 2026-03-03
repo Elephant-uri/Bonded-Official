@@ -347,7 +347,7 @@ export default function StoryViewer({
 
           {/* Header */}
           <LinearGradient
-            colors={['rgba(0,0,0,0.65)', 'transparent']}
+            colors={[theme.colors.overlay, 'transparent']}
             style={[styles.headerGradient, { paddingTop: (insets.top || 0) + hp(0.5) }]}
           >
             <View style={styles.header}>
@@ -386,7 +386,7 @@ export default function StoryViewer({
           {/* Story content - Proper dimensions */}
           <View style={styles.content}>
             <LinearGradient
-              colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.5)']}
+              colors={[theme.colors.overlay, theme.colors.borderSecondary, theme.colors.overlay]}
               style={styles.contentGradient}
               locations={[0, 0.5, 1]}
             />
@@ -479,7 +479,7 @@ export default function StoryViewer({
 
           {/* Bottom Action Bar */}
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.65)']}
+            colors={['transparent', theme.colors.overlay]}
             style={styles.bottomGradient}
           >
             <View style={styles.bottomActions}>
@@ -688,13 +688,13 @@ const createStyles = (theme) => StyleSheet.create({
   avatarText: {
     fontSize: hp(2),
     color: theme.colors.white,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   name: {
     fontSize: theme.typography.sizes.lg,
     color: theme.colors.white,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.35)',
+    fontFamily: theme.typography.fontFamily.bold,
+    textShadowColor: theme.colors.overlayLight,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
@@ -702,7 +702,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.white,
     opacity: theme.typography.opacity.meta,
-    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowColor: theme.colors.overlayLight,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
@@ -742,7 +742,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: hp(0.5),
   },
   textElementText: {
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.white,
   },
   stickerElement: {
@@ -780,12 +780,12 @@ const createStyles = (theme) => StyleSheet.create({
     width: hp(5),
     height: hp(5),
     borderRadius: hp(2.5),
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: theme.colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtonActive: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   messageButton: {
     flexDirection: 'row',
@@ -794,12 +794,12 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
     borderRadius: hp(2.5),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlayLight,
   },
   messageButtonText: {
     fontSize: hp(1.6),
     color: theme.colors.white,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   messageModalOverlay: {
     position: 'absolute',
@@ -841,7 +841,6 @@ const createStyles = (theme) => StyleSheet.create({
   messageModalTitle: {
     fontSize: hp(2),
     color: theme.colors.textPrimary,
-    fontWeight: '700',
     fontFamily: theme.typography.fontFamily.heading,
   },
   messageInput: {
@@ -871,8 +870,7 @@ const createStyles = (theme) => StyleSheet.create({
   messageSendButtonText: {
     fontSize: hp(1.7),
     color: theme.colors.white,
-    fontWeight: '600',
-    fontFamily: theme.typography.fontFamily.body,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   commentsContainer: {
     position: 'absolute',
@@ -907,7 +905,6 @@ const createStyles = (theme) => StyleSheet.create({
   commentsTitle: {
     fontSize: hp(2),
     color: theme.colors.textPrimary,
-    fontWeight: '700',
     fontFamily: theme.typography.fontFamily.heading,
   },
   commentsList: {
@@ -938,7 +935,7 @@ const createStyles = (theme) => StyleSheet.create({
   commentAvatarText: {
     fontSize: hp(1.6),
     color: theme.colors.white,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   commentContent: {
     flex: 1,
@@ -946,7 +943,6 @@ const createStyles = (theme) => StyleSheet.create({
   commentName: {
     fontSize: hp(1.6),
     color: theme.colors.textPrimary,
-    fontWeight: '600',
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.3),
   },

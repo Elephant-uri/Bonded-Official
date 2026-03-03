@@ -9,6 +9,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
+import { Logger } from '../utils/logger'
 import { isNetworkError } from '../utils/rlsHelpers'
 
 const MESSAGES_PER_PAGE = 50
@@ -56,13 +57,13 @@ export function useConversations() {
 
       if (partError) {
         if (isNetworkError(partError)) {
-          console.warn('⚠️ Network error fetching conversations, returning empty array:', partError.message || 'Connection timeout')
+          Logger.warn('Network error fetching conversations, returning empty array:', partError.message || 'Connection timeout')
           return [] // Return empty array instead of throwing to prevent UI crashes
         }
         if (isPolicyRecursionError(partError)) {
           return []
         }
-        console.error('❌ Error fetching conversations:', partError)
+        Logger.error('Error fetching conversations:', partError)
         throw partError
       }
 
@@ -119,7 +120,7 @@ export function useConversations() {
               .rpc('get_conversation_participants', { conv_id: conv.id })
 
             if (rpcError) {
-              console.warn('RPC get_conversation_participants error:', rpcError)
+              Logger.warn('RPC get_conversation_participants error:', rpcError)
             } else {
               participants = (rpcData || []).map(p => ({
                 id: p.user_id,
@@ -129,7 +130,7 @@ export function useConversations() {
               }))
             }
           } catch (err) {
-            console.warn('Failed to get participants via RPC:', err)
+            Logger.warn('Failed to get participants via RPC:', err)
           }
 
           const lastReadAt = item.last_read_at || '1970-01-01'
@@ -152,7 +153,7 @@ export function useConversations() {
             } else {
               // Fallback: if somehow only current user is in participants, use first one
               // This shouldn't happen for direct chats but handles edge cases
-              console.warn('⚠️ No other participant found for direct chat:', conv.id, 'participants:', participants.map(p => ({ id: p.id, name: p.full_name })))
+              Logger.warn('No other participant found for direct chat:', conv.id, 'participants:', participants.map(p => ({ id: p.id, name: p.full_name })))
               other_participant = participants[0]
             }
           }
@@ -254,10 +255,10 @@ export function useConversations() {
       return sorted
     },
     enabled: !!user?.id,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
       // Don't retry on network errors - they'll resolve when connection is restored
       if (isNetworkError(error)) {
@@ -314,7 +315,7 @@ export function useMessages(conversationId) {
     queryFn: async ({ pageParam = 0 }) => {
       if (!conversationId) return { messages: [], hasMore: false }
 
-      console.log(`📨 Fetching messages for conversation: ${conversationId}, page: ${pageParam}`)
+      Logger.info(`Fetching messages for conversation: ${conversationId}, page: ${pageParam}`)
 
       const startTime = Date.now()
 
@@ -345,14 +346,14 @@ export function useMessages(conversationId) {
 
       const { data, error } = await Promise.race([queryPromise, timeoutPromise])
 
-      console.log(`⏱️ Fetch completed in ${Date.now() - startTime}ms. Error: ${error?.message}, Data length: ${data?.length}`)
+      Logger.info(`Fetch completed in ${Date.now() - startTime}ms. Error: ${error?.message}, Data length: ${data?.length}`)
 
       if (error) {
         if (isNetworkError(error)) {
-          console.warn('⚠️ Network error fetching messages, returning empty:', error.message || 'Connection timeout')
+          Logger.warn('Network error fetching messages, returning empty:', error.message || 'Connection timeout')
           return { messages: [], hasMore: false } // Return empty instead of throwing
         }
-        console.error('❌ Error fetching messages:', error)
+        Logger.error('Error fetching messages:', error)
         throw error
       }
 
@@ -370,9 +371,9 @@ export function useMessages(conversationId) {
       return allPages.reduce((total, page) => total + page.messages.length, 0)
     },
     enabled: !!conversationId && !!user?.id,
-    staleTime: 0, // Always refetch for real-time feel
-    refetchInterval: 5000, // Poll every 5 seconds as fallback
-    refetchIntervalInBackground: true, // Continue polling when app is in background
+    staleTime: 30_000,
+    refetchInterval: false,
+    refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
       // Don't retry on network errors - they'll resolve when connection is restored
       if (isNetworkError(error)) {
@@ -424,7 +425,7 @@ export function useMessages(conversationId) {
                 .single()
 
               if (senderError) {
-                console.error('Error fetching sender in useMessages:', senderError)
+                Logger.error('Error fetching sender in useMessages:', senderError)
               }
 
               // Parse metadata if it's a string (JSONB from database)
@@ -433,7 +434,7 @@ export function useMessages(conversationId) {
                 try {
                   parsedMetadata = JSON.parse(payload.new.metadata)
                 } catch (e) {
-                  console.warn('Failed to parse message metadata in useMessages:', e)
+                  Logger.warn('Failed to parse message metadata in useMessages:', e)
                   parsedMetadata = {}
                 }
               }
@@ -468,7 +469,7 @@ export function useMessages(conversationId) {
 
                 // Avoid duplicates
                 if (existingIds.includes(newMessage.id)) {
-                  console.log('⚠️ Duplicate message ignored in useMessages:', newMessage.id)
+                  Logger.info('Duplicate message ignored in useMessages:', newMessage.id)
                   return old
                 }
 
@@ -522,14 +523,14 @@ export function useMessages(conversationId) {
         .subscribe((status, err) => {
           // console.log('📡 useMessages subscription status:', status, 'for conversation:', conversationId)
           if (status === 'SUBSCRIBED') {
-            console.log('✅ Successfully subscribed to realtime messages for:', conversationId)
+            Logger.info('Successfully subscribed to realtime messages for:', conversationId)
           } else if (status === 'CLOSED') {
             // console.log('🔒 useMessages subscription closed for:', conversationId)
           } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Channel subscription error in useMessages for:', conversationId, 'Error:', err)
+            Logger.error('Channel subscription error in useMessages for:', conversationId, 'Error:', err)
             // Realtime may not be available, but polling will continue as fallback
           } else if (status === 'TIMED_OUT') {
-            console.warn('⏱️ Channel subscription timed out in useMessages for:', conversationId)
+            Logger.warn('Channel subscription timed out in useMessages for:', conversationId)
           }
         })
     }
@@ -696,6 +697,8 @@ export function useUnsendMessage() {
 export function useCreateConversation() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
+  const recursionErrorMessage =
+    'Messaging is temporarily unavailable due to a database policy issue. Please try again shortly.'
 
   return useMutation({
     mutationFn: async ({ otherUserId, groupName, participantIds }) => {
@@ -713,7 +716,7 @@ export function useCreateConversation() {
 
           if (existingError) {
             if (isPolicyRecursionError(existingError)) {
-              return `local-conv-${user.id}-${otherUserId}`
+              throw new Error(recursionErrorMessage)
             }
             throw existingError
           }
@@ -724,7 +727,7 @@ export function useCreateConversation() {
           }
         } catch (error) {
           if (isPolicyRecursionError(error)) {
-            return `local-conv-${user.id}-${otherUserId}`
+            throw new Error(recursionErrorMessage)
           }
           throw error
         }
@@ -741,7 +744,7 @@ export function useCreateConversation() {
 
         if (convError) {
           if (isPolicyRecursionError(convError)) {
-            return `local-conv-${user.id}-${otherUserId}`
+            throw new Error(recursionErrorMessage)
           }
           throw convError
         }
@@ -756,7 +759,7 @@ export function useCreateConversation() {
 
         if (partError) {
           if (isPolicyRecursionError(partError)) {
-            return `local-conv-${user.id}-${otherUserId}`
+            throw new Error(recursionErrorMessage)
           }
           throw partError
         }
@@ -779,7 +782,7 @@ export function useCreateConversation() {
 
         if (convError) {
           if (isPolicyRecursionError(convError)) {
-            return `local-group-${user.id}-${Date.now()}`
+            throw new Error(recursionErrorMessage)
           }
           throw convError
         }
@@ -797,7 +800,7 @@ export function useCreateConversation() {
 
         if (partError) {
           if (isPolicyRecursionError(partError)) {
-            return `local-group-${user.id}-${Date.now()}`
+            throw new Error(recursionErrorMessage)
           }
           throw partError
         }

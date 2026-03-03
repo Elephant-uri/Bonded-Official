@@ -216,7 +216,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   title: {
     fontSize: hp(1.9),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
   },
@@ -228,7 +228,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   label: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
@@ -264,7 +264,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.4),
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   optionInput: {
     flex: 1,
@@ -290,7 +290,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.5),
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.body,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   settingRow: {
     flexDirection: 'row',
@@ -303,7 +303,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   settingLabel: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
     marginBottom: hp(0.3),

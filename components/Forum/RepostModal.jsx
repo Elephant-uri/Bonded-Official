@@ -265,7 +265,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.9),
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
   },
   previewInfo: {
     flex: 1,
@@ -274,7 +274,7 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: hp(1.7),
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   previewMeta: {
     fontSize: hp(1.35),
@@ -284,7 +284,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   previewTitle: {
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(0.5),
@@ -307,7 +307,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: hp(1.7),
-    fontWeight: '700',
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.heading,
     marginBottom: hp(1),
@@ -335,7 +335,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   typeButtonText: {
     fontSize: hp(1.6),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.bondedPurple,
     fontFamily: theme.typography.fontFamily.body,
   },
@@ -380,7 +380,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   groupChipText: {
     fontSize: hp(1.5),
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily.semibold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily.body,
   },
